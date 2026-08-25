@@ -1,6 +1,6 @@
 import { integer, text } from 'drizzle-orm/sqlite-core';
-import type { BasisPoints, Kurus } from '../../lib/money';
-import type { BusinessDate } from '../../lib/business-date';
+import type { BasisPoints, Kurus } from '../../lib/money.ts';
+import type { BusinessDate } from '../../lib/business-date.ts';
 
 /**
  * Unix zaman damgası, milisaniye. Ham sayı olarak tutuluyor:
@@ -115,3 +115,44 @@ export const RECURRENCE_LABELS: Record<RecurrencePeriod, string> = {
 
 export const GOAL_PERIODS = ['daily', 'weekly', 'monthly'] as const;
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
+
+// ---------------------------------------------------------------------------
+// Kilometre başına yıpranma
+// ---------------------------------------------------------------------------
+
+/**
+ * Aracın her kilometrede eriyen değeri — amortisman, lastik, balata, bakım.
+ * Kuruş cinsinden, kilometre başına. YAKIT BURAYA DAHİL DEĞİLDİR;
+ * yakıt gerçek dolum kayıtlarından ölçülüyor, tahmin edilmiyor.
+ *
+ * TASARIM KARARI — bu değer kullanıcıya SORULMAZ ve arayüzde gösterilmez.
+ * Sürücü aracının kaç yılda kaç kilometrede ne kadar değer kaybettiğini
+ * bilmiyor; sorarsak ya boş bırakır ya rastgele bir sayı yazar, ikisi de
+ * raporu kirletir. Ortalama bir değer atanır, sürücü işini yapar.
+ *
+ * Değer bilerek DÜŞÜK tutuldu. Yüksek bir yıpranma payı sürücünün kârını
+ * olduğundan kötü gösterir; sürücü de sayıya inanmaz ve uygulamayı bırakır.
+ * Eksik tahmin, güven kaybından iyidir.
+ */
+const WEAR_OWN_VEHICLE_KURUS = 300 as Kurus; // 3,00 TL/km
+
+/**
+ * Sahiplik biçimine göre yıpranma payı.
+ *
+ * Kiralık araçta ve işveren aracında sıfırdır — aracın değer kaybı sürücünün
+ * cebinden çıkmıyor, o maliyet zaten kira bedeli olarak `recurring_expenses`
+ * içinde sayılıyor. Sıfırlamazsak aynı maliyeti iki kez düşeriz.
+ *
+ * Kiralık plakada araç sürücünündür, yıpranma tam işler; kiralanan yalnızca
+ * plakadır ve o da ayrıca sabit gider olarak girilir.
+ */
+export const DEFAULT_WEAR_PER_KM: Record<OwnershipType, Kurus> = {
+  owned: WEAR_OWN_VEHICLE_KURUS,
+  rented_plate: WEAR_OWN_VEHICLE_KURUS,
+  rented_vehicle: ZERO_KURUS,
+  employer: ZERO_KURUS,
+};
+
+export function defaultWearPerKm(ownership: OwnershipType): Kurus {
+  return DEFAULT_WEAR_PER_KM[ownership];
+}

@@ -1,5 +1,7 @@
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { FUEL_TYPES, OWNERSHIP_TYPES, kurus, syncColumns } from './_shared';
+import {
+  DEFAULT_WEAR_PER_KM, FUEL_TYPES, OWNERSHIP_TYPES, kurus, syncColumns,
+} from './_shared';
 
 /**
  * Araç. Sürücü araç değiştirdiğinde geçmiş raporlar bozulmasın diye
@@ -22,6 +24,16 @@ export const vehicles = sqliteTable(
 
     /** Aracın devraldığı andaki kilometre — ilk yakıt hesabının referansı. */
     initialOdometerKm: integer(),
+
+    /**
+     * Kilometre başına yıpranma payı, kuruş — amortisman, lastik, bakım.
+     * Araç oluşturulurken sahiplik biçimine göre atanır; kullanıcıya
+     * sorulmaz ve arayüzde düzenlenmez (bkz. `_shared.ts`).
+     *
+     * Sütun olarak duruyor, koda gömülü sabit olarak değil: varsayılanı
+     * ilerde güncellersek mevcut araçların geçmiş raporları kaymasın.
+     */
+    wearPerKmKurus: kurus().notNull().default(DEFAULT_WEAR_PER_KM.owned),
 
     isActive: integer({ mode: 'boolean' }).notNull().default(true),
     sortOrder: integer().notNull().default(0),
