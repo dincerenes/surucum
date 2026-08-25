@@ -2,25 +2,29 @@
 // globalThis.crypto.getRandomValues'ı kuruyor.
 import '@/lib/crypto-polyfill';
 
-import { Stack } from 'expo-router';
+import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
+import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 
 import { getDb } from '@/db/client';
+import { AuthProvider } from '@/lib/auth/auth-context';
+import { space, useTheme } from '@/theme/use-theme';
 import migrations from '../../drizzle/migrations';
 
 export default function RootLayout() {
+  const { colors, scheme } = useTheme();
   const { success, error } = useMigrations(getDb(), migrations);
 
   if (error) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorTitle}>Veritabanı hazırlanamadı</Text>
-        <Text style={styles.errorBody}>{error.message}</Text>
-        <Text style={styles.hint}>
-          Uygulamayı kapatıp yeniden açın. Sorun sürerse verileriniz cihazda
-          duruyor, kaybolmadı.
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorTitle, { color: colors.text }]}>
+          Veritabanı hazırlanamadı
+        </Text>
+        <Text style={[styles.errorBody, { color: colors.textSoft }]}>{error.message}</Text>
+        <Text style={[styles.hint, { color: colors.textFaint }]}>
+          Uygulamayı kapatıp yeniden açın. Verileriniz cihazda duruyor, kaybolmadı.
         </Text>
       </View>
     );
@@ -28,18 +32,18 @@ export default function RootLayout() {
 
   if (!success) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-        <Text style={styles.loading}>Hazırlanıyor…</Text>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator color={colors.accent} />
+        <Text style={[styles.hint, { color: colors.textSoft }]}>Hazırlanıyor…</Text>
       </View>
     );
   }
 
   return (
-    <>
-      <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }} />
-    </>
+    <AuthProvider>
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <Slot />
+    </AuthProvider>
   );
 }
 
@@ -48,11 +52,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
-    gap: 12,
+    padding: space.xxl,
+    gap: space.md,
   },
-  loading: { fontSize: 15, opacity: 0.6 },
   errorTitle: { fontSize: 18, fontWeight: '600' },
-  errorBody: { fontSize: 14, opacity: 0.8, textAlign: 'center' },
-  hint: { fontSize: 13, opacity: 0.55, textAlign: 'center', marginTop: 8 },
+  errorBody: { fontSize: 14, textAlign: 'center' },
+  hint: { fontSize: 13, textAlign: 'center' },
 });
