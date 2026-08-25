@@ -1,0 +1,70 @@
+import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { FUEL_TYPES, OWNERSHIP_TYPES, kurus, syncColumns } from './_shared';
+
+/**
+ * Araç. Sürücü araç değiştirdiğinde geçmiş raporlar bozulmasın diye
+ * kayıt silinmez, `isActive` ile pasifleşir.
+ */
+export const vehicles = sqliteTable(
+  'vehicles',
+  {
+    ...syncColumns,
+
+    /** Kullanıcının verdiği ad. Plaka girmek istemeyebilir. */
+    label: text().notNull(),
+    plate: text(),
+
+    make: text(),
+    model: text(),
+    modelYear: integer(),
+
+    ownership: text({ enum: OWNERSHIP_TYPES }).notNull().default('owned'),
+
+    /** Aracın devraldığı andaki kilometre — ilk yakıt hesabının referansı. */
+    initialOdometerKm: integer(),
+
+    isActive: integer({ mode: 'boolean' }).notNull().default(true),
+    sortOrder: integer().notNull().default(0),
+    notes: text(),
+  },
+  (t) => [index('vehicles_user_idx').on(t.userId, t.isActive)],
+);
+
+/**
+ * Aracın kullandığı yakıt tipleri — ayrı tablo olmasının sebebi dönüşümlü
+ * LPG araçlar: aynı araç hem benzin hem LPG yakıyor ve ikisinin tüketimi,
+ * fiyatı, hatta deposu farklı.
+ */
+export const vehicleFuelTypes = sqliteTable(
+  'vehicle_fuel_types',
+  {
+    ...syncColumns,
+
+    vehicleId: text().notNull(),
+    fuelType: text({ enum: FUEL_TYPES }).notNull(),
+
+    /**
+     * 100 km başına ortalama tüketim. Sıvı/gaz yakıtta MİLİLİTRE,
+     * elektrikte WATT-SAAT. Tam sayı — kayan nokta yok.
+     * Örnek: 7,5 lt/100km → 7500
+     *
+     * Kullanıcı elle girmek zorunda değil: tam depo kayıtları biriktikçe
+     * bu değer gerçek tüketimden otomatik güncellenir.
+     */
+    avgConsumptionPer100Km: integer(),
+
+    /** Bu değerin ölçülen dolumlardan mı geldiği, yoksa elle mi girildiği. */
+    isConsumptionMeasured: integer({ mode: 'boolean' }).notNull().default(false),
+
+    /** Bilinen son birim fiyat — çevrimdışıyken tahmini maliyet için. */
+    lastUnitPriceKurus: kurus(),
+
+    isPrimary: integer({ mode: 'boolean' }).notNull().default(false),
+  },
+  (t) => [index('vehicle_fuel_types_vehicle_idx').on(t.vehicleId)],
+);
+
+export type Vehicle = typeof vehicles.$inferSelect;
+export type NewVehicle = typeof vehicles.$inferInsert;
+export type VehicleFuelType = typeof vehicleFuelTypes.$inferSelect;
+export type NewVehicleFuelType = typeof vehicleFuelTypes.$inferInsert;

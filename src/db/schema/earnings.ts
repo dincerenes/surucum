@@ -1,0 +1,122 @@
+import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import {
+  PAYMENT_METHODS, ZERO_BPS, ZERO_KURUS, bps, businessDate, kurus, syncColumns,
+} from './_shared';
+
+/**
+ * Kazanç kaynağı — sürücünün parayı nereden kazandığı.
+ *
+ * Bu liste UYGULAMA TARAFINDAN DOLDURULMAZ. Kullanıcı kendi kaynaklarını
+ * kendi adlandırır. Uygulama hiçbir yerde üçüncü taraf marka adı taşımaz;
+ * tohum veride bile taşımaz.
+ */
+export const earningSources = sqliteTable(
+  'earning_sources',
+  {
+    ...syncColumns,
+
+    name: text().notNull(),
+
+    /**
+     * Varsayılan komisyon oranı, baz puan (2500 = %25,00).
+     * Sefer kaydında bu oranın anlık kopyası saklanır — sonradan
+     * oran değişince geçmiş seferler kaymasın diye.
+     */
+    defaultCommissionBps: bps().notNull().default(ZERO_BPS),
+
+    /** Grafiklerde ayırt etmek için. */
+    colorHex: text(),
+
+    isActive: integer({ mode: 'boolean' }).notNull().default(true),
+    sortOrder: integer().notNull().default(0),
+  },
+  (t) => [index('earning_sources_user_idx').on(t.userId, t.isActive)],
+);
+
+/**
+ * Vardiya. Süre ve toplam kilometre buradan türetilir; TL/saat ve TL/km
+ * hesabının paydası bu tablodan gelir.
+ *
+ * `endedAt` boşsa vardiya açıktır — sürücü şu an direksiyonda.
+ */
+export const shifts = sqliteTable(
+  'shifts',
+  {
+    ...syncColumns,
+
+    vehicleId: text().notNull(),
+
+    startedAt: integer().notNull(),
+    endedAt: integer(),
+
+    startOdometerKm: integer(),
+    endOdometerKm: integer(),
+
+    /**
+     * Vardiyanın ait olduğu iş günü. Gece 22:00'de başlayan vardiya
+     * sabaha sarksa da tek bir iş gününe yazılır.
+     */
+    businessDate: businessDate().notNull(),
+
+    notes: text(),
+  },
+  (t) => [
+    index('shifts_user_date_idx').on(t.userId, t.businessDate),
+    index('shifts_open_idx').on(t.userId, t.endedAt),
+  ],
+);
+
+/**
+ * Sefer.
+ *
+ * TASARIM KARARI — brüt, komisyon ve net üçü de saklanıyor, ikisi
+ * diğerinden türetilmiyor. Sebep: kullanıcı bir kazanç kaynağının komisyon
+ * oranını sonradan değiştirdiğinde geçmiş seferlerin tutarı DEĞİŞMEMELİ.
+ * Oranın anlık kopyası (`commissionBps`) da saklanıyor ki kayıt kendi
+ * kendini açıklasın ve denetlenebilsin.
+ */
+export const rides = sqliteTable(
+  'rides',
+  {
+    ...syncColumns,
+
+    /** Vardiya dışında da sefer olabilir; bu yüzden boş bırakılabilir. */
+    shiftId: text(),
+    earningSourceId: text().notNull(),
+    vehicleId: text(),
+
+    occurredAt: integer().notNull(),
+    businessDate: businessDate().notNull(),
+
+    grossAmountKurus: kurus().notNull(),
+    commissionKurus: kurus().notNull().default(ZERO_KURUS),
+    netAmountKurus: kurus().notNull(),
+
+    /** Kaydın oluşturulduğu andaki komisyon oranının kopyası. */
+    commissionBps: bps().notNull().default(ZERO_BPS),
+
+    /** Bahşiş komisyona tabi değildir, ayrı tutulur. */
+    tipKurus: kurus().notNull().default(ZERO_KURUS),
+
+    paymentMethod: text({ enum: PAYMENT_METHODS }).notNull().default('app'),
+
+    /** Metre cinsinden — 3,4 km gibi küsuratlı mesafeler kayan nokta olmasın. */
+    distanceMeters: integer(),
+    durationSeconds: integer(),
+
+    notes: text(),
+  },
+  (t) => [
+    index('rides_user_date_idx').on(t.userId, t.businessDate),
+    index('rides_shift_idx').on(t.shiftId),
+    index('rides_source_idx').on(t.earningSourceId),
+    index('rides_occurred_idx').on(t.userId, t.occurredAt),
+  ],
+);
+
+export type EarningSource = typeof earningSources.$inferSelect;
+export type NewEarningSource = typeof earningSources.$inferInsert;
+export type Shift = typeof shifts.$inferSelect;
+export type NewShift = typeof shifts.$inferInsert;
+export type Ride = typeof rides.$inferSelect;
+export type NewRide = typeof rides.$inferInsert;
