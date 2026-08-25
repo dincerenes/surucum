@@ -50,3 +50,7 @@ supabase/.temp/
 supabase/.branches/
 *.db
 *.db-journal
+
+# Yerel geliştirme notları — depoya girmez
+CLAUDE.md
+.claude/
