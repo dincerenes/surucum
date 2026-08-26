@@ -1,0 +1,16 @@
+/**
+ * Veri erişim katmanının tek giriş noktası.
+ *
+ * Ekranlar `@/db/repo` üzerinden çağırır, tek tek dosyalara girmez —
+ * böylece dosyalar bölünüp birleştiğinde ekranlara dokunulmaz.
+ */
+
+export * from './_base';
+export * from './vehicles';
+export * from './earning-sources';
+export * from './shifts';
+export * from './rides';
+export * from './expenses';
+export * from './fuel';
+export * from './settings';
+export * from './summary';

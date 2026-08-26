@@ -77,6 +77,18 @@ export interface ProfitInput {
   wearPerKmKurus?: Kurus;
   /** Kilometre sayaçtan mı okundu, yoksa tahmin mi edildi? */
   isDistanceEstimated?: boolean;
+
+  /**
+   * Yıpranma payı hazır hesaplanmışsa. Verilirse `distanceKm` ve
+   * `wearPerKmKurus` KULLANILMAZ.
+   *
+   * Sebebi çok araçlı gün: aynı iş gününde iki farklı araçla çalışan
+   * sürücünün her aracı farklı yıpranma oranı taşır. Tek bir orana
+   * indirgemek için ortalama almak gerekirdi ve ortalama, kuruş
+   * seviyesinde yanlış sonuç verir. Çağıran taraf her vardiyanın payını
+   * kendi oranıyla hesaplayıp toplamını buraya verir.
+   */
+  wearShare?: Kurus;
 }
 
 /**
@@ -93,7 +105,8 @@ export function calculateProfit(input: ProfitInput): ProfitBreakdown {
   const fuelPaid = sum(input.fuelAmounts ?? []);
   const expensesPaid = sum(input.expenseAmounts ?? []);
   const fixedShare = input.fixedShare ?? ZERO;
-  const wearShare = calculateWearShare(input.distanceKm, input.wearPerKmKurus);
+  const wearShare = input.wearShare
+    ?? calculateWearShare(input.distanceKm, input.wearPerKmKurus);
 
   // (2) Yalnızca gerçekleşmiş nakit.
   const cashProfit = subtract(grossRevenue, add(commission, fuelPaid, expensesPaid));
