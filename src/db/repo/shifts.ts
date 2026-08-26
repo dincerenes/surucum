@@ -1,0 +1,165 @@
+/**
+ * Vardiya — günlük döngünün iskeleti.
+ *
+ * Vardiya BAŞLARKEN hiçbir şey sorulmaz: tek tuş, tek satır. Mesafe ve
+ * süre vardiya BİTERKEN sürücünün ağzından alınır ve ikisi de isteğe
+ * bağlıdır — hiçbir soru akışı bloklamaz.
+ */
+
+import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
+import { getDb } from '../client';
+import { shifts } from '../schema';
+import type { Shift } from '../schema/earnings';
+import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
+import { type BusinessDate, DEFAULT_CUTOFF_HOUR, toBusinessDate } from '@/lib/business-date';
+
+/**
+ * Vardiyayı başlatır.
+ *
+ * Açık vardiya varsa YENİSİ AÇILMAZ, mevcut olan döner. Sürücü butona
+ * iki kez basarsa ya da uygulama iki kez açılırsa iki vardiya oluşması
+ * TL/saat hesabını bozar ve sürücü bunu fark edemez.
+ */
+export function startShift(
+  userId: string,
+  vehicleId: string,
+  cutoffHour: number = DEFAULT_CUTOFF_HOUR,
+  now: UnixMs = Date.now(),
+): Shift {
+  const open = getOpenShift(userId);
+  if (open) return open;
+
+  const stamp = stampNew(userId, now);
+  return withOutbox('shifts', stamp.id, 'upsert', (tx) => (
+    tx.insert(shifts).values({
+      ...stamp,
+      vehicleId,
+      startedAt: now,
+      endedAt: null,
+      businessDate: toBusinessDate(now, cutoffHour),
+    }).returning().get()
+  ), now);
+}
+
+export interface EndShiftInput {
+  /**
+   * Vardiya boyunca kat edilen yol — kilometre SAYACI DEĞİL.
+   * Boşsa yıpranma payı hesaplanmaz, tahmin edilmez.
+   */
+  distanceKm?: number | null;
+
+  /**
+   * Fiilen çalışılan süre, dakika. Damga farkını EZER: sürücü mola verir
+   * ve vardiyayı kapatmayı unutur. Boşsa damga farkına düşülür.
+   */
+  workedMinutes?: number | null;
+
+  notes?: string | null;
+}
+
+/**
+ * Vardiyayı bitirir.
+ *
+ * Zaten kapalı bir vardiyayı yeniden kapatmaz — `endedAt` korunur.
+ * Sürücü geçmiş bir vardiyanın kilometresini sonradan düzeltebilmeli,
+ * ama bitiş saati o düzeltmeyle kaymamalı.
+ */
+export function endShift(
+  id: string, input: EndShiftInput = {}, now: UnixMs = Date.now(),
+): void {
+  const current = getShift(id);
+  if (!current) return;
+
+  withOutbox('shifts', id, 'upsert', (tx) => {
+    tx.update(shifts).set({
+      endedAt: current.endedAt ?? now,
+      distanceKm: sanitizePositive(input.distanceKm),
+      workedMinutes: sanitizePositive(input.workedMinutes),
+      ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
+      updatedAt: now,
+    }).where(eq(shifts.id, id)).run();
+  }, now);
+}
+
+/** Kapanmış vardiyanın mesafe/süre bilgisini sonradan düzeltir. */
+export function updateShiftTotals(
+  id: string, input: EndShiftInput, now: UnixMs = Date.now(),
+): void {
+  withOutbox('shifts', id, 'upsert', (tx) => {
+    tx.update(shifts).set({
+      ...(input.distanceKm !== undefined
+        ? { distanceKm: sanitizePositive(input.distanceKm) } : {}),
+      ...(input.workedMinutes !== undefined
+        ? { workedMinutes: sanitizePositive(input.workedMinutes) } : {}),
+      ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
+      updatedAt: now,
+    }).where(eq(shifts.id, id)).run();
+  }, now);
+}
+
+export function deleteShift(id: string, now: UnixMs = Date.now()): void {
+  softDeleteRow(shifts, 'shifts', id, now);
+}
+
+// ---------------------------------------------------------------------------
+// Okuma
+// ---------------------------------------------------------------------------
+
+/**
+ * Açık vardiya. En fazla bir tane olmalı; yine de en yenisi alınıyor —
+ * eski bir hatadan iki açık vardiya kaldıysa sürücü en azından kilitlenmez.
+ */
+export function getOpenShift(userId: string): Shift | undefined {
+  return getDb().select().from(shifts)
+    .where(and(alive(shifts, userId), isNull(shifts.endedAt)))
+    .orderBy(desc(shifts.startedAt))
+    .get();
+}
+
+export function getShift(id: string): Shift | undefined {
+  return getDb().select().from(shifts).where(aliveById(shifts, id)).get();
+}
+
+/** Bir iş gününün vardiyaları. */
+export function listShiftsOnDate(userId: string, date: BusinessDate): Shift[] {
+  return getDb().select().from(shifts)
+    .where(and(alive(shifts, userId), eq(shifts.businessDate, date)))
+    .orderBy(desc(shifts.startedAt))
+    .all();
+}
+
+/** İki iş günü arasındaki vardiyalar — uçlar dahil. */
+export function listShiftsInRange(
+  userId: string, from: BusinessDate, to: BusinessDate,
+): Shift[] {
+  return getDb().select().from(shifts)
+    .where(and(
+      alive(shifts, userId),
+      gte(shifts.businessDate, from),
+      lte(shifts.businessDate, to),
+    ))
+    .orderBy(desc(shifts.startedAt))
+    .all();
+}
+
+/** Son kapanmış vardiya — arayüzde "geçen vardiyan" karşılaştırması için. */
+export function getLastClosedShift(userId: string): Shift | undefined {
+  return getDb().select().from(shifts)
+    .where(alive(shifts, userId))
+    .orderBy(desc(shifts.startedAt))
+    .all()
+    .find((s) => s.endedAt != null);
+}
+
+/**
+ * Sıfır ve negatif değerleri `null`'a düşürür.
+ *
+ * Sürücü alanı boş bırakır ya da yanlışlıkla 0 yazarsa bu BİLİNMİYOR
+ * demektir, "sıfır kilometre yaptı" demek değil. Sıfır yazsaydık
+ * yıpranma payı sıfır çıkar ve rapor sessizce yanlış olurdu.
+ */
+function sanitizePositive(value: number | null | undefined): number | null {
+  if (value == null) return null;
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return value;
+}

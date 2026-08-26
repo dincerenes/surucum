@@ -34,10 +34,14 @@ export const earningSources = sqliteTable(
 );
 
 /**
- * Vardiya. Süre ve toplam kilometre buradan türetilir; TL/saat ve TL/km
- * hesabının paydası bu tablodan gelir.
+ * Vardiya. TL/saat ve TL/km hesabının paydası bu tablodan gelir.
  *
  * `endedAt` boşsa vardiya açıktır — sürücü şu an direksiyonda.
+ *
+ * TASARIM KARARI — vardiya BAŞLARKEN hiçbir şey sorulmaz, tek tuş.
+ * Mesafe ve süre vardiya BİTERKEN, sürücünün kendi ağzından alınır.
+ * Sebep: sürücü işe başlarken telefonla uğraşmaz; akşam hesabı
+ * kapatırken uğraşır. Başlangıçta soru sorarsak vardiya hiç açılmaz.
  */
 export const shifts = sqliteTable(
   'shifts',
@@ -49,6 +53,31 @@ export const shifts = sqliteTable(
     startedAt: integer().notNull(),
     endedAt: integer(),
 
+    /**
+     * Vardiya boyunca yapılan kilometre — sürücü vardiya sonunda yazar.
+     * Kilometre SAYACI değil, KAT EDİLEN yoldur; sürücü "bugün 280 yaptım"
+     * der, sayaç okumaz. Km yıpranma payının tek girdisi budur.
+     *
+     * Boşsa yıpranma payı hesaplanmaz, tahmin edilmez (bkz. `profit.ts`).
+     */
+    distanceKm: integer(),
+
+    /**
+     * Fiilen çalışılan süre, dakika — sürücü vardiya sonunda yazar.
+     *
+     * `endedAt - startedAt` farkı VARDIR ama doğru değildir: sürücü mola
+     * verir ve vardiyayı kapatmayı unutur. Unutulan vardiya ertesi gün
+     * kapatılınca fark 30 saat çıkar ve TL/saat çöpe döner. Sürücünün
+     * yazdığı süre o farkı EZER. Boşsa farka düşülür.
+     */
+    workedMinutes: integer(),
+
+    /**
+     * Kilometre sayacı okumaları. Vardiya akışında SORULMAZ — burada
+     * duruyorlar çünkü yakıt dolumu ekranı sayacı zaten soruyor
+     * (`fuelLogs.odometerKm`) ve tam depo yöntemi ileride bu iki uçtan
+     * beslenebilir. Faz 2 akışı ikisini de yazmaz.
+     */
     startOdometerKm: integer(),
     endOdometerKm: integer(),
 

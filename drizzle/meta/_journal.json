@@ -15,6 +15,13 @@
       "when": 1787676177139,
       "tag": "0001_thin_iceman",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787706395786,
+      "tag": "0002_cynical_infant_terrible",
+      "breakpoints": true
     }
   ]
 }
