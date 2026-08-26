@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AnnouncementBanner } from '@/components/announcement-banner';
 import { Button } from '@/components/ui/button';
 import { getDb } from '@/db/client';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -45,6 +46,8 @@ export default function HomeScreen() {
           {formatBusinessDate(today, 'weekday')}
         </Text>
       </View>
+
+      <AnnouncementBanner />
 
       <Card title="Hesap">
         <Text style={[typeScale.body, { color: colors.text }]}>

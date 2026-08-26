@@ -1,15 +1,20 @@
 /**
  * Özellik yetkileri.
  *
- * v1'de uygulama tamamen ücretsiz ve bu servis her zaman `true` döner.
- * Yine de baştan konuyor: ekranlar özelliği doğrudan açıp kapatmak yerine
- * `hasFeature()` sorar. İleride bir ödeme katmanı gelirse yalnızca bu
- * dosya değişir — kırk ekran değil.
+ * v1'de uygulama tamamen ücretsiz. Yine de ekranlar özelliği doğrudan açıp
+ * kapatmak yerine `hasFeature()` soruyor: ileride bir ödeme katmanı
+ * gelirse yalnızca bu dosya değişir, kırk ekran değil.
  *
- * Ödeme altyapısı (RevenueCat vb.) v1'de YOK. Buraya bir istemci
- * eklendiğinde `hasFeature` eşzamanlı kalmalı; yetki durumu önbellekten
- * okunmalı, ekran çizimi ağ çağrısı beklememeli.
+ * Yetki artık iki kaynaktan geliyor:
+ *  1. Uzaktan özellik bayrakları (yönetim paneli) — bozulan bir özelliği
+ *     sürüm çıkmadan kapatmaya yarayan acil durum anahtarı.
+ *  2. İleride: ödeme durumu. Henüz yok.
+ *
+ * `hasFeature` EŞZAMANLI kalmak zorunda; bayrak durumu önbellekten okunur,
+ * ekran çizimi ağ çağrısı beklemez. Bkz. `remote-config.ts`.
  */
+
+import { isFlagEnabled } from './remote-config';
 
 export const FEATURES = [
   'unlimitedHistory',  // 30 günden eski kayıtlara erişim
@@ -21,12 +26,14 @@ export const FEATURES = [
 
 export type Feature = (typeof FEATURES)[number];
 
-export function hasFeature(_feature: Feature): boolean {
-  // v1: her şey açık.
-  return true;
+export function hasFeature(feature: Feature): boolean {
+  // Bayrak tanımlı değilse veya bulut yoksa açık kabul edilir —
+  // uygulama bulutsuz da eksiksiz çalışmak zorunda.
+  return isFlagEnabled(feature);
 }
 
-/** Kilitli bir özelliğe dokunulduğunda gösterilecek metin. v1'de kullanılmıyor. */
-export function featureLockMessage(_feature: Feature): string | null {
-  return null;
+/** Kilitli bir özelliğe dokunulduğunda gösterilecek metin. */
+export function featureLockMessage(feature: Feature): string | null {
+  if (hasFeature(feature)) return null;
+  return 'Bu özellik şu anda geçici olarak kapalı. Kısa süre içinde açılacak.';
 }

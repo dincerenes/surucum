@@ -7,6 +7,7 @@ import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
+import { RemoteConfigSync } from '@/components/remote-config-sync';
 import { getDb } from '@/db/client';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { space, useTheme } from '@/theme/use-theme';
@@ -41,6 +42,7 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
+      <RemoteConfigSync />
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <Slot />
     </AuthProvider>

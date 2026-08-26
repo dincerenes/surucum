@@ -21,5 +21,9 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "drizzle/migrations.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "admin"
   ]
 }

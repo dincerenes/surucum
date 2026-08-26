@@ -39,6 +39,8 @@
     "@types/react": "~19.2.2",
     "babel-plugin-inline-import": "^3.0.0",
     "drizzle-kit": "^0.31.10",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~57.0.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -51,7 +53,9 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
-    "start:clean": "expo start -c"
+    "start:clean": "expo start -c",
+    "admin": "npm --prefix admin run dev",
+    "admin:build": "npm --prefix admin run build"
   },
   "private": true
 }

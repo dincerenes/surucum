@@ -1,0 +1,359 @@
+/*
+ * Panel tasarımı.
+ *
+ * Renkler src/theme/tokens.ts'ten birebir alındı: panel ile uygulama aynı
+ * marka içinde kalsın diye. Vurgu rengi yeşil DEĞİL — yeşil ve kırmızı
+ * kazanç ve gidere ayrılmış durumda, etkileşim rengi onlarla çakışırsa
+ * "bu buton mu, kâr mı" belirsizliği doğar.
+ *
+ * Mobil uygulamanın aksine burası masaüstü: dokunma hedefi değil, bilgi
+ * yoğunluğu önceliği. Satırlar dar, yazı küçük, tablo tarama için.
+ */
+
+:root {
+  --bg: #f4f6f4;
+  --surface: #ffffff;
+  --sunken: #eaeeeb;
+
+  --text: #141c18;
+  --text-soft: #586460;
+  --text-faint: #8b9691;
+
+  --border: #d6ddd8;
+  --border-strong: #b4beb8;
+
+  --accent: #0e5a63;
+  --accent-text: #ffffff;
+  --accent-soft: #dcedef;
+
+  --positive: #15803d;
+  --positive-soft: #dcf3e4;
+  --negative: #b3261e;
+  --negative-soft: #fadedc;
+  --warning: #8a5d14;
+  --warning-soft: #f6e9cf;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --shadow: 0 1px 2px rgba(20, 28, 24, 0.06), 0 1px 3px rgba(20, 28, 24, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101512;
+    --surface: #191f1b;
+    --sunken: #0b0f0d;
+
+    --text: #e6ebe7;
+    --text-soft: #9aa5a0;
+    --text-faint: #6d7873;
+
+    --border: #2a332e;
+    --border-strong: #3d4842;
+
+    --accent: #4fc3d0;
+    --accent-text: #062327;
+    --accent-soft: #0e3238;
+
+    --positive: #5cc98a;
+    --positive-soft: #12301f;
+    --negative: #f2837c;
+    --negative-soft: #3a1a18;
+    --warning: #d8a94e;
+    --warning-soft: #33280f;
+
+    --shadow: none;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Tutarlar hizalansın diye her rakam aynı genişlikte. Tablo taranırken
+   binlik basamağın kayması okumayı bozuyor. */
+.num { font-variant-numeric: tabular-nums; }
+
+/* --- Yerleşim ------------------------------------------------------------ */
+
+.shell { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 232px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.brand {
+  padding: 0 10px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.brand-name { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+.brand-sub { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.8px; }
+
+.nav-group {
+  padding: 14px 10px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-soft);
+  font-weight: 500;
+}
+.nav-link:hover { background: var(--sunken); color: var(--text); text-decoration: none; }
+.nav-link[aria-current='page'] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+.sidebar-foot {
+  margin-top: auto;
+  padding: 14px 10px 0;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+
+.main { flex: 1; min-width: 0; padding: 28px 32px 64px; }
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.page-title { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin: 0; }
+.page-sub { color: var(--text-soft); margin: 4px 0 0; font-size: 13px; }
+
+/* --- Kartlar ------------------------------------------------------------- */
+
+.grid { display: grid; gap: 12px; }
+.grid-4 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.grid-3 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.grid-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow);
+}
+.card-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 0 10px;
+}
+
+.stat-value { font-size: 26px; font-weight: 700; letter-spacing: -0.6px; }
+.stat-note { font-size: 12px; color: var(--text-soft); margin-top: 2px; }
+
+.section { margin-top: 26px; }
+.section-title { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+
+/* --- Tablo --------------------------------------------------------------- */
+
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  box-shadow: var(--shadow);
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: var(--surface);
+}
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--sunken); }
+.right { text-align: right; }
+.nowrap { white-space: nowrap; }
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-faint);
+}
+
+/* --- Rozetler ------------------------------------------------------------ */
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-neutral  { background: var(--sunken); color: var(--text-soft); }
+.badge-accent   { background: var(--accent-soft); color: var(--accent); }
+.badge-positive { background: var(--positive-soft); color: var(--positive); }
+.badge-negative { background: var(--negative-soft); color: var(--negative); }
+.badge-warning  { background: var(--warning-soft); color: var(--warning); }
+
+.dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+
+/* --- Form ---------------------------------------------------------------- */
+
+.field { display: flex; flex-direction: column; gap: 5px; }
+.label { font-size: 12px; font-weight: 600; color: var(--text-soft); }
+
+input[type='text'], input[type='email'], input[type='password'],
+input[type='number'], input[type='date'], input[type='datetime-local'],
+input[type='search'], select, textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  width: 100%;
+  min-width: 0;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+textarea { resize: vertical; min-height: 78px; }
+
+.btn {
+  font: inherit;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  cursor: pointer;
+  background: var(--accent);
+  color: var(--accent-text);
+  white-space: nowrap;
+}
+.btn:hover { filter: brightness(1.08); text-decoration: none; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+.btn-danger { background: transparent; color: var(--negative); border-color: var(--negative); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+
+.row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.row-tight { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+.notice {
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  padding: 11px 14px;
+  font-size: 13px;
+}
+.notice-info     { background: var(--accent-soft);   border-left-color: var(--accent);   color: var(--text); }
+.notice-warning  { background: var(--warning-soft);  border-left-color: var(--warning);  color: var(--text); }
+.notice-critical { background: var(--negative-soft); border-left-color: var(--negative); color: var(--text); }
+.notice-positive { background: var(--positive-soft); border-left-color: var(--positive); color: var(--text); }
+
+/* --- Giriş --------------------------------------------------------------- */
+
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--shadow);
+}
+
+/* --- Grafik -------------------------------------------------------------- */
+
+.chart { width: 100%; height: auto; display: block; overflow: visible; }
+.chart-bar { fill: var(--accent); }
+.chart-bar-soft { fill: var(--accent-soft); }
+.chart-axis { stroke: var(--border); stroke-width: 1; }
+.chart-label { fill: var(--text-faint); font-size: 9px; }
+
+@media (max-width: 860px) {
+  .shell { flex-direction: column; }
+  .sidebar {
+    width: auto;
+    height: auto;
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 12px;
+  }
+  .brand { padding: 0 10px 0 0; }
+  .nav-group { display: none; }
+  .sidebar-foot { margin: 0 0 0 auto; border: none; padding: 0; }
+  .main { padding: 20px 16px 48px; }
+}
