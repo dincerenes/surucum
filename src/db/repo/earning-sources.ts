@@ -11,7 +11,7 @@ import { getDb } from '../client';
 import { earningSources } from '../schema';
 import type { EarningSource } from '../schema/earnings';
 import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
-import type { BasisPoints } from '@/lib/money';
+import { type BasisPoints, clampBps } from '@/lib/money';
 
 export interface NewEarningSourceInput {
   name: string;
@@ -29,7 +29,7 @@ export function createEarningSource(
     tx.insert(earningSources).values({
       ...stamp,
       name: input.name.trim(),
-      defaultCommissionBps: input.defaultCommissionBps ?? (0 as BasisPoints),
+      defaultCommissionBps: clampBps(input.defaultCommissionBps ?? 0),
       colorHex: input.colorHex ?? null,
       sortOrder: input.sortOrder ?? 0,
     }).returning().get()
@@ -54,7 +54,7 @@ export function updateEarningSource(
     tx.update(earningSources).set({
       ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
       ...(patch.defaultCommissionBps !== undefined
-        ? { defaultCommissionBps: patch.defaultCommissionBps } : {}),
+        ? { defaultCommissionBps: clampBps(patch.defaultCommissionBps) } : {}),
       ...(patch.colorHex !== undefined ? { colorHex: patch.colorHex } : {}),
       ...(patch.sortOrder !== undefined ? { sortOrder: patch.sortOrder } : {}),
       ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}),

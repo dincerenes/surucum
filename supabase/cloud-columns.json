@@ -1,0 +1,198 @@
+{
+  "_aciklama": "Buluttaki (Postgres) sütun adları. server_updated_at HARİÇ — o yalnızca sunucuda var, artımlı çekmenin imleci. Bu dosya schema-parity.test.ts tarafından yerel SQLite şemasıyla karşılaştırılıyor: iki taraf birebir aynı olmak zorunda, çünkü senkron satırları hiçbir eşleme yapmadan olduğu gibi gönderiyor.",
+  "_kaynak": "information_schema.columns — proje rbguvcvouuapiwxhecjn, 27 Ağustos 2026",
+  "_bool_sutunlar": "SQLite bunları 0/1 tam sayı tutuyor, Postgres boolean bekliyor; senkron gönderirken çeviriyor.",
+  "bool": {
+    "earning_sources": [
+      "is_active"
+    ],
+    "expense_categories": [
+      "is_system",
+      "is_active"
+    ],
+    "fuel_logs": [
+      "is_full_tank"
+    ],
+    "goals": [
+      "is_active"
+    ],
+    "recurring_expenses": [
+      "is_active"
+    ],
+    "vehicle_fuel_types": [
+      "is_consumption_measured",
+      "is_primary"
+    ],
+    "vehicles": [
+      "is_active"
+    ]
+  },
+  "tables": {
+    "app_settings": [
+      "id",
+      "user_id",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+      "day_cutoff_hour",
+      "default_vehicle_id",
+      "region_code",
+      "default_earning_source_id",
+      "onboarding_completed_at"
+    ],
+    "earning_sources": [
+      "id",
+      "user_id",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+      "name",
+      "default_commission_bps",
+      "color_hex",
+      "is_active",
+      "sort_order"
+    ],
+    "expense_categories": [
+      "id",
+      "user_id",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+      "name",
+      "kind",
+      "icon",
+      "is_system",
+      "is_active",
+      "sort_order"
+    ],
+    "expenses": [
+      "id",
+      "user_id",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+      "category_id",
+      "vehicle_id",
+      "amount_kurus",
+      "occurred_at",
+      "business_date",
+      "receipt_path",
+      "notes"
+    ],
+    "fuel_logs": [
+      "id",
+      "user_id",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+      "vehicle_id",
+      "fuel_type",
+      "occurred_at",
+      "business_date",
+      "volume_per1000",
+      "unit_price_kurus",
+      "total_amount_kurus",
+      "odometer_km",
+      "is_full_tank",
+      "station_name",
+      "receipt_path",
+      "notes"
+    ],
+    "goals": [
+      "id",
+      "user_id",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+      "period",
+      "target_net_kurus",
+      "start_date",
+      "end_date",
+      "is_active"
+    ],
+    "recurring_expenses": [
+      "id",
+      "user_id",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+      "category_id",
+      "vehicle_id",
+      "name",
+      "amount_kurus",
+      "period",
+      "start_date",
+      "end_date",
+      "is_active",
+      "notes"
+    ],
+    "rides": [
+      "id",
+      "user_id",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+      "shift_id",
+      "earning_source_id",
+      "vehicle_id",
+      "occurred_at",
+      "business_date",
+      "gross_amount_kurus",
+      "commission_kurus",
+      "net_amount_kurus",
+      "commission_bps",
+      "tip_kurus",
+      "payment_method",
+      "distance_meters",
+      "duration_seconds",
+      "notes"
+    ],
+    "shifts": [
+      "id",
+      "user_id",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+      "vehicle_id",
+      "started_at",
+      "ended_at",
+      "start_odometer_km",
+      "end_odometer_km",
+      "business_date",
+      "notes",
+      "distance_km",
+      "worked_minutes"
+    ],
+    "vehicle_fuel_types": [
+      "id",
+      "user_id",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+      "vehicle_id",
+      "fuel_type",
+      "avg_consumption_per_100km",
+      "is_consumption_measured",
+      "last_unit_price_kurus",
+      "is_primary"
+    ],
+    "vehicles": [
+      "id",
+      "user_id",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+      "label",
+      "plate",
+      "make",
+      "model",
+      "model_year",
+      "ownership",
+      "initial_odometer_km",
+      "is_active",
+      "sort_order",
+      "notes",
+      "wear_per_km_kurus"
+    ]
+  }
+}

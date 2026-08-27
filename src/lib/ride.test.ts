@@ -107,3 +107,44 @@ describe('calculateRideAmounts', () => {
     }
   });
 });
+
+describe('saklanan oran bulut kısıtına uyar', () => {
+  it('aralık dışı oran 0–10000 arasına sıkıştırılır', () => {
+    // Bulutta check (commission_bps between 0 and 10000) var, SQLite'ta yok.
+    const over = calculateRideAmounts({
+      grossAmountKurus: k(100), commissionBps: 15000 as BasisPoints,
+    });
+    assert.equal(over.commissionBps, 10000);
+
+    const under = calculateRideAmounts({
+      grossAmountKurus: k(100), commissionBps: -500 as BasisPoints,
+    });
+    assert.equal(under.commissionBps, 0);
+  });
+
+  it('kesinti brüte eşitken oran tam 10000 olur, aşmaz', () => {
+    const r = calculateRideAmounts({
+      grossAmountKurus: k(100), commissionBps: pct(20),
+      commissionOverrideKurus: k(500),
+    });
+    assert.equal(r.commissionKurus, k(100));
+    assert.equal(r.commissionBps, 10000);
+  });
+
+  it('her yolda dönen oran kısıt aralığında kalır', () => {
+    for (const gross of [1, 100, 18750, 999999]) {
+      for (const bps of [-10000, -1, 0, 1, 2000, 9999, 10000, 10001, 99999]) {
+        for (const ovr of [undefined, 0, 1, 50, gross, gross * 2]) {
+          const r = calculateRideAmounts({
+            grossAmountKurus: gross as Kurus,
+            commissionBps: bps as BasisPoints,
+            commissionOverrideKurus: ovr as Kurus | undefined,
+          });
+          assert.ok(r.commissionBps >= 0 && r.commissionBps <= 10000,
+            `gross=${gross} bps=${bps} ovr=${ovr} → ${r.commissionBps}`);
+          assert.ok(Number.isInteger(r.commissionBps));
+        }
+      }
+    }
+  });
+});

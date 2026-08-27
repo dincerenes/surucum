@@ -63,7 +63,14 @@ export const vehicleFuelTypes = sqliteTable(
      * Kullanıcı elle girmek zorunda değil: tam depo kayıtları biriktikçe
      * bu değer gerçek tüketimden otomatik güncellenir.
      */
-    avgConsumptionPer100Km: integer(),
+    /**
+     * Sütun adı ELLE VERİLMİŞ, drizzle'ın casing'ine bırakılmamış.
+     * Otomatik dönüşüm `avg_consumption_per100_km` üretiyor, buluttaki ad
+     * ise `avg_consumption_per_100km`. Aradaki fark senkronda PostgREST
+     * tarafından "bilinmeyen sütun" olarak reddedilirdi ve bu tablo hiç
+     * senkronlanmazdı. İki taraf birebir aynı olmak zorunda.
+     */
+    avgConsumptionPer100Km: integer('avg_consumption_per_100km'),
 
     /** Bu değerin ölçülen dolumlardan mı geldiği, yoksa elle mi girildiği. */
     isConsumptionMeasured: integer({ mode: 'boolean' }).notNull().default(false),

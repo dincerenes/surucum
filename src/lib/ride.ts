@@ -12,7 +12,7 @@
 
 import {
   type BasisPoints, type Kurus, BPS_PER_UNIT, ZERO,
-  applyRate, asBps, roundHalfAwayFromZero, subtract,
+  applyRate, clampBps, roundHalfAwayFromZero, subtract,
 } from './money.ts';
 
 export interface RideAmountsInput {
@@ -104,8 +104,8 @@ function effectiveBps(
   gross: Kurus, commission: Kurus, input: RideAmountsInput,
 ): BasisPoints {
   if (input.commissionOverrideKurus === undefined) {
-    return input.commissionBps;
+    return clampBps(input.commissionBps);
   }
-  if (gross === 0) return asBps(0);
-  return asBps(roundHalfAwayFromZero((commission / gross) * BPS_PER_UNIT));
+  if (gross === 0) return clampBps(0);
+  return clampBps((commission / gross) * BPS_PER_UNIT);
 }

@@ -68,6 +68,23 @@ export function bpsToPercent(bps: BasisPoints): number {
   return bps / 100;
 }
 
+/**
+ * Oranı geçerli aralığa (0–10000, yani %0–%100) sıkıştırır.
+ *
+ * BU YEREL BİR ZEVK MESELESİ DEĞİL: bulut tarafında
+ * `check (commission_bps between 0 and 10000)` kısıtı var, SQLite'ta yok.
+ * Aralık dışı bir oran cihaza sorunsuz yazılır, sonra senkronda kalıcı
+ * olarak reddedilir — kayıt kuyrukta sonsuza kadar döner ve sürücü
+ * verisinin buluta gitmediğini asla öğrenemez.
+ *
+ * Yazma yolundaki her oran buradan geçmek zorunda.
+ */
+export function clampBps(n: number): BasisPoints {
+  if (!Number.isFinite(n)) return 0 as BasisPoints;
+  const whole = roundHalfAwayFromZero(n);
+  return Math.min(BPS_PER_UNIT, Math.max(0, whole)) as BasisPoints;
+}
+
 // ---------------------------------------------------------------------------
 // Yuvarlama
 // ---------------------------------------------------------------------------
