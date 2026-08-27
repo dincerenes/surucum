@@ -164,11 +164,25 @@ export async function runDataLayerSmoke(): Promise<SmokeCheck[]> {
      */
     const before = pendingCount();
     const sync = await runSync();
-    record('Senkron oturumsuz temiz atlıyor',
-      !sync.ran && (sync.skipped === 'not_signed_in' || sync.skipped === 'cloud_not_configured'),
-      `${sync.skipped ?? 'çalıştı'}`);
-    record('Atlanan tur kuyruğa dokunmadı', pendingCount() === before,
-      `${before} kayıt yerinde`);
+
+    if (sync.ran) {
+      /**
+       * Oturum açık. Bu satırlar `__smoke__` kullanıcısına ait, oturumdaki
+       * kullanıcıya değil — GÖNDERİLMEMELİ ve SİLİNMEMELİ. Aynı cihazda
+       * A çıkıp B girdiğinde A'nın gönderilmemiş kayıtları böyle korunuyor.
+       */
+      record('Başka kullanıcının satırı gönderilmedi',
+        (sync.push?.skipped ?? 0) > 0,
+        `${sync.push?.skipped ?? 0} satır atlandı, ${sync.push?.sent ?? 0} gönderildi`);
+      record('Atlanan satırlar kuyrukta kaldı', pendingCount() >= before,
+        `${pendingCount()} kayıt duruyor`);
+    } else {
+      record('Senkron oturumsuz temiz atlıyor',
+        sync.skipped === 'not_signed_in' || sync.skipped === 'cloud_not_configured',
+        `${sync.skipped}`);
+      record('Atlanan tur kuyruğa dokunmadı', pendingCount() === before,
+        `${before} kayıt yerinde`);
+    }
     record('Senkron durumu okunabiliyor',
       typeof getSyncStatus().cursor === 'string',
       `imleç ${getSyncStatus().cursor.slice(0, 10)}`);

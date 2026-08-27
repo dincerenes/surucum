@@ -10,6 +10,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { getDb } from '@/db/client';
 import { runDataLayerSmoke } from '@/db/dev-smoke';
+import { runSyncSmoke } from '@/sync/dev-sync-smoke';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { space, useTheme } from '@/theme/use-theme';
 import migrations from '../../drizzle/migrations';
@@ -25,12 +26,19 @@ export default function RootLayout() {
    */
   useEffect(() => {
     if (!success || !__DEV__) return;
-    void runDataLayerSmoke().then((checks) => {
+    void (async () => {
+      const checks = await runDataLayerSmoke();
       const failed = checks.filter((c) => !c.ok);
       console.log(`SMOKE_BASLADI ${checks.length - failed.length}/${checks.length}`);
       for (const c of checks) console.log(`SMOKE ${c.ok ? 'OK ' : 'FAIL'} ${c.label} :: ${c.detail}`);
       console.log('SMOKE_BITTI');
-    });
+
+      const sync = await runSyncSmoke();
+      const syncFailed = sync.filter((c) => !c.ok);
+      console.log(`SYNC_BASLADI ${sync.length - syncFailed.length}/${sync.length}`);
+      for (const c of sync) console.log(`SYNC ${c.ok ? 'OK ' : 'FAIL'} ${c.label} :: ${c.detail}`);
+      console.log('SYNC_BITTI');
+    })();
   }, [success]);
 
   if (error) {
