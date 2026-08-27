@@ -58,6 +58,7 @@ export async function runSyncSmoke(): Promise<SyncCheck[]> {
     }, 4, now + 1000);
     endShift(shift.id, {
       commissionKurus: asKurus(3400), distanceKm: 120, workedMinutes: 300,
+      fuelConsumptionPer100Km: 7500, fuelPriceKurus: asKurus(5000),
     }, now + 2000);
 
     const queuedBefore = pendingCount();
@@ -81,7 +82,7 @@ export async function runSyncSmoke(): Promise<SyncCheck[]> {
       `brüt ${cloudRide.data?.gross_amount_kurus} · net ${cloudRide.data?.net_amount_kurus}`);
 
     const cloudShift = await supabase.from('shifts')
-      .select('distance_km, worked_minutes, commission_kurus')
+      .select('distance_km, worked_minutes, commission_kurus, fuel_consumption_per_100km, fuel_price_kurus')
       .eq('id', shift.id).single();
     add('Vardiya mesafe/süre gitti (0002)',
       cloudShift.data?.distance_km === 120 && cloudShift.data?.worked_minutes === 300,
@@ -89,6 +90,10 @@ export async function runSyncSmoke(): Promise<SyncCheck[]> {
     add('Vardiya komisyonu gitti (0004)',
       cloudShift.data?.commission_kurus === 3400,
       `${cloudShift.data?.commission_kurus} kuruş`);
+    add('Tüketim ve yakıt fiyatı gitti (0005)',
+      cloudShift.data?.fuel_consumption_per_100km === 7500
+      && cloudShift.data?.fuel_price_kurus === 5000,
+      `${cloudShift.data?.fuel_consumption_per_100km} ml/100km · ${cloudShift.data?.fuel_price_kurus} kuruş/lt`);
 
     const cloudVehicle = await supabase.from('vehicles')
       .select('is_active, wear_per_km_kurus, label').eq('id', vehicle.id).single();

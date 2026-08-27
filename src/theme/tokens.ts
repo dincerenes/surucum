@@ -34,6 +34,18 @@ export interface Colors {
   negativeSoft: string;
   warning: string;
   warningSoft: string;
+
+  /**
+   * Vurgu renginin beş kademeli tonu — açıktan koyuya.
+   *
+   * Isı şeridi, yoğunluk grafiği ve dolgu çubukları gibi TEK BİR DEĞERİN
+   * ŞİDDETİNİ anlatan görseller için. Bunlar anlamsal renk değildir:
+   * yeşil/kırmızı kazanç ve gidere ayrılmış, "çok/az" onlarla anlatılamaz.
+   *
+   * Palette olmayan ara tonları her ekranın kendi uydurmasını engelliyor —
+   * uydurulan tonlar koyu temada çöküyor ve ekranlar birbirinden ayrışıyor.
+   */
+  accentScale: readonly [string, string, string, string, string];
 }
 
 export type ColorScheme = 'light' | 'dark';
@@ -61,6 +73,8 @@ export const palette: Record<ColorScheme, Colors> = {
     negativeSoft: '#FADEDC',
     warning: '#8A5D14',
     warningSoft: '#F6E9CF',
+
+    accentScale: ['#DCEDEF', '#B4D6DA', '#8FB9BE', '#4E8E95', '#0E5A63'],
   },
   dark: {
     background: '#101512',
@@ -84,8 +98,25 @@ export const palette: Record<ColorScheme, Colors> = {
     negativeSoft: '#3A1A18',
     warning: '#D8A94E',
     warningSoft: '#33280F',
+
+    accentScale: ['#0E3238', '#14484F', '#256E77', '#3A9AA5', '#4FC3D0'],
   },
 };
+
+/**
+ * Bir orana (0–1) karşılık gelen vurgu tonu.
+ *
+ * Aralık dışı ve sayı olmayan girdiler uçlara kırpılıyor: eksik veri
+ * yüzünden görselin çökmesindense en açık tonu göstermek daha iyi.
+ */
+export function accentStep(
+  colors: Colors, ratio: number,
+): string {
+  const steps = colors.accentScale;
+  if (!Number.isFinite(ratio)) return steps[0];
+  const index = Math.round(Math.min(1, Math.max(0, ratio)) * (steps.length - 1));
+  return steps[index];
+}
 
 /** 4'ün katları — ölçek tutarlı kalsın diye ara değer kullanılmıyor. */
 export const space = {

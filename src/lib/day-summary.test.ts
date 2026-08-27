@@ -300,3 +300,83 @@ describe('komisyon vardiya sonunda tek rakam', () => {
     assert.equal(s.profit.commission, k(150));
   });
 });
+
+describe('yakıt: ödenen nakit, yakılan model', () => {
+  const gun = (odenen: number, tuketimVar: boolean) => calculateDaySummary({
+    rides: [ride(2000, 0)],
+    expenses: [],
+    fuelLogs: odenen > 0 ? [{ totalAmountKurus: k(odenen) }] : [],
+    shifts: [{
+      ...shift({ endedAt: T0 + 8 * H, workedMinutes: 480, distanceKm: 200 }),
+      commissionKurus: k(400),
+      wearPerKmKurus: defaultWearPerKm('owned'),
+      ...(tuketimVar
+        ? { fuelConsumptionPer100Km: 7500, fuelPriceKurus: k(50) }
+        : {}),
+    }],
+    now: T0 + 9 * H,
+  });
+
+  it('pazartesi depo dolduran ile salı doldurmayan AYNI gerçek kârı görür', () => {
+    const pazartesi = gun(1000, true);   // 1.000 ₺ ödedi
+    const sali = gun(0, true);           // hiç ödemedi
+
+    // Nakit gerçeği dalgalanıyor — cebinden farklı para çıktı
+    assert.equal(pazartesi.profit.cashProfit, k(600));   // 2000 − 400 − 1000
+    assert.equal(sali.profit.cashProfit, k(1600));       // 2000 − 400 − 0
+
+    // Ama iki gün de 200 km yaptı: yakılan yakıt ve gerçek kâr aynı
+    assert.equal(pazartesi.profit.fuelBurned, k(750));   // 200 km × 7,5 lt × 50 ₺
+    assert.equal(sali.profit.fuelBurned, k(750));
+    assert.equal(pazartesi.profit.trueProfit, sali.profit.trueProfit);
+    assert.equal(pazartesi.profit.trueProfit, k(350));   // 2000−400−750−500
+  });
+
+  it('ödenen yakıt gerçek kârdan İKİ KEZ düşülmez', () => {
+    const s = gun(1000, true);
+    // Cebe kalandan türetilseydi 600 − 750 − 500 = −650 çıkardı
+    assert.notEqual(s.profit.trueProfit, k(-650));
+    assert.equal(s.profit.trueProfit, k(350));
+  });
+
+  it('tüketim girilmemişse ödenen yakıta düşülür — bedava sayılmaz', () => {
+    const s = gun(1000, false);
+    assert.equal(s.profit.fuelBurned, k(1000));
+    assert.equal(s.profit.trueProfit, k(100));  // 2000−400−1000−500
+    assert.equal(s.volumeBurned, null);
+  });
+
+  it('yakılan hacim arayüze veriliyor', () => {
+    assert.equal(gun(0, true).volumeBurned, 15000);  // 15 lt
+  });
+
+  it('her vardiya kendi tüketimi ve fiyatıyla hesaplanır', () => {
+    const s = calculateDaySummary({
+      rides: [ride(3000, 0)],
+      expenses: [], fuelLogs: [],
+      shifts: [
+        { ...shift({ endedAt: T0 + 4 * H, distanceKm: 100 }),
+          fuelConsumptionPer100Km: 7500, fuelPriceKurus: k(50) },   // 375 ₺
+        { ...shift({ startedAt: T0 + 6 * H, endedAt: T0 + 10 * H, distanceKm: 100 }),
+          fuelConsumptionPer100Km: 12000, fuelPriceKurus: k(22) },  // 264 ₺ (LPG)
+      ],
+      now: T0 + 11 * H,
+    });
+    assert.equal(s.profit.fuelBurned, k(639));
+    assert.equal(s.volumeBurned, 7500 + 12000);
+  });
+
+  it('mesafe yoksa yakıt hesaplanmaz', () => {
+    const s = calculateDaySummary({
+      rides: [ride(1000, 0)],
+      expenses: [], fuelLogs: [{ totalAmountKurus: k(300) }],
+      shifts: [{
+        ...shift({ endedAt: T0 + 5 * H }),
+        fuelConsumptionPer100Km: 7500, fuelPriceKurus: k(50),
+      }],
+      now: T0 + 6 * H,
+    });
+    assert.equal(s.volumeBurned, null);
+    assert.equal(s.profit.fuelBurned, k(300));  // ödenene düşüldü
+  });
+});

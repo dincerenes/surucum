@@ -6,8 +6,8 @@
  *   1. CİRO          — müşteriden tahsil edilen brüt tutar.
  *   2. CEBE KALAN    — ciro eksi komisyon, eksi o gün fiilen ödenen
  *                      gider ve yakıt. Sürücünün akşam cebinde bulduğu para.
- *   3. GERÇEK KÂR    — cebe kalan, eksi o güne düşen sabit gider payı,
- *                      eksi kilometre yıpranma payı.
+ *   3. GERÇEK KÂR    — ciro, eksi komisyon, eksi O GÜN YAKILAN yakıt,
+ *                      eksi gider, eksi kilometre yıpranma payı.
  *
  * Neden üçü birden? Çünkü 2 ile 3 arasındaki fark ürünün varlık sebebi.
  * Sürücü akşam 3.000 lira ile eve gider ve kazandığını sanır; oysa plaka
@@ -30,8 +30,17 @@ export interface ProfitBreakdown {
   /** Kazanç kaynaklarının kestiği toplam komisyon. */
   commission: Kurus;
 
-  /** O gün fiilen ödenen yakıt. */
+  /** O gün fiilen ÖDENEN yakıt — nakit. */
   fuelPaid: Kurus;
+
+  /**
+   * O gün YAKILAN yakıtın karşılığı — model.
+   *
+   * Ödenenden farklıdır: sürücü pazartesi depo doldurup cumaya kadar
+   * onunla gider. Ödenen para (2) satırında, yakılan yakıt (3) satırında.
+   * Tüketim bilinmiyorsa ödenen yakıta düşülür.
+   */
+  fuelBurned: Kurus;
 
   /** O gün fiilen ödenen diğer giderler — yemek, otopark, yıkama. */
   expensesPaid: Kurus;
@@ -63,8 +72,15 @@ export interface ProfitInput {
   /** Bahşişler. Komisyona tabi değildir, doğrudan ciroya eklenir. */
   tips?: readonly Kurus[];
 
-  /** Dönemde ödenen yakıt tutarları. */
+  /** Dönemde ödenen yakıt tutarları — nakit. */
   fuelAmounts?: readonly Kurus[];
+
+  /**
+   * Dönemde YAKILAN yakıtın karşılığı — çağıran taraf hesaplar
+   * (`fuel-cost.ts`). Verilmezse ödenen yakıta düşülür: bilinmeyeni
+   * sıfır saymak yakıtı bedava göstermek olurdu.
+   */
+  fuelBurned?: Kurus;
   /** Dönemde ödenen diğer gider tutarları. */
   expenseAmounts?: readonly Kurus[];
 
@@ -108,16 +124,33 @@ export function calculateProfit(input: ProfitInput): ProfitBreakdown {
   const wearShare = input.wearShare
     ?? calculateWearShare(input.distanceKm, input.wearPerKmKurus);
 
-  // (2) Yalnızca gerçekleşmiş nakit.
+  /**
+   * (2) CEBE KALAN — yalnızca gerçekleşmiş nakit. Yakıt burada ÖDENEN
+   * tutardır: sürücü o gün cebinden ne çıktıysa onu görmeli.
+   */
   const cashProfit = subtract(grossRevenue, add(commission, fuelPaid, expensesPaid));
 
-  // (3) Tahakkuk ve yıpranma da düşülmüş hâli.
-  const trueProfit = subtract(cashProfit, add(fixedShare, wearShare));
+  /**
+   * (3) GERÇEK KÂR — cebe kalandan TÜRETİLMİYOR, baştan kuruluyor.
+   *
+   * Sebebi yakıt: bu satırda ödenen değil YAKILAN yakıt düşülüyor. Cebe
+   * kalandan çıkarma yapsaydık ödenen yakıt içeride kalır, üstüne yakılan
+   * da eklenir ve aynı maliyet iki kez sayılırdı.
+   *
+   * Tüketim bilinmiyorsa ödenen yakıta düşülüyor — sıfır saymak yakıtı
+   * bedava göstermek olurdu.
+   */
+  const fuelBurned = input.fuelBurned ?? fuelPaid;
+  const trueProfit = subtract(
+    grossRevenue,
+    add(commission, fuelBurned, expensesPaid, fixedShare, wearShare),
+  );
 
   return {
     grossRevenue,
     commission,
     fuelPaid,
+    fuelBurned,
     expensesPaid,
     fixedShare,
     wearShare,

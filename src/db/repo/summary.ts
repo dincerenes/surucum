@@ -111,6 +111,8 @@ function readShiftRows(
     workedMinutes: shifts.workedMinutes,
     distanceKm: shifts.distanceKm,
     commissionKurus: shifts.commissionKurus,
+    fuelConsumptionPer100Km: shifts.fuelConsumptionPer100Km,
+    fuelPriceKurus: shifts.fuelPriceKurus,
     wearPerKmKurus: vehicles.wearPerKmKurus,
   })
     .from(shifts)
@@ -127,6 +129,8 @@ function readShiftRows(
       workedMinutes: r.workedMinutes,
       distanceKm: r.distanceKm,
       commissionKurus: r.commissionKurus as Kurus | null,
+      fuelConsumptionPer100Km: r.fuelConsumptionPer100Km,
+      fuelPriceKurus: r.fuelPriceKurus as Kurus | null,
       wearPerKmKurus: r.wearPerKmKurus as Kurus | null,
     }));
 }

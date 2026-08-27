@@ -163,3 +163,70 @@ function rememberUnitPrice(
       .where(eq(vehicleFuelTypes.id, row.id)).run();
   }, now);
 }
+
+/**
+ * Sürücünün vardiya sonunda yazdığı tüketimi ve fiyatı ARACA hatırlatır.
+ *
+ * Amaç yalnızca ÖNCEDEN DOLDURMAK: bir dahaki vardiya sonunda alanlar dolu
+ * gelsin, sürücü çoğu gün onaylayıp geçsin. Hesap bu değerden değil,
+ * vardiyaya kopyalanan değerden yapılıyor — geçmiş günler bugün girilen
+ * yeni bir tüketimle kaymasın.
+ *
+ * `isConsumptionMeasured` FALSE kalıyor: bu değer ölçülmedi, sürücü
+ * beyan etti. Arayüz ikisini aynı şekilde göstermemeli.
+ */
+export function rememberStatedFuelFigures(
+  vehicleId: string,
+  consumptionPer100Km: number | null | undefined,
+  unitPriceKurus: Kurus | null | undefined,
+  now: UnixMs = Date.now(),
+): void {
+  const hasConsumption = consumptionPer100Km != null
+    && Number.isFinite(consumptionPer100Km) && consumptionPer100Km > 0;
+  const hasPrice = unitPriceKurus != null
+    && Number.isFinite(unitPriceKurus) && unitPriceKurus > 0;
+  if (!hasConsumption && !hasPrice) return;
+
+  /**
+   * Birincil yakıt tipine yazılıyor. Çift yakıtlı araçta sürücü hangi
+   * yakıtla gittiğini söylemiyor; birincil olan en sık kullandığıdır ve
+   * ön dolgu için yeterli. Hesap zaten vardiyadaki kopyadan yapılıyor.
+   */
+  const row = getDb().select({ id: vehicleFuelTypes.id })
+    .from(vehicleFuelTypes)
+    .where(eq(vehicleFuelTypes.vehicleId, vehicleId))
+    .orderBy(desc(vehicleFuelTypes.isPrimary))
+    .get();
+  if (!row) return;
+
+  withOutbox('vehicle_fuel_types', row.id, 'upsert', (tx) => {
+    tx.update(vehicleFuelTypes).set({
+      ...(hasConsumption
+        ? {
+            avgConsumptionPer100Km: Math.round(consumptionPer100Km),
+            isConsumptionMeasured: false,
+          }
+        : {}),
+      ...(hasPrice ? { lastUnitPriceKurus: unitPriceKurus } : {}),
+      updatedAt: now,
+    }).where(eq(vehicleFuelTypes.id, row.id)).run();
+  }, now);
+}
+
+/** Vardiya sonu sihirbazının ön dolgusu: son bilinen tüketim ve fiyat. */
+export function getKnownFuelFigures(vehicleId: string): {
+  consumptionPer100Km: number | null;
+  unitPriceKurus: Kurus | null;
+  isMeasured: boolean;
+} {
+  const row = getDb().select().from(vehicleFuelTypes)
+    .where(eq(vehicleFuelTypes.vehicleId, vehicleId))
+    .orderBy(desc(vehicleFuelTypes.isPrimary))
+    .get();
+
+  return {
+    consumptionPer100Km: row?.avgConsumptionPer100Km ?? null,
+    unitPriceKurus: row?.lastUnitPriceKurus ?? null,
+    isMeasured: row?.isConsumptionMeasured ?? false,
+  };
+}

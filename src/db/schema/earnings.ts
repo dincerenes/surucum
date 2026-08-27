@@ -68,6 +68,33 @@ export const shifts = sqliteTable(
     commissionKurus: kurus(),
 
     /**
+     * Aracın ortalama tüketimi — sürücü vardiya sonunda yazar, 100 km
+     * başına MİLİLİTRE. Örnek: 7,5 lt/100km → 7500
+     *
+     * Neden vardiyaya yazılıyor da araca değil: araçtaki değer sürücünün
+     * en son beyanı ve değişebilir. Geçmiş bir günün yakıt maliyeti,
+     * bugün girilen yeni bir tüketimle kaymamalı. Sefer kaydının komisyon
+     * oranını kopyalamasıyla aynı mantık — kayıt kendini açıklıyor.
+     *
+     * Araçtaki değer yalnızca ÖNCEDEN DOLDURMAK için: sürücü çoğu gün
+     * onaylayıp geçiyor.
+     *
+     * Sütun adı ELLE VERİLDİ: drizzle'ın otomatik adlandırması
+     * `fuel_consumption_per100_km` üretiyor. Aynı hata bir kez yaşandı ve
+     * o tabloyu buluttan tamamen kopardı — `avg_consumption_per_100km` ile
+     * aynı yazımda kalması şart.
+     */
+    fuelConsumptionPer100Km: integer('fuel_consumption_per_100km'),
+
+    /**
+     * Hesapta kullanılan birim yakıt fiyatı, kuruş/litre.
+     *
+     * Bu da vardiyaya kopyalanıyor: fiyat her hafta değişiyor ve geçmiş
+     * günün maliyeti bugünkü fiyatla yeniden hesaplanmamalı.
+     */
+    fuelPriceKurus: kurus(),
+
+    /**
      * Vardiya boyunca yapılan kilometre — sürücü vardiya sonunda yazar.
      * Kilometre SAYACI değil, KAT EDİLEN yoldur; sürücü "bugün 280 yaptım"
      * der, sayaç okumaz. Km yıpranma payının tek girdisi budur.

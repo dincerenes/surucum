@@ -19,8 +19,8 @@ import {
 } from './schema';
 import {
   addExpense, addFuelLog, addRide, createEarningSource, createVehicle,
-  endShift, ensureSettings, getDaySummary, getOpenShift, listRidesInShift,
-  seedSystemCategories, startShift,
+  endShift, ensureSettings, getDaySummary, getKnownFuelFigures, getOpenShift,
+  listRidesInShift, seedSystemCategories, startShift,
 } from './repo';
 import { getSyncStatus, pendingCount, runSync } from '@/sync/worker';
 import { asKurus, formatKurus } from '@/lib/money';
@@ -118,7 +118,10 @@ export async function runDataLayerSmoke(): Promise<SmokeCheck[]> {
       `${inShift.length} sefer bağlı`);
 
     endShift(shift.id, {
-      commissionKurus: asKurus(21550), distanceKm: 238, workedMinutes: 462,
+      commissionKurus: asKurus(21550),
+      distanceKm: 238, workedMinutes: 462,
+      fuelConsumptionPer100Km: 7500,   // 7,5 lt/100km
+      fuelPriceKurus: asKurus(5000),   // 50,00 ₺/lt
     }, now + 7000);
     record('Vardiya kapandı', getOpenShift(SMOKE_USER_ID) === undefined,
       'açık vardiya kalmadı');
@@ -127,10 +130,12 @@ export async function runDataLayerSmoke(): Promise<SmokeCheck[]> {
     const date = toBusinessDate(now, 4);
     const summary = getDaySummary(SMOKE_USER_ID, date, now + 8000);
 
-    // ciro    240,00 + 187,50 + 520,00 + 20,00 bahşiş = 967,50
-    // komisyon vardiya sonunda tek rakam              = 215,50
-    // yakıt 520,02 · gider 150,00      → cebe kalan   =  81,98
-    // yıpranma 238 km × 2,50                          = 595,00
+    // ciro     240,00 + 187,50 + 520,00 + 20,00 bahşiş  = 967,50
+    // komisyon vardiya sonunda tek rakam                 = 215,50
+    // ÖDENEN yakıt 520,02 · gider 150,00 → cebe kalan    =  81,98
+    // YAKILAN yakıt 238 km × 7,5 lt × 50,00 ₺            = 892,50
+    // yıpranma 238 km × 2,50                             = 595,00
+    // gerçek kâr 967,50−215,50−892,50−150,00−595,00      = -885,50
     record('Ciro', summary.profit.revenue === 96750,
       formatKurus(summary.profit.revenue));
     record('Komisyon vardiyadan okundu', summary.profit.commission === 21550,
@@ -139,8 +144,23 @@ export async function runDataLayerSmoke(): Promise<SmokeCheck[]> {
       formatKurus(summary.profit.cashProfit));
     record('Yıpranma — aracın kendi oranıyla', summary.profit.wearShare === 59500,
       `238 km × 2,50 ₺ = ${formatKurus(summary.profit.wearShare)}`);
+    record('Ödenen yakıt cebe kalandan düştü',
+      summary.profit.fuelPaid === 52002, formatKurus(summary.profit.fuelPaid));
+    record('YAKILAN yakıt tüketimden hesaplandı',
+      summary.profit.fuelBurned === 89250,
+      `238 km × 7,5 lt × 50,00 ₺ = ${formatKurus(summary.profit.fuelBurned)}`);
+    record('Yakılan hacim', summary.volumeBurned === 17850,
+      `${((summary.volumeBurned ?? 0) / 1000).toFixed(1)} lt`);
+    record('Yakıt iki kez düşülmedi',
+      summary.profit.trueProfit === -88550,
+      formatKurus(summary.profit.trueProfit));
     record('Gerçek kâr negatif olabiliyor', summary.profit.trueProfit < 0,
       formatKurus(summary.profit.trueProfit));
+
+    const known = getKnownFuelFigures(vehicle.id);
+    record('Tüketim araca hatırlatıldı — ön dolgu için',
+      known.consumptionPer100Km === 7500 && !known.isMeasured,
+      `${(known.consumptionPer100Km ?? 0) / 1000} lt/100km · beyan`);
     record('Süre sürücünün yazdığı', !summary.isDurationEstimated,
       `${summary.durationMinutes} dk`);
     record('TL/saat cebe kalan üzerinden',

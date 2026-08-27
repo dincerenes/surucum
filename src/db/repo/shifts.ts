@@ -9,6 +9,7 @@
 import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { getDb } from '../client';
 import { shifts } from '../schema';
+import { rememberStatedFuelFigures } from './fuel';
 import type { Shift } from '../schema/earnings';
 import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
 import { type BusinessDate, DEFAULT_CUTOFF_HOUR, toBusinessDate } from '@/lib/business-date';
@@ -51,9 +52,15 @@ export interface EndShiftInput {
 
   /**
    * Vardiya boyunca kat edilen yol — kilometre SAYACI DEĞİL.
-   * Boşsa yıpranma payı hesaplanmaz, tahmin edilmez.
+   * Boşsa yıpranma payı da yakıt maliyeti de hesaplanmaz, tahmin edilmez.
    */
   distanceKm?: number | null;
+
+  /** Aracın ortalama tüketimi, 100 km başına mililitre (7,5 lt → 7500). */
+  fuelConsumptionPer100Km?: number | null;
+
+  /** O gün geçerli birim yakıt fiyatı, kuruş/litre. */
+  fuelPriceKurus?: Kurus | null;
 
   /**
    * Fiilen çalışılan süre, dakika. Damga farkını EZER: sürücü mola verir
@@ -81,12 +88,19 @@ export function endShift(
     tx.update(shifts).set({
       endedAt: current.endedAt ?? now,
       commissionKurus: sanitizeAmount(input.commissionKurus),
+      fuelConsumptionPer100Km: sanitizePositive(input.fuelConsumptionPer100Km),
+      fuelPriceKurus: sanitizeAmount(input.fuelPriceKurus),
       distanceKm: sanitizePositive(input.distanceKm),
       workedMinutes: sanitizePositive(input.workedMinutes),
       ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
       updatedAt: now,
     }).where(eq(shifts.id, id)).run();
   }, now);
+
+  // Bir dahaki vardiya sonunda alanlar dolu gelsin diye araca hatırlatılıyor.
+  rememberStatedFuelFigures(
+    current.vehicleId, input.fuelConsumptionPer100Km, input.fuelPriceKurus, now,
+  );
 }
 
 /** Kapanmış vardiyanın mesafe/süre bilgisini sonradan düzeltir. */
@@ -97,6 +111,10 @@ export function updateShiftTotals(
     tx.update(shifts).set({
       ...(input.commissionKurus !== undefined
         ? { commissionKurus: sanitizeAmount(input.commissionKurus) } : {}),
+      ...(input.fuelConsumptionPer100Km !== undefined
+        ? { fuelConsumptionPer100Km: sanitizePositive(input.fuelConsumptionPer100Km) } : {}),
+      ...(input.fuelPriceKurus !== undefined
+        ? { fuelPriceKurus: sanitizeAmount(input.fuelPriceKurus) } : {}),
       ...(input.distanceKm !== undefined
         ? { distanceKm: sanitizePositive(input.distanceKm) } : {}),
       ...(input.workedMinutes !== undefined

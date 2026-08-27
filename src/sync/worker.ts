@@ -10,7 +10,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabase, isCloudConfigured } from '@/lib/supabase';
 import { type PullResult, pullChanges } from './pull';
-import { type PushResult, pendingCount, pushOutbox } from './push';
+import { type PushResult, clearTransientBackoff, pendingCount, pushOutbox } from './push';
 import { markError, markSuccess } from './state';
 
 export type SyncSkipReason =
@@ -36,18 +36,30 @@ export interface SyncOutcome {
  */
 let inFlight: Promise<SyncOutcome> | null = null;
 
-export function runSync(): Promise<SyncOutcome> {
+export interface RunSyncOptions {
+  /**
+   * Geçici hatalardan doğan beklemeleri iptal eder.
+   *
+   * Uygulama öne geldiğinde ve sürücü elle senkron istediğinde `true`
+   * verilir: ikisi de bağlantının döndüğüne dair güçlü işaret. Otomatik
+   * aralık turlarında `false` — orada beklemenin amacı zaten ağ kapalıyken
+   * boşuna istek atmamak.
+   */
+  force?: boolean;
+}
+
+export function runSync(options: RunSyncOptions = {}): Promise<SyncOutcome> {
   if (inFlight) {
     return Promise.resolve({
       ran: false, skipped: 'already_running', errors: [], pending: pendingCount(),
     });
   }
 
-  inFlight = execute().finally(() => { inFlight = null; });
+  inFlight = execute(options).finally(() => { inFlight = null; });
   return inFlight;
 }
 
-async function execute(): Promise<SyncOutcome> {
+async function execute(options: RunSyncOptions): Promise<SyncOutcome> {
   if (!isCloudConfigured()) {
     return {
       ran: false, skipped: 'cloud_not_configured', errors: [],
@@ -69,6 +81,8 @@ async function execute(): Promise<SyncOutcome> {
       ran: false, skipped: 'not_signed_in', errors: [], pending: pendingCount(),
     };
   }
+
+  if (options.force) clearTransientBackoff();
 
   /**
    * ÖNCE GÖNDER, SONRA ÇEK.

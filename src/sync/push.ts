@@ -206,3 +206,32 @@ function describe(error: unknown): string {
 export function pendingCount(): number {
   return getDb().select().from(outbox).all().length;
 }
+
+/**
+ * Geçici hatalardan doğan beklemeleri iptal eder.
+ *
+ * Geri çekilme tavanı bir saat: sürücü tünelden ya da kapsama dışından
+ * çıktığında kuyruk kendiliğinden bu kadar bekleyebilir. Uygulamayı öne
+ * getirmek ya da elle senkron istemek, bağlantının döndüğüne dair en güçlü
+ * işaret — o anda beklemeyi sürdürmek anlamsız.
+ *
+ * ISRARLA BAŞARISIZ OLAN KAYITLAR muaf tutuluyor: `attemptCount` eşiği
+ * aşan satır büyük ihtimalle geçici bir ağ sorunundan değil, sunucunun
+ * kalıcı olarak reddettiği bir veriden dolayı takılı. Onu her açılışta
+ * yeniden denemek pil ve istek harcamaktan başka işe yaramaz.
+ */
+const TRANSIENT_ATTEMPT_LIMIT = 5;
+
+export function clearTransientBackoff(): number {
+  const stuck = getDb().select({ id: outbox.id, attempts: outbox.attemptCount })
+    .from(outbox).all()
+    .filter((r) => r.attempts > 0 && r.attempts < TRANSIENT_ATTEMPT_LIMIT)
+    .map((r) => r.id);
+
+  if (stuck.length === 0) return 0;
+  getDb().update(outbox)
+    .set({ nextAttemptAt: null })
+    .where(inArray(outbox.id, stuck))
+    .run();
+  return stuck.length;
+}

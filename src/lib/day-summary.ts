@@ -13,6 +13,7 @@
  */
 
 import { type Kurus, ZERO, add, multiply } from './money.ts';
+import { calculateFuelBurned, calculateVolumeBurned } from './fuel-cost.ts';
 import { type ProfitBreakdown, calculateProfit } from './profit.ts';
 import {
   type ShiftTiming, type UnixMs, normalizeDistance, resolveShiftDuration,
@@ -49,6 +50,12 @@ export interface ShiftRow extends ShiftTiming {
    * TEK RAKAM. Sefer başına oran kullanılmıyor.
    */
   commissionKurus?: Kurus | null;
+
+  /** Aracın ortalama tüketimi, 100 km başına mililitre (7,5 lt → 7500). */
+  fuelConsumptionPer100Km?: number | null;
+
+  /** O gün geçerli birim yakıt fiyatı, kuruş/litre. */
+  fuelPriceKurus?: Kurus | null;
 }
 
 export interface DaySummaryInput {
@@ -80,6 +87,12 @@ export interface DaySummary {
   /** Kilometresi girilmemiş vardiya sayısı — arayüz bunu söylemeli. */
   shiftsMissingDistance: number;
 
+  /**
+   * O gün yakılan yakıt, mililitre. Tüketim girilmemişse `null` —
+   * arayüz "tüketim girilmediği için yakıt maliyeti hesaplanmadı" demeli.
+   */
+  volumeBurned: number | null;
+
   durationMinutes: number;
   /** Süre damgalardan mı türetildi? Sürücü yazdıysa `false`. */
   isDurationEstimated: boolean;
@@ -100,6 +113,7 @@ export interface DaySummary {
 export function calculateDaySummary(input: DaySummaryInput): DaySummary {
   const shifts = input.shifts ?? [];
   const distance = collectDistance(shifts, input.wearPerKmKurus);
+  const fuel = collectBurnedFuel(shifts);
 
   const profit = calculateProfit({
     grossAmounts: input.rides.map((r) => r.grossAmountKurus),
@@ -116,6 +130,11 @@ export function calculateDaySummary(input: DaySummaryInput): DaySummary {
     fuelAmounts: input.fuelLogs.map((f) => f.totalAmountKurus),
     expenseAmounts: input.expenses.map((e) => e.amountKurus),
     fixedShare: input.fixedShare ?? ZERO,
+    /**
+     * Tüketim hiç girilmemişse `undefined` gidiyor ve `calculateProfit`
+     * ödenen yakıta düşüyor. Sıfır göndermek yakıtı bedava göstermek olurdu.
+     */
+    fuelBurned: fuel.cost ?? undefined,
     wearShare: distance.wearShare,
     isDistanceEstimated: distance.isPartial,
   });
@@ -128,6 +147,7 @@ export function calculateDaySummary(input: DaySummaryInput): DaySummary {
     rideCount,
     distanceKm: distance.km,
     shiftsMissingDistance: distance.missing,
+    volumeBurned: fuel.volume,
     durationMinutes: duration.minutes,
     isDurationEstimated: duration.isEstimated,
     perHour: earningsPerHour(profit.cashProfit, duration.minutes),
@@ -199,4 +219,35 @@ function collectDuration(shifts: readonly ShiftTiming[], now: UnixMs): {
 function sanitizeCommission(value: Kurus | null | undefined): Kurus {
   if (value == null || !Number.isFinite(value) || value <= 0) return ZERO;
   return value;
+}
+
+/**
+ * Vardiyalarda yakılan yakıtı toplar.
+ *
+ * Her vardiya KENDİ tüketimi ve KENDİ fiyatıyla hesaplanıyor, gün geneline
+ * tek bir değer uygulanmıyor: fiyat gün içinde değişebilir ve iki farklı
+ * araçla çalışılan günde tüketimler de farklıdır.
+ *
+ * Hiçbir vardiyada tüketim yoksa `cost` null döner — çağıran o zaman
+ * ödenen yakıta düşüyor.
+ */
+function collectBurnedFuel(shifts: readonly ShiftRow[]): {
+  cost: Kurus | null; volume: number | null;
+} {
+  let cost = ZERO;
+  let volume = 0;
+  let known = false;
+
+  for (const s of shifts) {
+    const burned = calculateFuelBurned(
+      s.distanceKm, s.fuelConsumptionPer100Km, s.fuelPriceKurus,
+    );
+    if (burned <= 0) continue;
+
+    cost = add(cost, burned);
+    volume += calculateVolumeBurned(s.distanceKm, s.fuelConsumptionPer100Km) ?? 0;
+    known = true;
+  }
+
+  return known ? { cost, volume } : { cost: null, volume: null };
 }
