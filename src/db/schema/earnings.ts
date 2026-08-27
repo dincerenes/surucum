@@ -54,6 +54,20 @@ export const shifts = sqliteTable(
     endedAt: integer(),
 
     /**
+     * O gün uygulamaya ödenen toplam komisyon — sürücü vardiya sonunda
+     * TEK RAKAM olarak yazar.
+     *
+     * ORAN KULLANILMIYOR. Sürücü yüzdesini bilmiyor, eline geçeni ve
+     * kesileni biliyor. Sefer başına oran uygulamak hem girişi
+     * yavaşlatıyor hem de sürücünün doğrulayamadığı bir sayı üretiyordu.
+     *
+     * `rides.commission_kurus` sütunu duruyor ve sıfır kalıyor; gün
+     * özeti ikisini de topluyor, yani ileride sefer başına kesinti
+     * gerekirse kapı açık.
+     */
+    commissionKurus: kurus(),
+
+    /**
      * Vardiya boyunca yapılan kilometre — sürücü vardiya sonunda yazar.
      * Kilometre SAYACI değil, KAT EDİLEN yoldur; sürücü "bugün 280 yaptım"
      * der, sayaç okumaz. Km yıpranma payının tek girdisi budur.

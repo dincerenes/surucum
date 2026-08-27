@@ -121,20 +121,26 @@ export type GoalPeriod = (typeof GOAL_PERIODS)[number];
 // ---------------------------------------------------------------------------
 
 /**
- * Aracın her kilometrede eriyen değeri — amortisman, lastik, balata, bakım.
- * Kuruş cinsinden, kilometre başına. YAKIT BURAYA DAHİL DEĞİLDİR;
- * yakıt gerçek dolum kayıtlarından ölçülüyor, tahmin edilmiyor.
+ * Aracın her kilometrede eriyen değeri — kuruş cinsinden, kilometre başına.
  *
- * TASARIM KARARI — bu değer kullanıcıya SORULMAZ ve arayüzde gösterilmez.
+ * TEK KATSAYI, KALEM KALEM DEĞİL. Amortisman, lastik, balata, bakım, MTV,
+ * sigorta, kasko — hepsi bunun içinde sayılıyor. Bunları ayrı ayrı takip
+ * etmek sürücüden onlarca soru sormak demekti; v1'de sorulmuyor.
+ * (Sürücü isterse bu ödemeleri sıradan gider olarak girebilir.)
+ *
+ * YAKIT DAHİL DEĞİLDİR; yakıt gerçek dolum kayıtlarından ölçülüyor.
+ *
+ * TASARIM KARARI — bu değer kullanıcıya SORULMAZ ve arayüzde düzenlenmez.
  * Sürücü aracının kaç yılda kaç kilometrede ne kadar değer kaybettiğini
  * bilmiyor; sorarsak ya boş bırakır ya rastgele bir sayı yazar, ikisi de
- * raporu kirletir. Ortalama bir değer atanır, sürücü işini yapar.
+ * raporu kirletir.
  *
- * Değer bilerek DÜŞÜK tutuldu. Yüksek bir yıpranma payı sürücünün kârını
- * olduğundan kötü gösterir; sürücü de sayıya inanmaz ve uygulamayı bırakır.
- * Eksik tahmin, güven kaybından iyidir.
+ * DEĞER BİLEREK DÜŞÜK: gerçek maliyeti tam karşılamıyor ve karşılaması
+ * hedeflenmiyor. Yüksek bir pay sürücünün kârını olduğundan kötü gösterir;
+ * sürücü de sayıya inanmaz ve uygulamayı bırakır. Eksik tahmin, güven
+ * kaybından iyidir. Yayın sonrası gerçek kullanım verisiyle ayarlanacak.
  */
-const WEAR_OWN_VEHICLE_KURUS = 300 as Kurus; // 3,00 TL/km
+const WEAR_OWN_VEHICLE_KURUS = 250 as Kurus; // 2,50 TL/km
 
 /**
  * Sahiplik biçimine göre yıpranma payı.

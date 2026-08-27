@@ -34,6 +34,11 @@ import { type BusinessDate, DEFAULT_CUTOFF_HOUR, toBusinessDate } from '@/lib/bu
  * özeti oradan okuyor. Bir de gider kategorisi olsaydı sürücü aynı
  * dolumu iki yere girebilir, iki kez düşülür ve fark edilmezdi.
  * Vardiya sonundaki "Yakıt" çipi `addFuelLog`'a gider, `addExpense`'e değil.
+ *
+ * `kind` alanının ŞU AN HİÇBİR HESAP DAVRANIŞI YOKTUR, yalnızca etikettir.
+ * Sabit gider tahakkuku yayın sonrasına ertelendi (27 Ağustos 2026); plaka
+ * kirası da sigorta da sıradan gider gibi, ödendiği güne yazılıyor. Alan
+ * duruyor çünkü motor geldiğinde ayrım oradan okunacak.
  */
 const SYSTEM_CATEGORIES: ReadonlyArray<{
   name: string; kind: ExpenseKind; icon: string;
@@ -46,6 +51,7 @@ const SYSTEM_CATEGORIES: ReadonlyArray<{
   { name: 'Plaka kirası', kind: 'fixed', icon: 'plate' },
   { name: 'Sigorta', kind: 'fixed', icon: 'shield' },
   { name: 'Vergi', kind: 'fixed', icon: 'receipt' },
+  { name: 'Diğer', kind: 'variable', icon: 'dots' },
 ];
 
 /**

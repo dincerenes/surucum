@@ -43,6 +43,12 @@ export interface FuelRow {
  */
 export interface ShiftRow extends ShiftTiming {
   wearPerKmKurus?: Kurus | null;
+
+  /**
+   * O gün uygulamaya ödenen komisyon — sürücünün vardiya sonunda yazdığı
+   * TEK RAKAM. Sefer başına oran kullanılmıyor.
+   */
+  commissionKurus?: Kurus | null;
 }
 
 export interface DaySummaryInput {
@@ -97,7 +103,15 @@ export function calculateDaySummary(input: DaySummaryInput): DaySummary {
 
   const profit = calculateProfit({
     grossAmounts: input.rides.map((r) => r.grossAmountKurus),
-    commissionAmounts: input.rides.map((r) => r.commissionKurus),
+    /**
+     * Komisyon İKİ KAYNAKTAN toplanıyor: vardiya sonunda girilen tek
+     * rakam (asıl yol) ve sefer kayıtlarının kendi komisyonu (v1'de
+     * daima sıfır, ileride sefer başına kesinti gerekirse diye açık).
+     */
+    commissionAmounts: [
+      ...input.rides.map((r) => r.commissionKurus),
+      ...shifts.map((s) => sanitizeCommission(s.commissionKurus)),
+    ],
     tips: input.rides.map((r) => r.tipKurus),
     fuelAmounts: input.fuelLogs.map((f) => f.totalAmountKurus),
     expenseAmounts: input.expenses.map((e) => e.amountKurus),
@@ -179,4 +193,10 @@ function collectDuration(shifts: readonly ShiftTiming[], now: UnixMs): {
   }
 
   return { minutes, isEstimated };
+}
+
+/** Boş ve negatif komisyonu sıfıra düşürür — negatif komisyon gelir olurdu. */
+function sanitizeCommission(value: Kurus | null | undefined): Kurus {
+  if (value == null || !Number.isFinite(value) || value <= 0) return ZERO;
+  return value;
 }

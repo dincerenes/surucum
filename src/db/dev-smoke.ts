@@ -23,7 +23,7 @@ import {
   seedSystemCategories, startShift,
 } from './repo';
 import { getSyncStatus, pendingCount, runSync } from '@/sync/worker';
-import { asKurus, formatKurus, percentToBps } from '@/lib/money';
+import { asKurus, formatKurus } from '@/lib/money';
 import { toBusinessDate } from '@/lib/business-date';
 
 /** Gerçek bir kullanıcı kimliğiyle asla çakışmayacak sabit. */
@@ -54,24 +54,24 @@ export async function runDataLayerSmoke(): Promise<SmokeCheck[]> {
     const hasFuelCategory = categories.some((c) => c.name === 'Yakıt');
     record('Gider kategorileri', categories.length > 0 && !hasFuelCategory,
       `${categories.length} kategori, "Yakıt" yok (çift sayım kapalı)`);
+    record('"Diğer" kategorisi var',
+      categories.some((c) => c.name === 'Diğer'),
+      'serbest gider girişi mümkün');
 
     const vehicle = createVehicle(SMOKE_USER_ID, {
-      label: 'Sınama aracı', ownership: 'rented_plate',
+      label: 'Sınama aracı', ownership: 'owned',
       fuelTypes: ['gasoline', 'lpg'],
     }, now);
-    record('Araç + yıpranma payı', vehicle.wearPerKmKurus === 300,
-      `kiralık plaka → ${vehicle.wearPerKmKurus} kuruş/km`);
+    record('Araç + yıpranma payı', vehicle.wearPerKmKurus === 250,
+      `kendi aracı → ${vehicle.wearPerKmKurus} kuruş/km`);
 
     const fuelRows = getDb().select().from(vehicleFuelTypes)
       .where(eq(vehicleFuelTypes.vehicleId, vehicle.id)).all();
     record('Çift yakıt', fuelRows.length === 2 && fuelRows[0].isPrimary,
       `${fuelRows.length} yakıt tipi, ilki birincil`);
 
-    const source = createEarningSource(SMOKE_USER_ID, {
-      name: 'Uygulama 1', defaultCommissionBps: percentToBps(20),
-    }, now);
-    record('Kazanç kaynağı', source.defaultCommissionBps === 2000,
-      `%${source.defaultCommissionBps / 100} komisyon`);
+    const source = createEarningSource(SMOKE_USER_ID, { name: 'Uygulama 1' }, now);
+    record('Kazanç kaynağı', source.name === 'Uygulama 1', 'oran sorulmuyor');
 
     // --- Günlük döngü ------------------------------------------------------
     const shift = startShift(SMOKE_USER_ID, vehicle.id, 4, now);
@@ -83,22 +83,19 @@ export async function runDataLayerSmoke(): Promise<SmokeCheck[]> {
       earningSourceId: source.id, shiftId: shift.id, vehicleId: vehicle.id,
       grossAmountKurus: asKurus(24000),
     }, 4, now + 2000);
-    record('Sefer — oran kaynaktan okundu',
-      ride1.commissionKurus === 4800 && ride1.netAmountKurus === 19200,
-      `brüt 240,00 → komisyon ${formatKurus(ride1.commissionKurus)} → net ${formatKurus(ride1.netAmountKurus)}`);
+    record('Sefer komisyon KESMİYOR',
+      ride1.commissionKurus === 0 && ride1.netAmountKurus === 24000,
+      `brüt ${formatKurus(ride1.grossAmountKurus)} → net ${formatKurus(ride1.netAmountKurus)}`);
 
     addRide(SMOKE_USER_ID, {
       earningSourceId: source.id, shiftId: shift.id, vehicleId: vehicle.id,
       grossAmountKurus: asKurus(18750), tipKurus: asKurus(2000),
     }, 4, now + 3000);
 
-    const ride3 = addRide(SMOKE_USER_ID, {
+    addRide(SMOKE_USER_ID, {
       earningSourceId: source.id, shiftId: shift.id, vehicleId: vehicle.id,
-      grossAmountKurus: asKurus(52000), commissionOverrideKurus: asKurus(13000),
+      grossAmountKurus: asKurus(52000),
     }, 4, now + 4000);
-    record('Girilen kesinti oranı ezdi',
-      ride3.commissionKurus === 13000 && ride3.commissionBps === 2500,
-      `13.000 kuruş kesinti → geriye hesaplanan oran %25`);
 
     addExpense(SMOKE_USER_ID, {
       categoryId: categories[0].id, amountKurus: asKurus(15000),
@@ -120,7 +117,9 @@ export async function runDataLayerSmoke(): Promise<SmokeCheck[]> {
     record('Vardiyanın seferleri', inShift.length === 3,
       `${inShift.length} sefer bağlı`);
 
-    endShift(shift.id, { distanceKm: 238, workedMinutes: 462 }, now + 7000);
+    endShift(shift.id, {
+      commissionKurus: asKurus(21550), distanceKm: 238, workedMinutes: 462,
+    }, now + 7000);
     record('Vardiya kapandı', getOpenShift(SMOKE_USER_ID) === undefined,
       'açık vardiya kalmadı');
 
@@ -128,17 +127,18 @@ export async function runDataLayerSmoke(): Promise<SmokeCheck[]> {
     const date = toBusinessDate(now, 4);
     const summary = getDaySummary(SMOKE_USER_ID, date, now + 8000);
 
-    // ciro 240,00 + 187,50 + 520,00 + 20,00 bahşiş = 967,50
-    // komisyon 48,00 + 37,50 + 130,00 = 215,50
-    // yakıt 520,02 · gider 150,00 → cebe kalan 82,  yıpranma 238 × 3,00 = 714,00
+    // ciro    240,00 + 187,50 + 520,00 + 20,00 bahşiş = 967,50
+    // komisyon vardiya sonunda tek rakam              = 215,50
+    // yakıt 520,02 · gider 150,00      → cebe kalan   =  81,98
+    // yıpranma 238 km × 2,50                          = 595,00
     record('Ciro', summary.profit.revenue === 96750,
       formatKurus(summary.profit.revenue));
-    record('Komisyon', summary.profit.commission === 21550,
+    record('Komisyon vardiyadan okundu', summary.profit.commission === 21550,
       formatKurus(summary.profit.commission));
     record('Cebe kalan', summary.profit.cashProfit === 96750 - 21550 - 52002 - 15000,
       formatKurus(summary.profit.cashProfit));
-    record('Yıpranma — aracın kendi oranıyla', summary.profit.wearShare === 71400,
-      `238 km × 3,00 ₺ = ${formatKurus(summary.profit.wearShare)}`);
+    record('Yıpranma — aracın kendi oranıyla', summary.profit.wearShare === 59500,
+      `238 km × 2,50 ₺ = ${formatKurus(summary.profit.wearShare)}`);
     record('Gerçek kâr negatif olabiliyor', summary.profit.trueProfit < 0,
       formatKurus(summary.profit.trueProfit));
     record('Süre sürücünün yazdığı', !summary.isDurationEstimated,

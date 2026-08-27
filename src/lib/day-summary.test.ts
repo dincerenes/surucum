@@ -36,8 +36,8 @@ describe('calculateDaySummary', () => {
     assert.equal(s.profit.revenue, k(2310));
     assert.equal(s.profit.commission, k(577.5));
     assert.equal(s.profit.cashProfit, k(482.5));
-    assert.equal(s.profit.wearShare, k(840));
-    assert.equal(s.profit.trueProfit, k(-1557.5));
+    assert.equal(s.profit.wearShare, k(700));      // 280 km × 2,50 ₺
+    assert.equal(s.profit.trueProfit, k(-1417.5));
 
     // Cebinde para var ama gün zararda — ürünün varlık sebebi
     assert.ok(s.profit.cashProfit > 0);
@@ -79,7 +79,7 @@ describe('calculateDaySummary', () => {
     assert.equal(s.distanceKm, 120);
     assert.equal(s.shiftsMissingDistance, 1);
     assert.equal(s.profit.isDistanceEstimated, true);
-    assert.equal(s.profit.wearShare, k(360)); // 120 km × 3,00 ₺
+    assert.equal(s.profit.wearShare, k(300)); // 120 km × 2,50 ₺
   });
 
   it('kiralık araçta yıpranma sıfır — kira zaten sabit giderde sayılıyor', () => {
@@ -197,7 +197,7 @@ describe('çok araçlı gün', () => {
       rides: [ride(2000, 0)],
       expenses: [], fuelLogs: [],
       shifts: [
-        // Kendi aracı: 200 km × 3,00 ₺ = 600 ₺
+        // Kendi aracı: 200 km × 2,50 ₺ = 500 ₺
         { ...shift({ endedAt: T0 + 5 * H, distanceKm: 200 }),
           wearPerKmKurus: defaultWearPerKm('owned') },
         // Kiralık araç: 150 km × 0 = 0 ₺
@@ -207,9 +207,9 @@ describe('çok araçlı gün', () => {
       now: T0 + 12 * H,
     });
     assert.equal(s.distanceKm, 350);
-    assert.equal(s.profit.wearShare, k(600));
-    // Toplam kilometreye tek oran uygulansaydı 350 × 3,00 = 1.050 çıkardı
-    assert.notEqual(s.profit.wearShare, k(1050));
+    assert.equal(s.profit.wearShare, k(500));
+    // Toplam kilometreye tek oran uygulansaydı 350 × 2,50 = 875 çıkardı
+    assert.notEqual(s.profit.wearShare, k(875));
   });
 
   it('vardiyanın kendi oranı yoksa gün geneli orana düşülür', () => {
@@ -220,7 +220,7 @@ describe('çok araçlı gün', () => {
       wearPerKmKurus: defaultWearPerKm('owned'),
       now: T0 + 6 * H,
     });
-    assert.equal(s.profit.wearShare, k(300));
+    assert.equal(s.profit.wearShare, k(250));
   });
 
   it('vardiyanın kendi oranı gün geneli oranı EZER', () => {
@@ -235,5 +235,68 @@ describe('çok araçlı gün', () => {
       now: T0 + 6 * H,
     });
     assert.equal(s.profit.wearShare, 0);
+  });
+});
+
+describe('komisyon vardiya sonunda tek rakam', () => {
+  it('vardiyaya yazılan komisyon cebe kalandan düşer', () => {
+    const s = calculateDaySummary({
+      rides: [ride(1000, 0), ride(500, 0)],   // seferlerde komisyon yok
+      expenses: [], fuelLogs: [],
+      shifts: [{
+        ...shift({ endedAt: T0 + 8 * H, workedMinutes: 480 }),
+        commissionKurus: k(340),
+      }],
+      now: T0 + 9 * H,
+    });
+    assert.equal(s.profit.revenue, k(1500));
+    assert.equal(s.profit.commission, k(340));
+    assert.equal(s.profit.cashProfit, k(1160));
+  });
+
+  it('komisyon girilmemişse sıfır sayılır, tahmin edilmez', () => {
+    const s = calculateDaySummary({
+      rides: [ride(1000, 0)],
+      expenses: [], fuelLogs: [],
+      shifts: [shift({ endedAt: T0 + 5 * H })],
+      now: T0 + 6 * H,
+    });
+    assert.equal(s.profit.commission, 0);
+    assert.equal(s.profit.cashProfit, k(1000));
+  });
+
+  it('negatif komisyon geliri BÜYÜTMEZ', () => {
+    const s = calculateDaySummary({
+      rides: [ride(1000, 0)],
+      expenses: [], fuelLogs: [],
+      shifts: [{ ...shift({ endedAt: T0 + 5 * H }), commissionKurus: k(-500) }],
+      now: T0 + 6 * H,
+    });
+    assert.equal(s.profit.commission, 0);
+    assert.equal(s.profit.cashProfit, k(1000));
+  });
+
+  it('birden fazla vardiyanın komisyonu toplanır', () => {
+    const s = calculateDaySummary({
+      rides: [ride(2000, 0)],
+      expenses: [], fuelLogs: [],
+      shifts: [
+        { ...shift({ endedAt: T0 + 4 * H }), commissionKurus: k(200) },
+        { ...shift({ startedAt: T0 + 6 * H, endedAt: T0 + 10 * H }), commissionKurus: k(150) },
+      ],
+      now: T0 + 11 * H,
+    });
+    assert.equal(s.profit.commission, k(350));
+  });
+
+  it('sefer komisyonu ile vardiya komisyonu birlikte toplanır', () => {
+    // v1'de sefer komisyonu daima sıfır; kapının açık kaldığını doğruluyoruz
+    const s = calculateDaySummary({
+      rides: [ride(1000, 50)],
+      expenses: [], fuelLogs: [],
+      shifts: [{ ...shift({ endedAt: T0 + 5 * H }), commissionKurus: k(100) }],
+      now: T0 + 6 * H,
+    });
+    assert.equal(s.profit.commission, k(150));
   });
 });

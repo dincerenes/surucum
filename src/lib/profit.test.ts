@@ -183,11 +183,11 @@ describe('gerçekçi vardiya', () => {
     assert.equal(p.revenue, k(2310));      // 14 × 165
     assert.equal(p.commission, k(577.5));
     assert.equal(p.cashProfit, k(482.5));  // 2310 − 577,5 − 1100 − 150
-    assert.equal(p.wearShare, k(840));     // 280 km × 3,00
+    assert.equal(p.wearShare, k(700));     // 280 km × 2,50
 
     // Cebinde 482,50 lira var ve kazandığını sanıyor.
-    // Gerçekte 1.557,50 lira ZARAR etmiş.
-    assert.equal(p.trueProfit, k(-1557.5));
+    // Gerçekte 1.417,50 lira ZARAR etmiş.
+    assert.equal(p.trueProfit, k(-1417.5));
     assert.ok(p.cashProfit > 0 && p.trueProfit < 0);
   });
 });

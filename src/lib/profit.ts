@@ -146,10 +146,16 @@ export function calculateWearShare(
 }
 
 /*
- * NOT — sabit giderin güne düşen payını hesaplayan tahakkuk motoru burada
- * DEĞİL, kendi modülünde olacak (Faz 3, raporlar). Sebebi şu: aylık tutarı
- * gün sayısına naif bölmek kuruş kaybettirir ve ayın günleri toplandığında
- * aylık tutar tutmaz. Bölme `money.ts`'teki `allocate()` ile yapılmalı,
- * gün de o dizideki indeksini almalı. `calculateProfit` bu yüzden payı
- * kendisi hesaplamıyor, `fixedShare` olarak hazır alıyor.
+ * NOT — sabit gider tahakkuku YAYIN SONRASINA ERTELENDİ (27 Ağustos 2026
+ * kapsam kararı). v1'de plaka kirası, kasko, MTV güne dağıtılmıyor; sürücü
+ * isterse bunları sıradan gider olarak giriyor ve o gün "cebe kalan"dan
+ * düşüyor. Gerçek kâr satırı yalnızca km yıpranma payını düşüyor.
+ *
+ * `fixedShare` alanı DURUYOR ve varsayılanı sıfır — motor geldiğinde
+ * çağıran taraf payı hesaplayıp buraya verecek, bu modül değişmeyecek.
+ *
+ * Motor geldiğinde uyulacak kural: aylık tutarı gün sayısına naif bölmek
+ * kuruş kaybettirir ve ayın günleri toplandığında aylık tutar tutmaz.
+ * Bölme `money.ts`'teki `allocate()` ile yapılmalı, gün de o dizideki
+ * indeksini almalı.
  */

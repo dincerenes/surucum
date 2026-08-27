@@ -18,12 +18,10 @@ import { type BusinessDate, todayBusinessDate } from '@/lib/business-date';
 /**
  * Bir iş gününün özeti.
  *
- * `fixedShare` şimdilik SIFIR: sabit giderin güne düşen payını hesaplayan
- * tahakkuk motoru Faz 3'te, kendi modülünde gelecek. Aylık tutarı gün
- * sayısına naif bölmek kuruş kaybettiriyor; bölme `allocate()` ile
- * yapılmak zorunda. O gelene kadar "gerçek kâr" satırı yalnızca yıpranma
- * payını düşüyor ve bu ARAYÜZDE BELİRTİLMELİ — eksik bir sayıyı tam
- * gibi göstermek, sürücünün sayıya olan güvenini kaybettirir.
+ * `fixedShare` SIFIR ve v1'de öyle kalıyor: sabit gider tahakkuku yayın
+ * sonrasına ertelendi (27 Ağustos 2026 kapsam kararı). Sürücü plaka kirası
+ * gibi ödemeleri sıradan gider olarak giriyor; o gün "cebe kalan"dan
+ * düşüyorlar. Gerçek kâr satırı yalnızca km yıpranma payını düşüyor.
  */
 export function getDaySummary(
   userId: string, date: BusinessDate, now: UnixMs = Date.now(),
@@ -112,6 +110,7 @@ function readShiftRows(
     endedAt: shifts.endedAt,
     workedMinutes: shifts.workedMinutes,
     distanceKm: shifts.distanceKm,
+    commissionKurus: shifts.commissionKurus,
     wearPerKmKurus: vehicles.wearPerKmKurus,
   })
     .from(shifts)
@@ -127,6 +126,7 @@ function readShiftRows(
       endedAt: r.endedAt,
       workedMinutes: r.workedMinutes,
       distanceKm: r.distanceKm,
+      commissionKurus: r.commissionKurus as Kurus | null,
       wearPerKmKurus: r.wearPerKmKurus as Kurus | null,
     }));
 }

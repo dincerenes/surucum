@@ -8,7 +8,7 @@
 
 import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import { getDb } from '../client';
-import { earningSources, rides } from '../schema';
+import { rides } from '../schema';
 import type { Ride } from '../schema/earnings';
 import type { PaymentMethod } from '../schema/_shared';
 import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
@@ -43,9 +43,13 @@ export interface NewRideInput {
 /**
  * Sefer ekler.
  *
- * Komisyon oranı kaynaktan OKUNUR ve kaydın içine kopyalanır. Kaynak
- * bulunamazsa oran sıfır kabul edilir — sefer yine kaydedilir. Kaydı
- * reddetmek, sürücünün parasını uygulamaya girememesi demek olurdu.
+ * KOMİSYON KESİLMEZ. Sefer kaydı yalnızca sürücünün eline geçen brüt
+ * tutarı taşır; komisyon vardiya sonunda tek rakam olarak giriliyor
+ * (`shifts.commission_kurus`). Sefer başına oran hem girişi
+ * yavaşlatıyordu hem de sürücünün doğrulayamadığı bir sayı üretiyordu.
+ *
+ * `commissionBps` ve `commissionOverrideKurus` alanları duruyor ve
+ * varsayılanları sıfır — açıkça verilirse yine çalışırlar, kapı açık.
  */
 export function addRide(
   userId: string,
@@ -54,11 +58,10 @@ export function addRide(
   now: UnixMs = Date.now(),
 ): Ride {
   const occurredAt = input.occurredAt ?? now;
-  const bps = input.commissionBps ?? readCommissionBps(input.earningSourceId);
 
   const amounts = calculateRideAmounts({
     grossAmountKurus: input.grossAmountKurus,
-    commissionBps: bps,
+    commissionBps: input.commissionBps ?? (0 as BasisPoints),
     commissionOverrideKurus: input.commissionOverrideKurus,
     tipKurus: input.tipKurus,
   });
@@ -166,19 +169,4 @@ export function listRidesInRange(
     ))
     .orderBy(desc(rides.occurredAt))
     .all();
-}
-
-/**
- * Kaynağın o anki komisyon oranı.
- *
- * Kaynak silinmiş ya da bulunamıyorsa sıfır döner: sefer kaydedilir,
- * komisyon kesilmez. Yanlış oranla kesmektense kesmemek daha az zararlı —
- * eksik kesinti sürücünün fark edeceği bir sapma, uydurma kesinti değil.
- */
-function readCommissionBps(earningSourceId: string): BasisPoints {
-  const source = getDb().select({ bps: earningSources.defaultCommissionBps })
-    .from(earningSources)
-    .where(aliveById(earningSources, earningSourceId))
-    .get();
-  return source?.bps ?? (0 as BasisPoints);
 }

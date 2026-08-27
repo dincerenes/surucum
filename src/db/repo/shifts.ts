@@ -12,6 +12,7 @@ import { shifts } from '../schema';
 import type { Shift } from '../schema/earnings';
 import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
 import { type BusinessDate, DEFAULT_CUTOFF_HOUR, toBusinessDate } from '@/lib/business-date';
+import type { Kurus } from '@/lib/money';
 
 /**
  * Vardiyayı başlatır.
@@ -43,6 +44,12 @@ export function startShift(
 
 export interface EndShiftInput {
   /**
+   * O gün uygulamaya ödenen toplam komisyon — TEK RAKAM, oran değil.
+   * Sürücü yüzdesini bilmiyor; eline geçeni ve kesileni biliyor.
+   */
+  commissionKurus?: Kurus | null;
+
+  /**
    * Vardiya boyunca kat edilen yol — kilometre SAYACI DEĞİL.
    * Boşsa yıpranma payı hesaplanmaz, tahmin edilmez.
    */
@@ -73,6 +80,7 @@ export function endShift(
   withOutbox('shifts', id, 'upsert', (tx) => {
     tx.update(shifts).set({
       endedAt: current.endedAt ?? now,
+      commissionKurus: sanitizeAmount(input.commissionKurus),
       distanceKm: sanitizePositive(input.distanceKm),
       workedMinutes: sanitizePositive(input.workedMinutes),
       ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
@@ -87,6 +95,8 @@ export function updateShiftTotals(
 ): void {
   withOutbox('shifts', id, 'upsert', (tx) => {
     tx.update(shifts).set({
+      ...(input.commissionKurus !== undefined
+        ? { commissionKurus: sanitizeAmount(input.commissionKurus) } : {}),
       ...(input.distanceKm !== undefined
         ? { distanceKm: sanitizePositive(input.distanceKm) } : {}),
       ...(input.workedMinutes !== undefined
@@ -162,4 +172,17 @@ function sanitizePositive(value: number | null | undefined): number | null {
   if (value == null) return null;
   if (!Number.isFinite(value) || value <= 0) return null;
   return value;
+}
+
+/**
+ * Tutarı temizler: negatif ve sıfır `null` olur.
+ *
+ * Sıfır komisyon ile "komisyon girilmedi" arasındaki farkı korumak
+ * gerekmiyor — ikisi de hesaba sıfır olarak giriyor. Ama negatif bir
+ * tutar komisyonu GELİRE çevirirdi.
+ */
+function sanitizeAmount(value: Kurus | null | undefined): Kurus | null {
+  if (value == null) return null;
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.round(value) as Kurus;
 }

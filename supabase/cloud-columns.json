@@ -161,7 +161,8 @@
       "business_date",
       "notes",
       "distance_km",
-      "worked_minutes"
+      "worked_minutes",
+      "commission_kurus"
     ],
     "vehicle_fuel_types": [
       "id",

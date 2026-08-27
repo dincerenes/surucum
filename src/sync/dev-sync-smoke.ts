@@ -13,7 +13,7 @@ import { getDb } from '@/db/client';
 import { earningSources, outbox, rides, shifts, vehicles } from '@/db/schema';
 import { addRide, createEarningSource, createVehicle, endShift, startShift } from '@/db/repo';
 import { getSupabase } from '@/lib/supabase';
-import { asKurus, percentToBps } from '@/lib/money';
+import { asKurus } from '@/lib/money';
 import { getPullCursor, resetPullCursor } from './state';
 import { pendingCount } from './push';
 import { runSync } from './worker';
@@ -50,15 +50,15 @@ export async function runSyncSmoke(): Promise<SyncCheck[]> {
     const vehicle = createVehicle(userId, {
       label: `${MARK} aracı`, ownership: 'owned', fuelTypes: ['gasoline'],
     }, now);
-    const source = createEarningSource(userId, {
-      name: `${MARK} kaynağı`, defaultCommissionBps: percentToBps(20),
-    }, now);
+    const source = createEarningSource(userId, { name: `${MARK} kaynağı` }, now);
     const shift = startShift(userId, vehicle.id, 4, now);
     const ride = addRide(userId, {
       earningSourceId: source.id, shiftId: shift.id, vehicleId: vehicle.id,
       grossAmountKurus: asKurus(24000),
     }, 4, now + 1000);
-    endShift(shift.id, { distanceKm: 120, workedMinutes: 300 }, now + 2000);
+    endShift(shift.id, {
+      commissionKurus: asKurus(3400), distanceKm: 120, workedMinutes: 300,
+    }, now + 2000);
 
     const queuedBefore = pendingCount();
     add('Kayıtlar kuyruğa girdi', queuedBefore >= 5, `${queuedBefore} kayıt`);
@@ -71,21 +71,24 @@ export async function runSyncSmoke(): Promise<SyncCheck[]> {
 
     // --- 3. Bulutta gerçekten var mı ------------------------------------
     const cloudRide = await supabase.from('rides')
-      .select('gross_amount_kurus, commission_kurus, net_amount_kurus, commission_bps, business_date')
+      .select('gross_amount_kurus, commission_kurus, net_amount_kurus, business_date')
       .eq('id', ride.id).single();
     add('Sefer buluta ulaştı', !cloudRide.error && cloudRide.data != null,
       cloudRide.error?.message ?? 'bulundu');
     add('Kuruş tutarları bozulmadan gitti',
       cloudRide.data?.gross_amount_kurus === 24000
-      && cloudRide.data?.commission_kurus === 4800
-      && cloudRide.data?.net_amount_kurus === 19200,
-      `${cloudRide.data?.gross_amount_kurus} / ${cloudRide.data?.commission_kurus} / ${cloudRide.data?.net_amount_kurus}`);
+      && cloudRide.data?.net_amount_kurus === 24000,
+      `brüt ${cloudRide.data?.gross_amount_kurus} · net ${cloudRide.data?.net_amount_kurus}`);
 
     const cloudShift = await supabase.from('shifts')
-      .select('distance_km, worked_minutes').eq('id', shift.id).single();
-    add('Yeni sütunlar gitti (0002)',
+      .select('distance_km, worked_minutes, commission_kurus')
+      .eq('id', shift.id).single();
+    add('Vardiya mesafe/süre gitti (0002)',
       cloudShift.data?.distance_km === 120 && cloudShift.data?.worked_minutes === 300,
       `${cloudShift.data?.distance_km} km · ${cloudShift.data?.worked_minutes} dk`);
+    add('Vardiya komisyonu gitti (0004)',
+      cloudShift.data?.commission_kurus === 3400,
+      `${cloudShift.data?.commission_kurus} kuruş`);
 
     const cloudVehicle = await supabase.from('vehicles')
       .select('is_active, wear_per_km_kurus, label').eq('id', vehicle.id).single();
@@ -93,7 +96,7 @@ export async function runSyncSmoke(): Promise<SyncCheck[]> {
       cloudVehicle.data?.is_active === true,
       `is_active = ${JSON.stringify(cloudVehicle.data?.is_active)}`);
     add('Yıpranma payı gitti (0001)',
-      cloudVehicle.data?.wear_per_km_kurus === 300,
+      cloudVehicle.data?.wear_per_km_kurus === 250,
       `${cloudVehicle.data?.wear_per_km_kurus} kuruş/km`);
 
     // vehicle_fuel_types — 0003'te adı düzeltilen sütunun tablosu
