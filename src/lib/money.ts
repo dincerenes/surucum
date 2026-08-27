@@ -241,6 +241,15 @@ function groupThousands(digits: string): string {
  * platforma göre değişiyor ve para biçiminin her cihazda aynı görünmesi
  * gerekiyor.
  */
+/**
+ * Eksi işareti — düz tire değil, TİPOGRAFİK EKSİ (U+2212).
+ *
+ * Düz tire rakamlardan belirgin biçimde dar ve alçak duruyor; alt alta
+ * sıralanan tutarlarda hizayı bozuyor ve okunurluğu düşürüyor. Ayrıca
+ * gider satırlarında elle konan eksiyle biçim tutarsızlığı çıkıyordu.
+ */
+const MINUS = '\u2212';
+
 export function formatKurus(value: Kurus | number, opts: FormatOptions = {}): string {
   const { symbol = true, decimals = true, sign = 'auto' } = opts;
   const v = Math.trunc(value);
@@ -257,7 +266,7 @@ export function formatKurus(value: Kurus | number, opts: FormatOptions = {}): st
     body = groupThousands(String(whole));
   }
 
-  const prefix = negative ? '-' : sign === 'always' ? '+' : '';
+  const prefix = negative ? MINUS : sign === 'always' ? '+' : '';
   return symbol ? `${prefix}${body} ₺` : `${prefix}${body}`;
 }
 
@@ -272,7 +281,7 @@ export function formatKurusCompact(value: Kurus | number, symbol = true): string
   else if (lira >= 1_000) body = `${trimZero(lira / 1_000)} B`;
   else body = trimZero(lira);
 
-  const prefix = negative ? '-' : '';
+  const prefix = negative ? MINUS : '';
   return symbol ? `${prefix}${body} ₺` : `${prefix}${body}`;
 }
 
@@ -318,7 +327,14 @@ export function parseAmount(input: string): Kurus | null {
   if (!s) return null;
 
   let negative = false;
-  if (s.startsWith('-')) {
+  /**
+   * Hem düz tire hem TİPOGRAFİK EKSİ kabul ediliyor.
+   *
+   * `formatKurus` tipografik eksi üretiyor; biçimlendirilmiş bir tutar
+   * alana geri konup düzenlenirse (ön dolgulu alanlar böyle çalışıyor)
+   * düz tire beklemek girdiyi okunamaz yapardı ve `null` dönerdi.
+   */
+  if (s.startsWith('-') || s.startsWith(MINUS)) {
     negative = true;
     s = s.slice(1);
   } else if (s.startsWith('+')) {

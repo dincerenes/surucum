@@ -152,7 +152,8 @@ describe('biçimlendirme', () => {
     assert.equal(formatKurus(K(0)), '0,00 ₺');
     assert.equal(formatKurus(K(5)), '0,05 ₺');
     assert.equal(formatKurus(K(100)), '1,00 ₺');
-    assert.equal(formatKurus(K(-123456)), '-1.234,56 ₺');
+    // Tipografik eksi (U+2212), düz tire değil — rakamlarla hizalı dursun
+    assert.equal(formatKurus(K(-123456)), '\u22121.234,56 ₺');
     assert.equal(formatKurus(K(123456789)), '1.234.567,89 ₺');
   });
 
@@ -161,7 +162,7 @@ describe('biçimlendirme', () => {
     assert.equal(formatKurus(K(123456), { decimals: false }), '1.235 ₺');
     assert.equal(formatKurus(K(123400), { decimals: false }), '1.234 ₺');
     assert.equal(formatKurus(K(123456), { sign: 'always' }), '+1.234,56 ₺');
-    assert.equal(formatKurus(K(-123456), { sign: 'always' }), '-1.234,56 ₺');
+    assert.equal(formatKurus(K(-123456), { sign: 'always' }), '\u22121.234,56 ₺');
   });
 
   test('kısa biçim', () => {
@@ -193,6 +194,8 @@ describe('girdi okuma — sürücü hızlı yazar, biçim tutarsızdır', () => 
     ['₺1.234,56', 123456],
     ['1234,56 TL', 123456],
     ['-450', -45000],
+    ['\u2212450', -45000],        // tipografik eksi de okunuyor
+    ['\u22121.234,56 ₺', -123456], // biçimlendirilmiş tutar geri okunabiliyor
     ['1,234.56', 123456],
     ['1.234.567', 123456700],
     ['1,999', 200],

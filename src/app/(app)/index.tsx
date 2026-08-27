@@ -2,7 +2,12 @@ import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ui/button';
+import { useState } from 'react';
+import {
+  AmountInput, AmountText, Button, Card as UiCard, Chip, ChipRow, SummaryRows,
+} from '@/components/ui';
+import { calculateDaySummary } from '@/lib/day-summary';
+import { defaultWearPerKm } from '@/db/schema/_shared';
 import { getDb } from '@/db/client';
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatBusinessDate, todayBusinessDate } from '@/lib/business-date';
@@ -34,6 +39,35 @@ export default function HomeScreen() {
   }, []);
 
   const today = todayBusinessDate();
+
+  /**
+   * GEÇİCİ — primitiflerin cihazda gerçekten render edildiğini gösteren
+   * blok. Faz 2'nin gerçek ekranları geldiğinde bu ekranla birlikte
+   * silinecek.
+   */
+  const [tutar, setTutar] = useState('');
+  const [kaynak, setKaynak] = useState('Uygulama 1');
+
+  const ornekOzet = useMemo(() => {
+    const T = Date.now();
+    return calculateDaySummary({
+      rides: [
+        { grossAmountKurus: asKurus(24000), commissionKurus: asKurus(0), tipKurus: asKurus(0) },
+        { grossAmountKurus: asKurus(18750), commissionKurus: asKurus(0), tipKurus: asKurus(2000) },
+      ],
+      expenses: [{ amountKurus: asKurus(15000) }],
+      fuelLogs: [{ totalAmountKurus: asKurus(52002) }],
+      shifts: [{
+        startedAt: T - 8 * 3_600_000, endedAt: T,
+        workedMinutes: 462, distanceKm: 238,
+        commissionKurus: asKurus(21550),
+        fuelConsumptionPer100Km: 7500,
+        fuelPriceKurus: asKurus(5000),
+        wearPerKmKurus: defaultWearPerKm('owned'),
+      }],
+      now: T,
+    });
+  }, []);
 
   return (
     <ScrollView
@@ -72,6 +106,36 @@ export default function HomeScreen() {
           {check.commission + check.net === check.gross ? 'tutuyor' : 'TUTMUYOR'}
         </Text>
       </Card>
+
+      <UiCard title="Primitifler — üç satır">
+        <SummaryRows summary={ornekOzet} />
+      </UiCard>
+
+      <UiCard title="Primitifler — çip ve tutar">
+        <ChipRow>
+          {['Uygulama 1', 'Uygulama 2', 'Nakit Müşteri'].map((ad) => (
+            <Chip
+              key={ad}
+              label={ad}
+              selected={kaynak === ad}
+              onPress={() => setKaynak(ad)}
+            />
+          ))}
+        </ChipRow>
+        <AmountInput
+          label="Brüt tutar"
+          value={tutar}
+          onChangeText={setTutar}
+          hint="Sistem klavyesi · ondalık mod"
+        />
+        <View style={styles.row}>
+          <Text style={[typeScale.body, { color: colors.textSoft }]}>Pozitif / negatif</Text>
+          <View style={{ flexDirection: 'row', gap: space.md }}>
+            <AmountText value={asKurus(48250)} tone="signed" />
+            <AmountText value={asKurus(-63202)} tone="signed" />
+          </View>
+        </View>
+      </UiCard>
 
       {user ? (
         <Button label="Çıkış yap" variant="secondary" onPress={signOut} />
