@@ -25,11 +25,12 @@ export default function RootLayout() {
    */
   useEffect(() => {
     if (!success || !__DEV__) return;
-    const checks = runDataLayerSmoke();
-    const failed = checks.filter((c) => !c.ok);
-    console.log(`SMOKE_BASLADI ${checks.length - failed.length}/${checks.length}`);
-    for (const c of checks) console.log(`SMOKE ${c.ok ? 'OK ' : 'FAIL'} ${c.label} :: ${c.detail}`);
-    console.log('SMOKE_BITTI');
+    void runDataLayerSmoke().then((checks) => {
+      const failed = checks.filter((c) => !c.ok);
+      console.log(`SMOKE_BASLADI ${checks.length - failed.length}/${checks.length}`);
+      for (const c of checks) console.log(`SMOKE ${c.ok ? 'OK ' : 'FAIL'} ${c.label} :: ${c.detail}`);
+      console.log('SMOKE_BITTI');
+    });
   }, [success]);
 
   if (error) {

@@ -22,6 +22,7 @@ import {
   endShift, ensureSettings, getDaySummary, getOpenShift, listRidesInShift,
   seedSystemCategories, startShift,
 } from './repo';
+import { getSyncStatus, pendingCount, runSync } from '@/sync/worker';
 import { asKurus, formatKurus, percentToBps } from '@/lib/money';
 import { toBusinessDate } from '@/lib/business-date';
 
@@ -34,7 +35,7 @@ export interface SmokeCheck {
   detail: string;
 }
 
-export function runDataLayerSmoke(): SmokeCheck[] {
+export async function runDataLayerSmoke(): Promise<SmokeCheck[]> {
   const checks: SmokeCheck[] = [];
   const now = Date.now();
   const record = (label: string, ok: boolean, detail: string) => {
@@ -153,6 +154,24 @@ export function runDataLayerSmoke(): SmokeCheck[] {
       `${queued.length} kayıt, ${uniqueRows.size} benzersiz satır`);
     record('Aynı satır kuyrukta tek kez', queued.length === uniqueRows.size,
       'tekrar düzenlemeler çakışmadı');
+
+    // --- Senkron işçisi ----------------------------------------------------
+    /**
+     * Ağ yolu oturum gerektiriyor; buradaki sınama işçinin Hermes'te
+     * YÜKLENDİĞİNİ ve oturumsuzken düzgün davrandığını gösteriyor.
+     * Oturumsuzken çökmek ya da boş kuyruk bırakmak yerine temiz
+     * atlaması gerekiyor — uygulama bulutsuz da eksiksiz çalışmalı.
+     */
+    const before = pendingCount();
+    const sync = await runSync();
+    record('Senkron oturumsuz temiz atlıyor',
+      !sync.ran && (sync.skipped === 'not_signed_in' || sync.skipped === 'cloud_not_configured'),
+      `${sync.skipped ?? 'çalıştı'}`);
+    record('Atlanan tur kuyruğa dokunmadı', pendingCount() === before,
+      `${before} kayıt yerinde`);
+    record('Senkron durumu okunabiliyor',
+      typeof getSyncStatus().cursor === 'string',
+      `imleç ${getSyncStatus().cursor.slice(0, 10)}`);
 
     const allInteger = [
       summary.profit.revenue, summary.profit.commission, summary.profit.cashProfit,
