@@ -12,13 +12,19 @@ import { rides } from '../schema';
 import type { Ride } from '../schema/earnings';
 import type { PaymentMethod } from '../schema/_shared';
 import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
+import { ensureDefaultEarningSource } from './earning-sources';
 import { type BasisPoints, type Kurus } from '@/lib/money';
 import { calculateRideAmounts } from '@/lib/ride';
 import { type BusinessDate, DEFAULT_CUTOFF_HOUR, toBusinessDate } from '@/lib/business-date';
 
 export interface NewRideInput {
-  earningSourceId: string;
   grossAmountKurus: Kurus;
+
+  /**
+   * Kazanç kaynağı. v1'de sürücüye sorulmuyor; verilmezse tek olan
+   * kaynak kullanılıyor (yoksa açılıyor).
+   */
+  earningSourceId?: string;
 
   /** Açık vardiya varsa kimliği. Vardiya dışında da sefer olabilir. */
   shiftId?: string | null;
@@ -58,6 +64,8 @@ export function addRide(
   now: UnixMs = Date.now(),
 ): Ride {
   const occurredAt = input.occurredAt ?? now;
+  const earningSourceId = input.earningSourceId
+    ?? ensureDefaultEarningSource(userId, now).id;
 
   const amounts = calculateRideAmounts({
     grossAmountKurus: input.grossAmountKurus,
@@ -71,7 +79,7 @@ export function addRide(
     tx.insert(rides).values({
       ...stamp,
       shiftId: input.shiftId ?? null,
-      earningSourceId: input.earningSourceId,
+      earningSourceId,
       vehicleId: input.vehicleId ?? null,
       occurredAt,
       businessDate: toBusinessDate(occurredAt, cutoffHour),

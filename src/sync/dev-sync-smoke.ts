@@ -51,6 +51,7 @@ export async function runSyncSmoke(): Promise<SyncCheck[]> {
       label: `${MARK} aracı`, ownership: 'owned', fuelTypes: ['gasoline'],
     }, now);
     const source = createEarningSource(userId, { name: `${MARK} kaynağı` }, now);
+
     const shift = startShift(userId, vehicle.id, 4, now);
     const ride = addRide(userId, {
       earningSourceId: source.id, shiftId: shift.id, vehicleId: vehicle.id,

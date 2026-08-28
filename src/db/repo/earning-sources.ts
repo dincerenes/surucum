@@ -1,9 +1,16 @@
 /**
- * Kazanç kaynakları — sürücünün parayı nereden kazandığı.
+ * Kazanç kaynağı.
  *
- * BU LİSTE UYGULAMA TARAFINDAN DOLDURULMAZ. Kullanıcı kendi kaynaklarını
- * kendi adlandırır; uygulama hiçbir yerde üçüncü taraf marka adı taşımaz,
- * tohum veride bile taşımaz.
+ * v1'DE SÜRÜCÜYE HİÇ SORULMUYOR ve arayüzde görünmüyor. Hedef kitle tek
+ * bir platform üzerinden çalışıyor; her sefer için "bu para nereden
+ * geldi" diye sormak, cevabı hep aynı olan bir soru sormaktır ve sefer
+ * girişini yavaşlatır.
+ *
+ * Tek satır otomatik açılıyor (`ensureDefaultEarningSource`) ve seferler
+ * ona bağlanıyor. Tablo duruyor çünkü ileride birden fazla kaynakla
+ * çalışan sürücü desteklenirse kapı açık; bugün o kapıdan geçen yok.
+ *
+ * Uygulama hiçbir yerde üçüncü taraf marka adı taşımaz — tohum veride bile.
  */
 
 import { asc, eq } from 'drizzle-orm';
@@ -81,4 +88,18 @@ export function listActiveEarningSources(userId: string): EarningSource[] {
 export function getEarningSource(id: string): EarningSource | undefined {
   return getDb().select().from(earningSources)
     .where(aliveById(earningSources, id)).get();
+}
+
+/**
+ * Sürücünün tek kazanç kaynağı — yoksa açar.
+ *
+ * Adı sürücüye GÖSTERİLMİYOR; seferler bir kaynağa bağlanmak zorunda
+ * olduğu için var. Nötr ve tanımlayıcı: hiçbir platforma işaret etmiyor.
+ */
+export function ensureDefaultEarningSource(
+  userId: string, now: UnixMs = Date.now(),
+): EarningSource {
+  const existing = listActiveEarningSources(userId);
+  if (existing.length > 0) return existing[0];
+  return createEarningSource(userId, { name: 'Sefer geliri' }, now);
 }

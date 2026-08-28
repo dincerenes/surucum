@@ -18,7 +18,7 @@ import {
   shifts, appSettings, vehicleFuelTypes, vehicles,
 } from './schema';
 import {
-  addExpense, addFuelLog, addRide, createEarningSource, createVehicle,
+  addExpense, addFuelLog, addRide, createVehicle, ensureDefaultEarningSource,
   endShift, ensureSettings, getDaySummary, getKnownFuelFigures, getOpenShift,
   listRidesInShift, seedSystemCategories, startShift,
 } from './repo';
@@ -70,8 +70,11 @@ export async function runDataLayerSmoke(): Promise<SmokeCheck[]> {
     record('Çift yakıt', fuelRows.length === 2 && fuelRows[0].isPrimary,
       `${fuelRows.length} yakıt tipi, ilki birincil`);
 
-    const source = createEarningSource(SMOKE_USER_ID, { name: 'Uygulama 1' }, now);
-    record('Kazanç kaynağı', source.name === 'Uygulama 1', 'oran sorulmuyor');
+    const source = ensureDefaultEarningSource(SMOKE_USER_ID, now);
+    record('Tek kazanç kaynağı otomatik açıldı',
+      source.name === 'Sefer geliri', 'sürücüye sorulmuyor');
+    record('İkinci çağrı yeni kaynak açmıyor',
+      ensureDefaultEarningSource(SMOKE_USER_ID, now).id === source.id, 'tek satır');
 
     // --- Günlük döngü ------------------------------------------------------
     const shift = startShift(SMOKE_USER_ID, vehicle.id, 4, now);
@@ -80,20 +83,22 @@ export async function runDataLayerSmoke(): Promise<SmokeCheck[]> {
       'ikinci basış yeni vardiya açmadı');
 
     const ride1 = addRide(SMOKE_USER_ID, {
-      earningSourceId: source.id, shiftId: shift.id, vehicleId: vehicle.id,
+      shiftId: shift.id, vehicleId: vehicle.id,
       grossAmountKurus: asKurus(24000),
     }, 4, now + 2000);
+    record('Sefer kaynağı kendi buluyor',
+      ride1.earningSourceId === source.id, 'girişte seçim yok');
     record('Sefer komisyon KESMİYOR',
       ride1.commissionKurus === 0 && ride1.netAmountKurus === 24000,
       `brüt ${formatKurus(ride1.grossAmountKurus)} → net ${formatKurus(ride1.netAmountKurus)}`);
 
     addRide(SMOKE_USER_ID, {
-      earningSourceId: source.id, shiftId: shift.id, vehicleId: vehicle.id,
+      shiftId: shift.id, vehicleId: vehicle.id,
       grossAmountKurus: asKurus(18750), tipKurus: asKurus(2000),
     }, 4, now + 3000);
 
     addRide(SMOKE_USER_ID, {
-      earningSourceId: source.id, shiftId: shift.id, vehicleId: vehicle.id,
+      shiftId: shift.id, vehicleId: vehicle.id,
       grossAmountKurus: asKurus(52000),
     }, 4, now + 4000);
 

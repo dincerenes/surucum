@@ -31,10 +31,12 @@ Uygulama adı, alt başlık, ikon, ekran görüntüsü, örnek veri, mockup içi
 sahte veri — **hiçbirinde** taksi/yolculuk uygulaması markası olmayacak.
 Yasal sebep.
 
-Mockup'ta örnek kazanç kaynağı gerekiyorsa nötr adlar kullan:
-**"Uygulama 1", "Uygulama 2", "Nakit Müşteri", "Kurumsal"**
+**Kazanç kaynağı seçimi diye bir şey YOK.** Hedef kitle tek platform
+üzerinden çalışıyor; sefer ekleme ekranında kaynak çipi, ödeme yöntemi
+seçimi ve komisyon oranı bulunmaz. Sadece tutar.
 
-Kazanç kaynakları sabit liste değildir — kullanıcı kendi listesini kurar.
+Mockup'ta örnek veri gerekiyorsa hiçbir platforma işaret etmeyen nötr
+adlar kullan.
 
 Jenerik kelimeler serbesttir: *taksi, şoför, sürücü, ticari araç, vardiya, hasılat*.
 
@@ -335,3 +337,53 @@ Aşağıdakiler ikinci turda düzeltilecek.
 10. **Vardiya bitirme sihirbazı** (bkz. bölüm E, ekran 9–11) — mesafe/süre,
     giderler, üç satırlı özet. Ürünün ödül anı.
 11. **Gider ekle** ve **yakıt ekle** akışları.
+
+---
+
+# Tur 3 — kapsam daralması
+
+Aşağıdakiler ürün kararıyla kapsam dışına çıktı; tasarımda YER ALMAYACAK.
+
+## Sefer ekleme ekranı yalnızca TEK ALAN
+
+- Kazanç kaynağı çipi **yok** — tek platform, seçim gereksiz
+- Komisyon **yok** — vardiya sonunda tek rakam olarak soruluyor
+- Ödeme yöntemi **yok**
+- Sistem klavyesi, ondalık mod; Kaydet butonu klavyenin üstünde
+
+Ekranda görünen tek şey: **tutar alanı ve Kaydet.**
+
+## Vardiya sonu sihirbazı — kesinleşmiş hâli
+
+1. **Kaç km yaptın?**
+2. **Ortalama tüketim** (önceden dolu gelir, sürücü çoğu gün onaylar)
+3. **Yakıt fiyatı** (önceden dolu, son dolumdan)
+4. **Bugün uygulamaya ödediğin komisyon** — tek rakam
+5. **Ekstra gider eklemek ister misin?** — çipler:
+   Yemek · Otopark · Yıkama · Ceza · **Yakıt** · Diğer
+6. **ÖZET**
+
+## Özet TAM OLARAK bu yapıda
+
+```
+Ciro                447,50 ₺
+Komisyon           −215,50 ₺
+Yakıt · 17,9 lt    −892,50 ₺
+Gider              −150,00 ₺
+────────────────────────────
+CEBE KALAN         −810,50 ₺
+Yıpranma · 238 km  −595,00 ₺
+────────────────────────────
+GERÇEK KÂR       −1.405,50 ₺
+```
+
+**İki satır arasındaki tek fark yıpranma payıdır.** Ekrandaki satırlar
+toplanınca gerçek kâra ulaşmalı — sürücü gördüğü sayıları topluyor ve
+tutmadığında sayıya güvenmiyor.
+
+## Kapsam dışı — tasarlanmayacak
+
+- Sabit gider tahakkuku (plaka kirası günlük payı) — yayın sonrasına ertelendi
+- Depo / kilometre sayacı takibi, tam depo tüketim ölçümü
+- Çoklu kazanç kaynağı, kaynak bazlı komisyon oranı
+- Sefer başına komisyon gösterimi

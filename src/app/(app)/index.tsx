@@ -46,7 +46,7 @@ export default function HomeScreen() {
    * silinecek.
    */
   const [tutar, setTutar] = useState('');
-  const [kaynak, setKaynak] = useState('Uygulama 1');
+  const [gider, setGider] = useState('Yemek');
 
   const ornekOzet = useMemo(() => {
     const T = Date.now();
@@ -113,12 +113,12 @@ export default function HomeScreen() {
 
       <UiCard title="Primitifler — çip ve tutar">
         <ChipRow>
-          {['Uygulama 1', 'Uygulama 2', 'Nakit Müşteri'].map((ad) => (
+          {['Yemek', 'Otopark', 'Yıkama', 'Ceza', 'Yakıt'].map((ad) => (
             <Chip
               key={ad}
               label={ad}
-              selected={kaynak === ad}
-              onPress={() => setKaynak(ad)}
+              selected={gider === ad}
+              onPress={() => setGider(ad)}
             />
           ))}
         </ChipRow>
