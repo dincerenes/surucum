@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AmountText, Button } from '@/components/ui';
+import { AmountText, Button, RideList } from '@/components/ui';
 import { startShift } from '@/db/repo';
 import { formatKurus } from '@/lib/money';
 import { earningsPerHour, earningsPerKm } from '@/lib/shift';
@@ -68,15 +68,26 @@ export default function DriveScreen() {
         />
       </View>
 
+      <ScrollView
+        style={styles.feed}
+        contentContainerStyle={styles.feedBody}
+        showsVerticalScrollIndicator={false}
+      >
+        <RideList
+          rides={state.rides}
+          emptyText="Henüz sefer yok. İlk parayı aldığında aşağıdaki butona bas."
+        />
+      </ScrollView>
+
       <View style={styles.liveActions}>
-        <Button label="Sefer ekle" onPress={() => router.push('/sefer')} />
+        <Button label="Sefer ekle" size="hero" plus onPress={() => router.push('/sefer')} />
         <View style={styles.pair}>
           <Button label="Gider" variant="secondary" style={styles.half}
             onPress={() => router.push('/gider')} />
           <Button label="Yakıt" variant="secondary" style={styles.half}
             onPress={() => router.push('/yakit')} />
         </View>
-        <Button label="Vardiyayı bitir" variant="ghost"
+        <Button label="Vardiyayı bitir" variant="secondary"
           onPress={() => router.push('/vardiya-bitir')} />
       </View>
     </View>
@@ -122,9 +133,11 @@ const styles = StyleSheet.create({
   eyebrow: { ...typeScale.label, letterSpacing: 1 },
   clock: { fontSize: 72, fontWeight: '700', letterSpacing: -2, fontVariant: ['tabular-nums'] },
   cash: { marginTop: space.xl, gap: space.xs },
-  stats: { flexDirection: 'row', gap: space.sm, marginTop: space.xl },
+  stats: { flexDirection: 'row', gap: space.sm, marginTop: space.lg },
+  feed: { flex: 1, marginTop: space.lg },
+  feedBody: { paddingBottom: space.lg },
   stat: { flex: 1, borderRadius: radius.md, padding: space.md, gap: 2 },
-  liveActions: { marginTop: 'auto', paddingBottom: space.xl, gap: space.md },
+  liveActions: { paddingBottom: space.xl, gap: space.md },
   pair: { flexDirection: 'row', gap: space.md },
   half: { flex: 1 },
   closed: {

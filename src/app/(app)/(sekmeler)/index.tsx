@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AmountText, Button, SummaryRows } from '@/components/ui';
+import { Button, RideList, SummaryRows } from '@/components/ui';
 import { startShift } from '@/db/repo';
 import { formatBusinessDate } from '@/lib/business-date';
 import { formatKurus } from '@/lib/money';
@@ -60,6 +60,8 @@ export default function HomeScreen() {
         <EmptyDay hasShift={openShift != null} />
       )}
 
+      {rides.length > 0 ? <RideList rides={rides} /> : null}
+
       {openShift ? (
         <OpenShiftBar
           minutes={state.openShiftMinutes}
@@ -71,7 +73,8 @@ export default function HomeScreen() {
       <View style={styles.actions}>
         {openShift ? (
           <>
-            <Button label="Sefer ekle" onPress={() => router.push('/sefer')} />
+            <Button label="Sefer ekle" size="hero" plus
+              onPress={() => router.push('/sefer')} />
             <View style={styles.pair}>
               <Button
                 label="Gider"
@@ -90,6 +93,7 @@ export default function HomeScreen() {
         ) : (
           <Button
             label={hasRecords ? 'Yeni vardiya başlat' : 'Vardiyayı başlat'}
+            size="hero"
             onPress={baslat}
           />
         )}

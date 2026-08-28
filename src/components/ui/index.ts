@@ -17,3 +17,4 @@ export { AmountInput, AboveKeyboard, previewAmount } from './amount-input';
 export { SummaryRows } from './summary-rows';
 export { SheetHeader, sheetStyles } from './sheet';
 export { SelectField } from './select-field';
+export { RideList } from './ride-list';
