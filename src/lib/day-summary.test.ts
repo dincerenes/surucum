@@ -375,3 +375,27 @@ describe('yakıt tek sayı', () => {
     assert.equal(s.profit.fuelPaid, k(300));
   });
 });
+
+describe('gece vardiyası gün ortasında bölünmez', () => {
+  it('vardiyanın tüm seferleri tek güne toplanıyor', () => {
+    /**
+     * Bu testin koruduğu davranış: 22:00'de açılan vardiya sabah
+     * 06:00'da kapanıyor. Seferler kendi saatlerinden gün alsaydı
+     * gece yarısında ikiye bölünürdü. Repo katmanı sefere vardiyanın
+     * iş gününü yazıyor; özet de o günü topluyor.
+     */
+    const s = calculateDaySummary({
+      rides: [ride(300, 0), ride(400, 0), ride(500, 0)],
+      expenses: [], fuelLogs: [],
+      shifts: [{
+        ...shift({ endedAt: T0 + 8 * H, workedMinutes: 480, distanceKm: 200 }),
+        commissionKurus: k(200),
+        wearPerKmKurus: defaultWearPerKm('owned'),
+      }],
+      now: T0 + 9 * H,
+    });
+    assert.equal(s.rideCount, 3);
+    assert.equal(s.profit.revenue, k(1200));
+    assert.equal(s.durationMinutes, 480);
+  });
+});

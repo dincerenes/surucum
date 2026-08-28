@@ -8,7 +8,7 @@
 
 import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import { getDb } from '../client';
-import { rides } from '../schema';
+import { rides, shifts } from '../schema';
 import type { Ride } from '../schema/earnings';
 import type { PaymentMethod } from '../schema/_shared';
 import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
@@ -67,6 +67,18 @@ export function addRide(
   const earningSourceId = input.earningSourceId
     ?? ensureDefaultEarningSource(userId, now).id;
 
+  /**
+   * SEFER, VARDİYASININ İŞ GÜNÜNE YAZILIR — kendi saatinden türetilmez.
+   *
+   * Gece 22:00'de açılan vardiya sabah 06:00'da kapanıyor. Saat başına
+   * gün hesaplansaydı aynı kesintisiz vardiya iki güne bölünürdü:
+   * gece yarısından önceki seferler bir güne, sonrakiler diğerine.
+   * Sürücü tek bir iş yaptı, tek bir günde görmeli.
+   *
+   * Vardiya dışında girilen sefer kendi saatinden gün alır.
+   */
+  const businessDate = resolveBusinessDate(input.shiftId, occurredAt, cutoffHour);
+
   const amounts = calculateRideAmounts({
     grossAmountKurus: input.grossAmountKurus,
     commissionBps: input.commissionBps ?? (0 as BasisPoints),
@@ -82,7 +94,7 @@ export function addRide(
       earningSourceId,
       vehicleId: input.vehicleId ?? null,
       occurredAt,
-      businessDate: toBusinessDate(occurredAt, cutoffHour),
+      businessDate,
       grossAmountKurus: amounts.grossAmountKurus,
       commissionKurus: amounts.commissionKurus,
       netAmountKurus: amounts.netAmountKurus,
@@ -177,4 +189,16 @@ export function listRidesInRange(
     ))
     .orderBy(desc(rides.occurredAt))
     .all();
+}
+
+/** Vardiyaya bağlı kayıtlar vardiyanın gününü alır. */
+function resolveBusinessDate(
+  shiftId: string | null | undefined, occurredAt: UnixMs, cutoffHour: number,
+): BusinessDate {
+  if (shiftId) {
+    const shift = getDb().select({ businessDate: shifts.businessDate })
+      .from(shifts).where(eq(shifts.id, shiftId)).get();
+    if (shift) return shift.businessDate;
+  }
+  return toBusinessDate(occurredAt, cutoffHour);
 }

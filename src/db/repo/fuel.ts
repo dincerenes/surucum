@@ -36,6 +36,12 @@ export interface NewFuelLogInput {
   receiptPath?: string | null;
   notes?: string | null;
   occurredAt?: UnixMs;
+
+  /**
+   * İş günü. Açık vardiya varsa ÇAĞIRAN vardiyanın gününü verir; yoksa
+   * kaydın saatinden türetilir. Gece vardiyası gün ortasında dönmesin.
+   */
+  businessDate?: BusinessDate;
 }
 
 /**
@@ -60,7 +66,7 @@ export function addFuelLog(
       vehicleId: input.vehicleId,
       fuelType: input.fuelType,
       occurredAt,
-      businessDate: toBusinessDate(occurredAt, cutoffHour),
+      businessDate: input.businessDate ?? toBusinessDate(occurredAt, cutoffHour),
       volumePer1000: Math.round(input.volumePer1000),
       unitPriceKurus: input.unitPriceKurus,
       totalAmountKurus: input.totalAmountKurus,

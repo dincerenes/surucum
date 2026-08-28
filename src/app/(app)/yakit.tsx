@@ -21,7 +21,7 @@ import { SheetHeader, sheetStyles } from '@/components/ui/sheet';
  */
 export default function AddFuelScreen() {
   const { colors } = useTheme();
-  const { userId, vehicle } = useDriver();
+  const { userId, vehicle, openShift } = useDriver();
   const [total, setTotal] = useState('');
   const [unitPrice, setUnitPrice] = useState('');
   const [fuelType, setFuelType] = useState<FuelType | null>(null);
@@ -55,6 +55,7 @@ export default function AddFuelScreen() {
       unitPriceKurus: (priceKurus ?? 0) as Kurus,
       volumePer1000: volume,
       isFullTank: false,
+      businessDate: openShift?.businessDate,
     });
     requestSync();
     router.back();

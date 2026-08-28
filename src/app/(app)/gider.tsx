@@ -19,7 +19,7 @@ import { SheetHeader, sheetStyles } from '@/components/ui/sheet';
  */
 export default function AddExpenseScreen() {
   const { colors } = useTheme();
-  const { userId, vehicle } = useDriver();
+  const { userId, vehicle, openShift } = useDriver();
   const [raw, setRaw] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
 
@@ -39,6 +39,7 @@ export default function AddExpenseScreen() {
       categoryId: selected,
       amountKurus: amount as Kurus,
       vehicleId: vehicle?.id ?? null,
+      businessDate: openShift?.businessDate,
     });
     requestSync();
     router.back();

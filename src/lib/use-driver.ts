@@ -29,6 +29,13 @@ export interface DriverState {
   shiftIsStale: boolean;
   /** Açık vardiyanın şu ana kadarki süresi, dakika. */
   openShiftMinutes: number;
+  /**
+   * Ekranda gösterilen iş günü.
+   *
+   * Vardiya AÇIKSA onun günü — takvim günü dönse bile ekran vardiyayla
+   * birlikte kalır. Gece 22:00'de başlayan vardiya sabah 05:00'te hâlâ
+   * aynı defterde görünür; sürücü tek bir iş yaptı.
+   */
   today: BusinessDate;
   summary: DaySummary | null;
   rides: Ride[];
@@ -56,6 +63,9 @@ export function useDriver(): DriverState {
     const vehicle = vehicles[0] ?? null;
     const openShift = getOpenShift(userId) ?? null;
 
+    // Vardiya açıkken defter onun gününde kalır, takvim dönse bile.
+    const activeDate = openShift?.businessDate ?? today;
+
     return {
       userId,
       vehicle,
@@ -65,9 +75,9 @@ export function useDriver(): DriverState {
       openShiftMinutes: openShift
         ? resolveShiftDuration({ ...openShift, distanceKm: openShift.distanceKm }, now).minutes
         : 0,
-      today,
-      summary: getDaySummary(userId, today, now),
-      rides: listRidesOnDate(userId, today),
+      today: activeDate,
+      summary: getDaySummary(userId, activeDate, now),
+      rides: listRidesOnDate(userId, activeDate),
     } satisfies DriverState;
   }, [userId]);
 

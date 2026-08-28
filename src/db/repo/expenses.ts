@@ -130,6 +130,12 @@ export interface NewExpenseInput {
   amountKurus: Kurus;
   vehicleId?: string | null;
   occurredAt?: UnixMs;
+
+  /**
+   * İş günü. Açık vardiya varsa ÇAĞIRAN vardiyanın gününü verir; yoksa
+   * kaydın saatinden türetilir. Gece vardiyası gün ortasında dönmesin.
+   */
+  businessDate?: BusinessDate;
   receiptPath?: string | null;
   notes?: string | null;
 }
@@ -150,7 +156,7 @@ export function addExpense(
       vehicleId: input.vehicleId ?? null,
       amountKurus: input.amountKurus,
       occurredAt,
-      businessDate: toBusinessDate(occurredAt, cutoffHour),
+      businessDate: input.businessDate ?? toBusinessDate(occurredAt, cutoffHour),
       receiptPath: input.receiptPath ?? null,
       notes: input.notes?.trim() || null,
     }).returning().get()
