@@ -15,3 +15,5 @@ export { AmountText } from './amount-text';
 export { Chip, ChipRow, ChipGrid } from './chip';
 export { AmountInput, AboveKeyboard, previewAmount } from './amount-input';
 export { SummaryRows } from './summary-rows';
+export { SheetHeader, sheetStyles } from './sheet';
+export { SelectField } from './select-field';
