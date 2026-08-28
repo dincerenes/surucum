@@ -1,18 +1,12 @@
 /**
- * O gün YAKILAN yakıtın parasal karşılığı.
+ * O günün yakıt maliyeti.
  *
- * Sürücü vardiya sonunda iki şey yazıyor: kaç km yaptığı ve aracının
- * ortalama tüketimi. Üçüncüsü — birim fiyat — son dolumundan biliniyor.
- * Üçü çarpılınca o günün gerçek yakıt maliyeti çıkıyor.
+ * Sürücü vardiya sonunda kaç km yaptığını ve aracının ortalama tüketimini
+ * yazıyor; birim fiyat son dolumundan biliniyor. Üçü çarpılınca o günün
+ * yakıt gideri çıkıyor.
  *
- * NEDEN ÖDENEN YAKIT YETMİYOR: sürücü pazartesi depo doldurup cumaya
- * kadar onunla gidiyor. Ödenen parayı pazartesiye yazmak o günü felaket,
- * diğer dört günü harika gösterir — oysa beş gün de aynı işi yaptı.
- * Ödenen para "cebe kalan" satırında (nakit gerçeği), yakılan yakıt
- * "gerçek kâr" satırında duruyor.
- *
- * Depo/sayaç takibi YOK. Tam depo yöntemi sürücüden her dolumda kilometre
- * sayacı istiyordu ve zincirdeki tek bir eksik kayıt ölçümü bozuyordu.
+ * Depo ve sayaç takibi YOK — her dolumda kilometre sayacı istemek ve
+ * zincirdeki tek eksik kayıtla ölçümü bozmak kapsam dışı bırakıldı.
  */
 
 import { type Kurus, ZERO, asKurus, roundHalfAwayFromZero } from './money.ts';
@@ -21,14 +15,13 @@ import { type Kurus, ZERO, asKurus, roundHalfAwayFromZero } from './money.ts';
 export type ConsumptionPer100Km = number;
 
 /**
- * Yakılan yakıtın kuruş karşılığı.
+ * Yakıt maliyeti, kuruş.
  *
- * Üç girdiden biri bile eksikse SIFIR döner ve bu doğru davranış:
- * bilinmeyen maliyeti uydurmaktansa hesaba katmamak yeğdir. Arayüz
- * eksik girdiyi söylemek zorunda, yoksa sürücü kârını olduğundan
- * yüksek görür ve neden olduğunu anlamaz.
+ * Üç girdiden biri bile eksikse SIFIR döner: bilinmeyen maliyeti
+ * uydurmaktansa hesaba katmamak yeğdir. Arayüz eksik girdiyi söylemek
+ * zorunda, yoksa sürücü kârını olduğundan yüksek görür.
  */
-export function calculateFuelBurned(
+export function calculateFuelCost(
   distanceKm: number | null | undefined,
   consumptionPer100Km: ConsumptionPer100Km | null | undefined,
   unitPriceKurus: Kurus | null | undefined,
@@ -49,8 +42,8 @@ export function calculateFuelBurned(
   ));
 }
 
-/** Yakılan mililitre — arayüzde "bugün ~15 lt yaktın" demek için. */
-export function calculateVolumeBurned(
+/** Yakılan mililitre — arayüzde "17,9 lt" diye göstermek için. */
+export function calculateFuelVolume(
   distanceKm: number | null | undefined,
   consumptionPer100Km: ConsumptionPer100Km | null | undefined,
 ): number | null {

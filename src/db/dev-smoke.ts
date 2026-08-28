@@ -132,28 +132,28 @@ export async function runDataLayerSmoke(): Promise<SmokeCheck[]> {
 
     // ciro     240,00 + 187,50 + 520,00 + 20,00 bahşiş  = 967,50
     // komisyon vardiya sonunda tek rakam                 = 215,50
-    // ÖDENEN yakıt 520,02 · gider 150,00 → cebe kalan    =  81,98
-    // YAKILAN yakıt 238 km × 7,5 lt × 50,00 ₺            = 892,50
+    // yakıt 238 km × 7,5 lt × 50,00 ₺                    = 892,50
+    // gider 150,00       → cebe kalan                    = -290,50
     // yıpranma 238 km × 2,50                             = 595,00
-    // gerçek kâr 967,50−215,50−892,50−150,00−595,00      = -885,50
+    // gerçek kâr = cebe kalan − yıpranma                 = -885,50
     record('Ciro', summary.profit.revenue === 96750,
       formatKurus(summary.profit.revenue));
     record('Komisyon vardiyadan okundu', summary.profit.commission === 21550,
       formatKurus(summary.profit.commission));
-    record('Cebe kalan', summary.profit.cashProfit === 96750 - 21550 - 52002 - 15000,
+    record('Cebe kalan', summary.profit.cashProfit === 96750 - 21550 - 89250 - 15000,
       formatKurus(summary.profit.cashProfit));
     record('Yıpranma — aracın kendi oranıyla', summary.profit.wearShare === 59500,
       `238 km × 2,50 ₺ = ${formatKurus(summary.profit.wearShare)}`);
-    record('Ödenen yakıt cebe kalandan düştü',
-      summary.profit.fuelPaid === 52002, formatKurus(summary.profit.fuelPaid));
-    record('YAKILAN yakıt tüketimden hesaplandı',
-      summary.profit.fuelBurned === 89250,
-      `238 km × 7,5 lt × 50,00 ₺ = ${formatKurus(summary.profit.fuelBurned)}`);
-    record('Yakılan hacim', summary.volumeBurned === 17850,
-      `${((summary.volumeBurned ?? 0) / 1000).toFixed(1)} lt`);
-    record('Yakıt iki kez düşülmedi',
-      summary.profit.trueProfit === -88550,
-      formatKurus(summary.profit.trueProfit));
+    record('Yakıt tüketimden hesaplandı',
+      summary.profit.fuelPaid === 89250,
+      `238 km × 7,5 lt × 50,00 ₺ = ${formatKurus(summary.profit.fuelPaid)}`);
+    record('Dolum kaydı ayrıca sayılmadı',
+      summary.profit.fuelPaid === 89250, '520,02 ₺ dolum üstüne eklenmedi');
+    record('Yakılan hacim', summary.fuelVolume === 17850,
+      `${((summary.fuelVolume ?? 0) / 1000).toFixed(1)} lt`);
+    record('Tek fark yıpranma',
+      summary.profit.trueProfit === summary.profit.cashProfit - summary.profit.wearShare,
+      `${formatKurus(summary.profit.cashProfit)} − ${formatKurus(summary.profit.wearShare)}`);
     record('Gerçek kâr negatif olabiliyor', summary.profit.trueProfit < 0,
       formatKurus(summary.profit.trueProfit));
 

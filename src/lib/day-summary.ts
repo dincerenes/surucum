@@ -13,7 +13,7 @@
  */
 
 import { type Kurus, ZERO, add, multiply } from './money.ts';
-import { calculateFuelBurned, calculateVolumeBurned } from './fuel-cost.ts';
+import { calculateFuelCost, calculateFuelVolume } from './fuel-cost.ts';
 import { type ProfitBreakdown, calculateProfit } from './profit.ts';
 import {
   type ShiftTiming, type UnixMs, normalizeDistance, resolveShiftDuration,
@@ -91,7 +91,7 @@ export interface DaySummary {
    * O gün yakılan yakıt, mililitre. Tüketim girilmemişse `null` —
    * arayüz "tüketim girilmediği için yakıt maliyeti hesaplanmadı" demeli.
    */
-  volumeBurned: number | null;
+  fuelVolume: number | null;
 
   durationMinutes: number;
   /** Süre damgalardan mı türetildi? Sürücü yazdıysa `false`. */
@@ -127,14 +127,16 @@ export function calculateDaySummary(input: DaySummaryInput): DaySummary {
       ...shifts.map((s) => sanitizeCommission(s.commissionKurus)),
     ],
     tips: input.rides.map((r) => r.tipKurus),
-    fuelAmounts: input.fuelLogs.map((f) => f.totalAmountKurus),
+    /**
+     * Yakıt TEK SAYI. Tüketim girilmişse ondan hesaplanıyor
+     * (tüketim × km × fiyat), girilmemişse kaydedilen dolum tutarları
+     * kullanılıyor. İkisi birden sayılmıyor — aynı yakıt iki kez düşülürdü.
+     */
+    fuelAmounts: fuel.cost != null
+      ? [fuel.cost]
+      : input.fuelLogs.map((f) => f.totalAmountKurus),
     expenseAmounts: input.expenses.map((e) => e.amountKurus),
     fixedShare: input.fixedShare ?? ZERO,
-    /**
-     * Tüketim hiç girilmemişse `undefined` gidiyor ve `calculateProfit`
-     * ödenen yakıta düşüyor. Sıfır göndermek yakıtı bedava göstermek olurdu.
-     */
-    fuelBurned: fuel.cost ?? undefined,
     wearShare: distance.wearShare,
     isDistanceEstimated: distance.isPartial,
   });
@@ -147,7 +149,7 @@ export function calculateDaySummary(input: DaySummaryInput): DaySummary {
     rideCount,
     distanceKm: distance.km,
     shiftsMissingDistance: distance.missing,
-    volumeBurned: fuel.volume,
+    fuelVolume: fuel.volume,
     durationMinutes: duration.minutes,
     isDurationEstimated: duration.isEstimated,
     perHour: earningsPerHour(profit.cashProfit, duration.minutes),
@@ -222,7 +224,7 @@ function sanitizeCommission(value: Kurus | null | undefined): Kurus {
 }
 
 /**
- * Vardiyalarda yakılan yakıtı toplar.
+ * O günün yakıt maliyetini vardiyalardan hesaplar.
  *
  * Her vardiya KENDİ tüketimi ve KENDİ fiyatıyla hesaplanıyor, gün geneline
  * tek bir değer uygulanmıyor: fiyat gün içinde değişebilir ve iki farklı
@@ -239,13 +241,13 @@ function collectBurnedFuel(shifts: readonly ShiftRow[]): {
   let known = false;
 
   for (const s of shifts) {
-    const burned = calculateFuelBurned(
+    const burned = calculateFuelCost(
       s.distanceKm, s.fuelConsumptionPer100Km, s.fuelPriceKurus,
     );
     if (burned <= 0) continue;
 
     cost = add(cost, burned);
-    volume += calculateVolumeBurned(s.distanceKm, s.fuelConsumptionPer100Km) ?? 0;
+    volume += calculateFuelVolume(s.distanceKm, s.fuelConsumptionPer100Km) ?? 0;
     known = true;
   }
 

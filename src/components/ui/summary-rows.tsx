@@ -1,7 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { AmountText } from './amount-text';
 import type { DaySummary } from '@/lib/day-summary';
-import { formatKurus } from '@/lib/money';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 interface Props {
@@ -17,9 +16,11 @@ interface Props {
  * arasındaki fark bu ürünün neden var olduğudur: sürücü akşam cebindeki
  * parayla eve gider ve kazandığını sanır; aracının eridiğini görmez.
  *
- * (2) NAKİT GERÇEĞİDİR — yalnızca el değiştirmiş para.
- * (3) MODELDİR — yakılan yakıt ve yıpranma tahmin içerir.
- * Bu ayrım görsel olarak da korunuyor: ikisi ayrı ağırlıkta duruyor.
+ * İKİ SATIR ARASINDAKİ TEK FARK YIPRANMA PAYIDIR. (2) sürücünün akşam
+ * cebinde bulduğu para; (3) aracının eridiği de düşülmüş hâli.
+ *
+ * Ekrandaki satırlar toplanınca gerçek kâra ULAŞMALI: sürücü gördüğü
+ * sayıları topluyor ve tutmadığında sayıya güvenmiyor.
  */
 export function SummaryRows({ summary, detailed = true }: Props) {
   const { colors } = useTheme();
@@ -35,7 +36,14 @@ export function SummaryRows({ summary, detailed = true }: Props) {
       {detailed ? (
         <>
           <Deduction label="Komisyon" value={profit.commission} />
-          <Deduction label="Yakıt" value={profit.fuelPaid} />
+          <Deduction
+            label={
+              summary.fuelVolume == null
+                ? 'Yakıt'
+                : `Yakıt · ${(summary.fuelVolume / 1000).toFixed(1)} lt`
+            }
+            value={profit.fuelPaid}
+          />
           <Deduction label="Gider" value={profit.expensesPaid} />
         </>
       ) : null}
@@ -53,20 +61,7 @@ export function SummaryRows({ summary, detailed = true }: Props) {
       </View>
 
       {detailed ? (
-        <View style={[styles.modelled, { backgroundColor: colors.surfaceSunken }]}>
-          <Text style={[styles.heroLabel, { color: colors.textFaint }]}>
-            HENÜZ ÖDEMEDİĞİNİZ
-          </Text>
-
-          <Deduction
-            label={
-              summary.volumeBurned == null
-                ? 'Yakılan yakıt'
-                : `Yakılan yakıt · ${(summary.volumeBurned / 1000).toFixed(1)} lt`
-            }
-            value={profit.fuelBurned}
-            muted
-          />
+        <>
           <Deduction
             label={
               summary.distanceKm == null
@@ -74,7 +69,6 @@ export function SummaryRows({ summary, detailed = true }: Props) {
                 : `Yıpranma · ${summary.distanceKm} km`
             }
             value={profit.wearShare}
-            muted
           />
 
           <View style={[styles.rule, { backgroundColor: colors.border }]} />
@@ -83,12 +77,12 @@ export function SummaryRows({ summary, detailed = true }: Props) {
             <View style={styles.heroText}>
               <Text style={[styles.heroLabel, { color: colors.text }]}>GERÇEK KÂR</Text>
               <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-                model — yakılan yakıt ve yıpranma dahil
+                yıpranma dahil
               </Text>
             </View>
             <AmountText value={profit.trueProfit} size="title" tone="signed" />
           </View>
-        </View>
+        </>
       ) : (
         <View style={styles.line}>
           <Text style={[typeScale.bodyStrong, { color: colors.text }]}>Gerçek kâr</Text>
@@ -134,8 +128,8 @@ function MissingData({ summary }: { summary: DaySummary }) {
     notes.push(`${summary.shiftsMissingDistance} vardiyanın kilometresi girilmemiş; pay eksik.`);
   }
 
-  if (summary.volumeBurned == null && summary.profit.fuelPaid > 0) {
-    notes.push(`Tüketim girilmediği için yakıt ${formatKurus(summary.profit.fuelPaid)} ödenen tutardan sayıldı.`);
+  if (summary.fuelVolume == null && summary.profit.fuelPaid > 0) {
+    notes.push('Ortalama tüketim girilmediği için yakıt, kaydedilen dolum tutarından sayıldı.');
   }
 
   if (notes.length === 0) return null;
@@ -172,11 +166,5 @@ const styles = StyleSheet.create({
    */
   heroText: { flexShrink: 1 },
   heroLabel: { ...typeScale.label, letterSpacing: 1 },
-  modelled: {
-    borderRadius: radius.md,
-    padding: space.md,
-    gap: space.sm,
-    marginTop: space.xs,
-  },
   note: { borderRadius: radius.sm, padding: space.md, gap: space.xs },
 });

@@ -301,8 +301,8 @@ describe('komisyon vardiya sonunda tek rakam', () => {
   });
 });
 
-describe('yakıt: ödenen nakit, yakılan model', () => {
-  const gun = (odenen: number, tuketimVar: boolean) => calculateDaySummary({
+describe('yakıt tek sayı', () => {
+  const gun = (tuketimVar: boolean, odenen = 0) => calculateDaySummary({
     rides: [ride(2000, 0)],
     expenses: [],
     fuelLogs: odenen > 0 ? [{ totalAmountKurus: k(odenen) }] : [],
@@ -317,37 +317,32 @@ describe('yakıt: ödenen nakit, yakılan model', () => {
     now: T0 + 9 * H,
   });
 
-  it('pazartesi depo dolduran ile salı doldurmayan AYNI gerçek kârı görür', () => {
-    const pazartesi = gun(1000, true);   // 1.000 ₺ ödedi
-    const sali = gun(0, true);           // hiç ödemedi
-
-    // Nakit gerçeği dalgalanıyor — cebinden farklı para çıktı
-    assert.equal(pazartesi.profit.cashProfit, k(600));   // 2000 − 400 − 1000
-    assert.equal(sali.profit.cashProfit, k(1600));       // 2000 − 400 − 0
-
-    // Ama iki gün de 200 km yaptı: yakılan yakıt ve gerçek kâr aynı
-    assert.equal(pazartesi.profit.fuelBurned, k(750));   // 200 km × 7,5 lt × 50 ₺
-    assert.equal(sali.profit.fuelBurned, k(750));
-    assert.equal(pazartesi.profit.trueProfit, sali.profit.trueProfit);
-    assert.equal(pazartesi.profit.trueProfit, k(350));   // 2000−400−750−500
+  it('tüketimden hesaplanıyor: 200 km × 7,5 lt × 50 ₺ = 750 ₺', () => {
+    const s = gun(true);
+    assert.equal(s.profit.fuelPaid, k(750));
+    assert.equal(s.fuelVolume, 15000);
   });
 
-  it('ödenen yakıt gerçek kârdan İKİ KEZ düşülmez', () => {
-    const s = gun(1000, true);
-    // Cebe kalandan türetilseydi 600 − 750 − 500 = −650 çıkardı
-    assert.notEqual(s.profit.trueProfit, k(-650));
-    assert.equal(s.profit.trueProfit, k(350));
+  it('tek fark yıpranma: gerçek kâr = cebe kalan − yıpranma', () => {
+    const s = gun(true);
+    assert.equal(s.profit.cashProfit, k(850));    // 2000 − 400 − 750
+    assert.equal(s.profit.wearShare, k(500));     // 200 km × 2,50
+    assert.equal(s.profit.trueProfit, k(350));    // 850 − 500
+    assert.equal(s.profit.trueProfit, s.profit.cashProfit - s.profit.wearShare);
   });
 
-  it('tüketim girilmemişse ödenen yakıta düşülür — bedava sayılmaz', () => {
-    const s = gun(1000, false);
-    assert.equal(s.profit.fuelBurned, k(1000));
-    assert.equal(s.profit.trueProfit, k(100));  // 2000−400−1000−500
-    assert.equal(s.volumeBurned, null);
+  it('tüketim girilmemişse kaydedilen dolum kullanılıyor', () => {
+    const s = gun(false, 1000);
+    assert.equal(s.profit.fuelPaid, k(1000));
+    assert.equal(s.fuelVolume, null);
+    assert.equal(s.profit.cashProfit, k(600));    // 2000 − 400 − 1000
+    assert.equal(s.profit.trueProfit, k(100));    // 600 − 500
   });
 
-  it('yakılan hacim arayüze veriliyor', () => {
-    assert.equal(gun(0, true).volumeBurned, 15000);  // 15 lt
+  it('tüketim varsa dolum kaydı AYRICA sayılmıyor — iki kez düşülmez', () => {
+    const s = gun(true, 1000);
+    assert.equal(s.profit.fuelPaid, k(750));      // 1750 değil
+    assert.equal(s.profit.cashProfit, k(850));
   });
 
   it('her vardiya kendi tüketimi ve fiyatıyla hesaplanır', () => {
@@ -358,15 +353,15 @@ describe('yakıt: ödenen nakit, yakılan model', () => {
         { ...shift({ endedAt: T0 + 4 * H, distanceKm: 100 }),
           fuelConsumptionPer100Km: 7500, fuelPriceKurus: k(50) },   // 375 ₺
         { ...shift({ startedAt: T0 + 6 * H, endedAt: T0 + 10 * H, distanceKm: 100 }),
-          fuelConsumptionPer100Km: 12000, fuelPriceKurus: k(22) },  // 264 ₺ (LPG)
+          fuelConsumptionPer100Km: 12000, fuelPriceKurus: k(22) },  // 264 ₺
       ],
       now: T0 + 11 * H,
     });
-    assert.equal(s.profit.fuelBurned, k(639));
-    assert.equal(s.volumeBurned, 7500 + 12000);
+    assert.equal(s.profit.fuelPaid, k(639));
+    assert.equal(s.fuelVolume, 19500);
   });
 
-  it('mesafe yoksa yakıt hesaplanmaz', () => {
+  it('mesafe yoksa yakıt hesaplanmaz, dolum kaydına düşülür', () => {
     const s = calculateDaySummary({
       rides: [ride(1000, 0)],
       expenses: [], fuelLogs: [{ totalAmountKurus: k(300) }],
@@ -376,7 +371,7 @@ describe('yakıt: ödenen nakit, yakılan model', () => {
       }],
       now: T0 + 6 * H,
     });
-    assert.equal(s.volumeBurned, null);
-    assert.equal(s.profit.fuelBurned, k(300));  // ödenene düşüldü
+    assert.equal(s.fuelVolume, null);
+    assert.equal(s.profit.fuelPaid, k(300));
   });
 });
