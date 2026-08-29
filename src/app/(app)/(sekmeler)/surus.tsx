@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AmountText, Button, RideList } from '@/components/ui';
 import { startShift } from '@/db/repo';
 import { formatKurus } from '@/lib/money';
-import { earningsPerHour, earningsPerRide } from '@/lib/shift';
+import { earningsPerRide } from '@/lib/shift';
 import { useDriver } from '@/lib/use-driver';
 import { requestSync } from '@/sync/scheduler';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
@@ -42,11 +42,17 @@ export default function DriveScreen() {
   const minutes = state.openShiftMinutes;
   const rides = state.shiftRides;
   const gross = state.shiftGross;
-  const perHour = earningsPerHour(gross, minutes);
   /**
-   * ₺/km YOK: kilometre vardiya sonunda soruluyor, vardiya sürerken
-   * bilinmiyor ve sürekli "—" gösteren bir kutu yer kaplamaktan başka
-   * bir şey yapmıyor. ₺/sefer ise her seferde canlı güncelleniyor.
+   * ₺/saat ve ₺/km YOK.
+   *
+   * ₺/saat vardiyanın başında saçmalıyor: on beş dakikada 2.250 ₺ girildiğinde
+   * "9.000 ₺/saat" yazıyor. Sürücü o hızla çalışmayacağını biliyor; sayı
+   * ona bir şey öğretmiyor, sadece uygulamanın ciddiyetini düşürüyor.
+   * Anlamlı hâli vardiya kapandığında, tam süre belliyken hesaplanıyor.
+   *
+   * ₺/km ise kilometre vardiya sonunda sorulduğu için canlı ekranda
+   * her zaman boş kalıyordu. ₺/sefer her seferde güncelleniyor ve
+   * ilk seferden itibaren doğru.
    */
   const perRide = earningsPerRide(gross, rides.length);
 
@@ -77,10 +83,6 @@ export default function DriveScreen() {
 
       <View style={styles.stats}>
         <Stat value={String(rides.length)} label="sefer" />
-        <Stat
-          value={perHour != null ? formatKurus(perHour, { symbol: false, decimals: false }) : '—'}
-          label="₺/saat"
-        />
         <Stat
           value={perRide != null ? formatKurus(perRide, { symbol: false, decimals: false }) : '—'}
           label="₺/sefer"

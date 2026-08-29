@@ -5,8 +5,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, RideList, SummaryRows } from '@/components/ui';
 import { startShift } from '@/db/repo';
 import { formatBusinessDate } from '@/lib/business-date';
-import { formatKurus } from '@/lib/money';
-import { earningsPerHour } from '@/lib/shift';
 import { useDriver } from '@/lib/use-driver';
 import { requestSync } from '@/sync/scheduler';
 import { HIT_SIZE, radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
@@ -65,7 +63,6 @@ export default function HomeScreen() {
       {openShift ? (
         <OpenShiftBar
           minutes={state.openShiftMinutes}
-          cashProfit={summary?.profit.cashProfit ?? 0}
           stale={state.shiftIsStale}
         />
       ) : null}
@@ -126,12 +123,17 @@ function EmptyDay({ hasShift }: { hasShift: boolean }) {
   );
 }
 
-/** Açık vardiyanın canlı özeti — süre ve saat başına kazanç. */
+/**
+ * Açık vardiyanın canlı özeti — yalnızca süre.
+ *
+ * ₺/saat BİLEREK YOK: vardiyanın başında saçmalıyor ve sürücünün gördüğü
+ * ilk sayı saçmaysa geri kalanına da inanmıyor. Saat başına kazanç
+ * vardiya kapandığında, süre gerçekten belliyken anlamlı.
+ */
 function OpenShiftBar({
-  minutes, cashProfit, stale,
-}: { minutes: number; cashProfit: number; stale: boolean }) {
+  minutes, stale,
+}: { minutes: number; stale: boolean }) {
   const { colors } = useTheme();
-  const perHour = earningsPerHour(cashProfit as never, minutes);
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
 
@@ -150,7 +152,6 @@ function OpenShiftBar({
           { color: stale ? colors.warning : colors.accent },
         ]}>
           Vardiya {hours}:{String(mins).padStart(2, '0')}
-          {perHour != null ? ` · ${formatKurus(perHour, { decimals: false })}/saat` : ''}
         </Text>
         {stale ? (
           <Text style={[typeScale.caption, { color: colors.warning }]}>
