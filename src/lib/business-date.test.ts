@@ -5,7 +5,7 @@ import {
   isBusinessDate, asBusinessDate,
   addDays, daysBetween, compareBusinessDate, businessDatesInRange,
   startOfMonth, endOfMonth, daysInMonth, startOfWeek, endOfWeek, startOfYear,
-  weekdayIndex, weekdayName, formatBusinessDate, formatRelative,
+  weekdayIndex, weekdayName, formatBusinessDate, formatRelative, formatClock,
   DEFAULT_CUTOFF_HOUR,
   type BusinessDate,
 } from './business-date.ts';
@@ -219,5 +219,22 @@ describe('bugün', () => {
     const now = new Date(2026, 7, 25, 1, 0);
     assert.equal(todayBusinessDate(4, now), '2026-08-24');
     assert.equal(todayBusinessDate(0, now), '2026-08-25');
+  });
+});
+
+describe('formatClock', () => {
+  test('iki haneli 24 saat verir', () => {
+    const at = new Date(2026, 7, 29, 9, 5).getTime();
+    assert.equal(formatClock(at), '09:05');
+  });
+
+  test('gece yarısını 00:00 yazar', () => {
+    const at = new Date(2026, 7, 29, 0, 0).getTime();
+    assert.equal(formatClock(at), '00:00');
+  });
+
+  test('öğleden sonrayı 24 saat düzeninde yazar', () => {
+    const at = new Date(2026, 7, 29, 19, 14).getTime();
+    assert.equal(formatClock(at), '19:14');
   });
 });

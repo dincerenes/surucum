@@ -1,17 +1,19 @@
-import { SectionList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AmountText } from '@/components/ui';
+import { AmountText, Card, SummaryRows } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import {
-  getCutoffHour, listExpensesInRange, listFuelLogsInRange, listRidesInRange,
+  getCutoffHour, getDaySummary, listExpensesInRange, listFuelLogsInRange,
+  listRidesInRange,
 } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
-  type BusinessDate, addDays, formatBusinessDate, todayBusinessDate,
+  type BusinessDate, addDays, formatBusinessDate, formatClock, todayBusinessDate,
 } from '@/lib/business-date';
+import type { DaySummary } from '@/lib/day-summary';
 import type { Kurus } from '@/lib/money';
-import { space, type as typeScale, useTheme } from '@/theme/use-theme';
+import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 /** Kaç günlük geçmiş gösteriliyor. Sayfalama Faz 3'te. */
 const WINDOW_DAYS = 60;
@@ -25,12 +27,26 @@ interface Entry {
   incoming: boolean;
 }
 
+interface Day {
+  date: BusinessDate;
+  entries: Entry[];
+  summary: DaySummary;
+}
+
 /**
- * Kayıtlar — akan defter.
+ * Kayıtlar — gün gün kartlar.
  *
- * Sefer, gider ve yakıt AYNI listede: sürücü günü tek akış olarak
- * yaşıyor, üç ayrı sekmede aramıyor. Gün ayırıcıları o günün cebe
- * kalanını taşıyor.
+ * HER GÜN KENDİ KARTINDA. Kesintisiz bir liste, altmış günlük "Sefer,
+ * Sefer, Sefer" duvarına dönüşüyor: sürücü nerede olduğunu kaybediyor
+ * ve gün ayırıcısını kaydırıp geçince hangi güne baktığını unutuyor.
+ *
+ * Kart yalnızca kayıtları değil O GÜNÜN SONUCUNU da taşıyor. Geçmiş bir
+ * günün üç satırını görebileceği başka yer yok — Anasayfa yalnızca bugünü
+ * gösteriyor. Sürücünün asıl sorusu "27 Ağustos'ta ne kaldı", tek tek
+ * seferler değil.
+ *
+ * Sefer, gider ve yakıt AYNI kartta: sürücü günü tek akış olarak yaşıyor,
+ * üç ayrı sekmede aramıyor.
  */
 export default function RecordsScreen() {
   const { colors } = useTheme();
@@ -38,7 +54,7 @@ export default function RecordsScreen() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
 
-  const sections = useDbValue(() => {
+  const days = useDbValue<Day[]>(() => {
     if (!userId) return [];
     const cutoff = getCutoffHour(userId);
     const to = todayBusinessDate(cutoff);
@@ -72,24 +88,29 @@ export default function RecordsScreen() {
       });
     }
 
+    /**
+     * Özet YALNIZCA kaydı olan günler için hesaplanıyor. Altmış günün
+     * tamamını dolaşmak, çoğu boş olan günler için beş sorgu demekti.
+     */
     return [...byDay.entries()]
       .sort((a, b) => (a[0] < b[0] ? 1 : -1))
-      .map(([date, data]) => ({
+      .map(([date, entries]) => ({
         date,
-        data: data.sort((a, b) => b.at - a.at),
+        entries: entries.sort((a, b) => b.at - a.at),
+        summary: getDaySummary(userId, date),
       }));
   }, [userId]);
 
   return (
-    <SectionList
-      sections={sections}
-      keyExtractor={(item) => item.id}
+    <FlatList
+      data={days}
+      keyExtractor={(day) => day.date}
       contentContainerStyle={[
         styles.page,
         { paddingTop: insets.top + space.lg },
-        sections.length === 0 && styles.pageEmpty,
+        days.length === 0 && styles.pageEmpty,
       ]}
-      stickySectionHeadersEnabled
+      showsVerticalScrollIndicator={false}
       ListHeaderComponent={
         <Text style={[typeScale.display, { color: colors.text, marginBottom: space.md }]}>
           Kayıtlar
@@ -103,46 +124,68 @@ export default function RecordsScreen() {
           </Text>
         </View>
       }
-      renderSectionHeader={({ section }) => (
-        <View style={[styles.dayHead, { backgroundColor: colors.background }]}>
-          <Text style={[styles.dayLabel, { color: colors.textFaint }]}>
-            {formatBusinessDate(section.date, 'long').toUpperCase()}
-          </Text>
-        </View>
-      )}
-      renderItem={({ item }) => (
-        <View style={[styles.row, { borderBottomColor: colors.border }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[typeScale.bodyStrong, { color: colors.text }]}>{item.title}</Text>
-            {item.detail ? (
-              <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-                {item.detail}
-              </Text>
-            ) : null}
-          </View>
-          <AmountText
-            value={item.amount}
-            tone={item.incoming ? 'plain' : 'cost'}
-            showMinus={!item.incoming}
-          />
-        </View>
-      )}
+      renderItem={({ item }) => <DayCard day={item} />}
     />
   );
 }
 
+function DayCard({ day }: { day: Day }) {
+  const { colors } = useTheme();
+
+  return (
+    <Card
+      title={formatBusinessDate(day.date, 'long')}
+      meta={`${day.entries.length} kayıt`}
+      style={styles.card}
+    >
+      <View style={[styles.list, { borderColor: colors.border }]}>
+        {day.entries.map((entry, index) => (
+          <View
+            key={entry.id}
+            style={[
+              styles.row,
+              index > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.time, { color: colors.textFaint }]}>
+              {formatClock(entry.at)}
+            </Text>
+            <View style={styles.rowText}>
+              <Text style={[typeScale.body, { color: colors.text }]}>{entry.title}</Text>
+              {entry.detail ? (
+                <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+                  {entry.detail}
+                </Text>
+              ) : null}
+            </View>
+            <AmountText
+              value={entry.amount}
+              tone={entry.incoming ? 'plain' : 'cost'}
+              showMinus={!entry.incoming}
+            />
+          </View>
+        ))}
+      </View>
+
+      <SummaryRows summary={day.summary} detailed={false} />
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
-  page: { paddingHorizontal: space.xl, paddingBottom: space.xxxl },
+  page: { paddingHorizontal: space.xl, paddingBottom: space.xxxl, gap: space.lg },
   pageEmpty: { flexGrow: 1 },
-  dayHead: { paddingTop: space.lg, paddingBottom: space.xs },
-  dayLabel: { ...typeScale.label, letterSpacing: 1 },
+  card: { gap: space.lg },
+  list: { borderWidth: 1, borderRadius: radius.md, overflow: 'hidden' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
+    paddingHorizontal: space.md,
     paddingVertical: space.md,
-    borderBottomWidth: 1,
   },
+  time: { ...typeScale.body, fontVariant: ['tabular-nums'] },
+  rowText: { flex: 1 },
   empty: {
     borderWidth: 1, borderStyle: 'dashed', borderRadius: 14,
     padding: space.xl, gap: space.sm,

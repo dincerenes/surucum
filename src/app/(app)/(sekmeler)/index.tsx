@@ -46,7 +46,7 @@ export default function HomeScreen() {
           <Text style={[typeScale.display, { color: colors.text }]}>Gün defteri</Text>
           {rides.length > 0 ? (
             <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-              {rides.length} kayıt
+              {rides.length} sefer
             </Text>
           ) : null}
         </View>

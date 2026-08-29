@@ -1,11 +1,18 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { AmountText } from './amount-text';
 import type { DaySummary } from '@/lib/day-summary';
+import { add } from '@/lib/money';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 interface Props {
   summary: DaySummary;
-  /** Yıpranma ve yakıt dökümünü gösterir. Küçük kartlarda kapatılabilir. */
+  /**
+   * Kesintileri kalem kalem gösterir.
+   *
+   * Kapalıyken komisyon, yakıt ve gider TEK "Kesintiler" satırında
+   * toplanır — gizlenmez. Gizleseydik ekrandaki sayılar toplanınca
+   * gerçek kâra ulaşmazdı ve sürücü tutmayan bir hesaba bakardı.
+   */
   detailed?: boolean;
 }
 
@@ -25,6 +32,7 @@ interface Props {
 export function SummaryRows({ summary, detailed = true }: Props) {
   const { colors } = useTheme();
   const { profit } = summary;
+  const deductions = add(profit.commission, profit.fuelPaid, profit.expensesPaid);
 
   return (
     <View style={styles.wrap}>
@@ -46,19 +54,28 @@ export function SummaryRows({ summary, detailed = true }: Props) {
           />
           <Deduction label="Gider" value={profit.expensesPaid} />
         </>
-      ) : null}
+      ) : (
+        <Deduction label="Kesintiler" value={deductions} />
+      )}
 
       <View style={[styles.rule, { backgroundColor: colors.accent }]} />
 
-      <View style={styles.hero}>
-        <View style={styles.heroText}>
-          <Text style={[styles.heroLabel, { color: colors.accent }]}>CEBE KALAN</Text>
-          <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-            gerçekleşmiş nakit
-          </Text>
+      {detailed ? (
+        <View style={styles.hero}>
+          <View style={styles.heroText}>
+            <Text style={[styles.heroLabel, { color: colors.accent }]}>CEBE KALAN</Text>
+            <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+              gerçekleşmiş nakit
+            </Text>
+          </View>
+          <AmountText value={profit.cashProfit} size="title" tone="signed" />
         </View>
-        <AmountText value={profit.cashProfit} size="title" tone="signed" />
-      </View>
+      ) : (
+        <View style={styles.line}>
+          <Text style={[typeScale.bodyStrong, { color: colors.accent }]}>Cebe kalan</Text>
+          <AmountText value={profit.cashProfit} size="bodyStrong" tone="signed" />
+        </View>
+      )}
 
       {detailed ? (
         <>
@@ -84,10 +101,23 @@ export function SummaryRows({ summary, detailed = true }: Props) {
           </View>
         </>
       ) : (
-        <View style={styles.line}>
-          <Text style={[typeScale.bodyStrong, { color: colors.text }]}>Gerçek kâr</Text>
-          <AmountText value={profit.trueProfit} size="bodyStrong" tone="signed" />
-        </View>
+        <>
+          <Deduction
+            label={
+              summary.distanceKm == null
+                ? 'Yıpranma'
+                : `Yıpranma · ${summary.distanceKm} km`
+            }
+            value={profit.wearShare}
+          />
+
+          <View style={[styles.rule, { backgroundColor: colors.border }]} />
+
+          <View style={styles.line}>
+            <Text style={[typeScale.bodyStrong, { color: colors.text }]}>Gerçek kâr</Text>
+            <AmountText value={profit.trueProfit} size="bodyStrong" tone="signed" />
+          </View>
+        </>
       )}
 
       <MissingData summary={summary} />

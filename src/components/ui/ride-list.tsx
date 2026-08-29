@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { AmountText } from './amount-text';
 import type { Ride } from '@/db/schema/earnings';
+import { formatClock } from '@/lib/business-date';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 interface Props {
@@ -54,7 +55,7 @@ export function RideList({ rides, limit = 8, emptyText }: Props) {
             ]}
           >
             <Text style={[styles.time, { color: colors.textFaint }]}>
-              {clockOf(ride.occurredAt)}
+              {formatClock(ride.occurredAt)}
             </Text>
             <View style={styles.spacer} />
             <AmountText value={ride.grossAmountKurus} size="bodyStrong" />
@@ -69,18 +70,6 @@ export function RideList({ rides, limit = 8, emptyText }: Props) {
       ) : null}
     </View>
   );
-}
-
-/**
- * Damgadan saat:dakika.
- *
- * `toLocaleTimeString` KULLANILMIYOR: Hermes'te ICU verisi eksik
- * olabiliyor ve saat biçimi cihaza göre değişiyor. İki haneli 24 saat
- * her cihazda aynı görünsün.
- */
-function clockOf(at: number): string {
-  const d = new Date(at);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 const styles = StyleSheet.create({
