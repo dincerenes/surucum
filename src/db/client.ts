@@ -1,8 +1,9 @@
 import { drizzle } from 'drizzle-orm/expo-sqlite';
 import * as SQLite from 'expo-sqlite';
 import * as schema from './schema';
+import { DATABASE_NAME } from './change-events';
 
-export const DATABASE_NAME = 'surucum.db';
+export { DATABASE_NAME };
 
 let sqliteClient: SQLite.SQLiteDatabase | null = null;
 let database: ReturnType<typeof createDrizzle> | null = null;

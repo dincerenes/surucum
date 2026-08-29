@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { addDatabaseChangeListener } from 'expo-sqlite';
-import { DATABASE_NAME } from './client';
+import { isOwnDatabaseEvent } from './change-events';
 
 /**
  * Veritabanı her değiştiğinde `read` fonksiyonunu yeniden çalıştırır.
@@ -34,7 +34,7 @@ export function useDbValue<T>(read: () => T, deps: readonly unknown[] = []): T {
        * Uygulama tek veritabanı açıyor ama sınama düzenekleri geçici
        * veritabanları açabiliyor.
        */
-      if (event.databaseName && !event.databaseName.includes(DATABASE_NAME)) return;
+      if (!isOwnDatabaseEvent(event)) return;
       setValue(compute());
     });
 

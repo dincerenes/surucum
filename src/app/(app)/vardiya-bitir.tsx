@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AboveKeyboard, AmountInput, Button, SummaryRows } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import { endShift, getDaySummary, getKnownFuelFigures } from '@/db/repo';
+import type { BusinessDate } from '@/lib/business-date';
 import { type Kurus, parseAmount } from '@/lib/money';
 import { useDriver } from '@/lib/use-driver';
 import { requestSync } from '@/sync/scheduler';
@@ -30,6 +31,17 @@ export default function EndShiftScreen() {
     [vehicle?.id],
   );
 
+  /**
+   * Özetin günü, vardiya KAPANMADAN ÖNCE sabitlenir.
+   *
+   * Kapanınca `today` vardiyanın gününden takvim gününe atlar. Sabitlemezsek
+   * ödül anında boş bir gün gösteririz: gece 22:00'de başlayıp 05:00'te
+   * kapanan vardiya 28'e yazılıdır, ekran 29'a geçer ve sürücü kazandığı
+   * paranın kaybolduğunu görür.
+   */
+  const [closedDate, setClosedDate] = useState<BusinessDate | null>(null);
+  const summaryDate = closedDate ?? openShift?.businessDate ?? today;
+
   const [step, setStep] = useState(1);
   const [km, setKm] = useState('');
   const [hours, setHours] = useState('');
@@ -44,11 +56,12 @@ export default function EndShiftScreen() {
   /** Özet adımında gösterilecek, HENÜZ KAYDEDİLMEMİŞ hesap. */
   const preview = useDbValue(() => {
     if (!userId) return null;
-    return getDaySummary(userId, today);
-  }, [userId, today, step]);
+    return getDaySummary(userId, summaryDate);
+  }, [userId, summaryDate, step]);
 
   function kapat() {
     if (!userId || !openShift) return;
+    setClosedDate(openShift.businessDate);
 
     const kmValue = Number(km.replace(',', '.'));
     const hoursValue = Number(hours.replace(',', '.'));
