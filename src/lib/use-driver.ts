@@ -10,11 +10,12 @@ import { useMemo } from 'react';
 import { useDbValue } from '@/db/use-db';
 import {
   ensureSettings, getCutoffHour, getDaySummary, getOpenShift,
-  listActiveVehicles, listRidesOnDate,
+  listActiveVehicles, listRidesInShift, listRidesOnDate,
 } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
 import { type BusinessDate, todayBusinessDate } from '@/lib/business-date';
 import type { DaySummary } from '@/lib/day-summary';
+import { type Kurus, ZERO, add } from '@/lib/money';
 import { isShiftStale, resolveShiftDuration } from '@/lib/shift';
 import type { Ride, Shift } from '@/db/schema/earnings';
 import type { Vehicle } from '@/db/schema/vehicles';
@@ -38,13 +39,28 @@ export interface DriverState {
    */
   today: BusinessDate;
   summary: DaySummary | null;
+  /** Gün defterinin seferleri — iş gününün tamamı. */
   rides: Ride[];
+
+  /**
+   * YALNIZCA açık vardiyanın seferleri.
+   *
+   * Günden ayrı tutuluyor: bir iş gününde iki vardiya olabilir ve canlı
+   * ekran "CANLI VARDİYA" diyorsa oradaki her sayı o vardiyanın olmalı.
+   * Karıştırıldığında sürücü, yeni başlattığı boş vardiyada bir önceki
+   * vardiyanın parasını görüyor.
+   */
+  shiftRides: Ride[];
+
+  /** Açık vardiyanın cirosu — brüt, hiçbir kesinti düşülmemiş. */
+  shiftGross: Kurus;
 }
 
 const EMPTY: DriverState = {
   userId: null, vehicle: null, needsSetup: true, openShift: null,
   shiftIsStale: false, openShiftMinutes: 0,
   today: todayBusinessDate(), summary: null, rides: [],
+  shiftRides: [], shiftGross: ZERO,
 };
 
 export function useDriver(): DriverState {
@@ -66,6 +82,8 @@ export function useDriver(): DriverState {
     // Vardiya açıkken defter onun gününde kalır, takvim dönse bile.
     const activeDate = openShift?.businessDate ?? today;
 
+    const shiftRides = openShift ? listRidesInShift(openShift.id) : [];
+
     return {
       userId,
       vehicle,
@@ -78,6 +96,8 @@ export function useDriver(): DriverState {
       today: activeDate,
       summary: getDaySummary(userId, activeDate, now),
       rides: listRidesOnDate(userId, activeDate),
+      shiftRides,
+      shiftGross: shiftRides.reduce((sum, r) => add(sum, r.grossAmountKurus), ZERO),
     } satisfies DriverState;
   }, [userId]);
 

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AmountText, Button, RideList } from '@/components/ui';
 import { startShift } from '@/db/repo';
 import { formatKurus } from '@/lib/money';
-import { earningsPerHour, earningsPerKm } from '@/lib/shift';
+import { earningsPerHour, earningsPerRide } from '@/lib/shift';
 import { useDriver } from '@/lib/use-driver';
 import { requestSync } from '@/sync/scheduler';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
@@ -16,12 +16,22 @@ import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
  * Sürücü gün boyu bu ekranda. Tek dev hedef var: "Sefer ekle". Anasayfa
  * kaydırılabilir bir defter; burada kaydırma yok, başparmak nereye
  * gideceğini düşünmüyor.
+ *
+ * BURADAKİ HER SAYI AÇIK VARDİYANIN — günün değil. Bir iş gününde iki
+ * vardiya olabilir; ekran "CANLI VARDİYA" diyorsa parası da o vardiyanın
+ * olmalı. Karıştırıldığında sürücü yeni başlattığı boş vardiyada bir
+ * öncekinin parasını görüyordu.
+ *
+ * Gösterilen sayı CİRO, cebe kalan değil. Komisyon ve yakıt vardiya
+ * sonunda soruluyor; vardiya sürerken ikisi de bilinmiyor ve bilinmeyen
+ * bir kesintiyi düşülmüş gibi göstermek sayıya olan güveni bitirir.
+ * Günün üç satırı Anasayfa'da, gerçek rakamlarla duruyor.
  */
 export default function DriveScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const state = useDriver();
-  const { openShift, summary, userId, vehicle } = state;
+  const { openShift, userId, vehicle } = state;
 
   if (!openShift) return <ClosedState onStart={() => {
     if (!userId || !vehicle) return;
@@ -30,9 +40,15 @@ export default function DriveScreen() {
   }} />;
 
   const minutes = state.openShiftMinutes;
-  const cash = summary?.profit.cashProfit ?? (0 as never);
-  const perHour = earningsPerHour(cash, minutes);
-  const perKm = earningsPerKm(cash, summary?.distanceKm ?? null);
+  const rides = state.shiftRides;
+  const gross = state.shiftGross;
+  const perHour = earningsPerHour(gross, minutes);
+  /**
+   * ₺/km YOK: kilometre vardiya sonunda soruluyor, vardiya sürerken
+   * bilinmiyor ve sürekli "—" gösteren bir kutu yer kaplamaktan başka
+   * bir şey yapmıyor. ₺/sefer ise her seferde canlı güncelleniyor.
+   */
+  const perRide = earningsPerRide(gross, rides.length);
 
   return (
     <View style={[
@@ -52,19 +68,22 @@ export default function DriveScreen() {
       </Text>
 
       <View style={styles.cash}>
-        <Text style={[styles.eyebrow, { color: colors.textFaint }]}>CEBE KALAN</Text>
-        <AmountText value={cash} size="display" tone="signed" />
+        <Text style={[styles.eyebrow, { color: colors.textFaint }]}>BU VARDİYANIN CİROSU</Text>
+        <AmountText value={gross} size="display" />
+        <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+          komisyon ve yakıt vardiya sonunda düşülür
+        </Text>
       </View>
 
       <View style={styles.stats}>
-        <Stat value={String(state.rides.length)} label="sefer" />
+        <Stat value={String(rides.length)} label="sefer" />
         <Stat
           value={perHour != null ? formatKurus(perHour, { symbol: false, decimals: false }) : '—'}
           label="₺/saat"
         />
         <Stat
-          value={perKm != null ? formatKurus(perKm, { symbol: false }) : '—'}
-          label="₺/km"
+          value={perRide != null ? formatKurus(perRide, { symbol: false, decimals: false }) : '—'}
+          label="₺/sefer"
         />
       </View>
 
@@ -74,7 +93,7 @@ export default function DriveScreen() {
         showsVerticalScrollIndicator={false}
       >
         <RideList
-          rides={state.rides}
+          rides={rides}
           emptyText="Henüz sefer yok. İlk parayı aldığında aşağıdaki butona bas."
         />
       </ScrollView>
