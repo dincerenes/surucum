@@ -19,6 +19,7 @@ import { earningSources } from '../schema';
 import type { EarningSource } from '../schema/earnings';
 import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
 import { type BasisPoints, clampBps } from '@/lib/money';
+import { pickDuplicatesToRemove } from '@/lib/settings-merge';
 
 export interface NewEarningSourceInput {
   name: string;
@@ -100,6 +101,24 @@ export function ensureDefaultEarningSource(
   userId: string, now: UnixMs = Date.now(),
 ): EarningSource {
   const existing = listActiveEarningSources(userId);
+
+  /**
+   * ÇOĞALMA TEMİZLENİYOR. Bu fonksiyon çekme tamamlanmadan yerelde bir
+   * satır açıyor, senkron buluttakini indiriyor ve iki "Sefer geliri"
+   * oluşuyor. v1'de kaynak arayüzde görünmediği için zararsız duruyor
+   * ama seferler iki farklı kimliğe bağlanıyor; ileride kaynak bazlı
+   * rapor gerekirse aynı iş iki kaynağa bölünmüş görünür.
+   *
+   * Seferlerin `earning_source_id`'si TAŞINMIYOR: geçmiş kayıt kendi
+   * oluşturulduğu andaki bağı korumalı ve silinen kaynak yalnızca
+   * yumuşak siliniyor, satır duruyor.
+   */
+  const duplicates = pickDuplicatesToRemove(existing);
+  if (duplicates) {
+    for (const id of duplicates.removeIds) deleteEarningSource(id, now);
+    return duplicates.keep;
+  }
+
   if (existing.length > 0) return existing[0];
   return createEarningSource(userId, { name: 'Sefer geliri' }, now);
 }

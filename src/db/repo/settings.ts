@@ -6,12 +6,13 @@
  * bir önceki iş gününe yazılır.
  */
 
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { getDb } from '../client';
 import { appSettings } from '../schema';
 import type { AppSettings } from '../schema/system';
-import { type UnixMs, alive, stampNew, withOutbox } from './_base';
+import { type UnixMs, alive, softDeleteRow, stampNew, withOutbox } from './_base';
 import { DEFAULT_CUTOFF_HOUR } from '@/lib/business-date';
+import { mergeSettingsRows } from '@/lib/settings-merge';
 
 /**
  * Ayar satırını okur, yoksa oluşturur.
@@ -22,6 +23,14 @@ import { DEFAULT_CUTOFF_HOUR } from '@/lib/business-date';
 export function ensureSettings(
   userId: string, now: UnixMs = Date.now(),
 ): AppSettings {
+  /**
+   * Önce ÇOĞALMA TEMİZLENİYOR. Ayar satırı mantıken tek ama pratikte
+   * çoğalabiliyor: bu fonksiyon çekme tamamlanmadan yerel satırı açıyor,
+   * hemen ardından senkron buluttakini indiriyor ve kimlik cihazda
+   * üretildiği için ikisi aynı satır sayılmıyor.
+   */
+  consolidateSettings(userId, now);
+
   const existing = getSettings(userId);
   if (existing) return existing;
 
@@ -33,9 +42,59 @@ export function ensureSettings(
   ), now);
 }
 
+/**
+ * Ayar satırı — SIRALAMA ŞART.
+ *
+ * Sıralamasız `get()` çoğalmış satırlarda rastgele birini döndürüyordu ve
+ * dönen satırın `onboarding_completed_at`'i boşsa sürücü kurulumu
+ * bitirmiş olmasına rağmen kurulum ekranına atılıyordu. En eski satır
+ * kanoniktir ve tüm cihazlarda aynıdır.
+ */
 export function getSettings(userId: string): AppSettings | undefined {
   return getDb().select().from(appSettings)
-    .where(alive(appSettings, userId)).get();
+    .where(alive(appSettings, userId))
+    .orderBy(asc(appSettings.createdAt), asc(appSettings.id))
+    .get();
+}
+
+/**
+ * Çoğalmış ayar satırlarını tek satıra indirir.
+ *
+ * Fazlalıklar YUMUŞAK siliniyor ve kuyruğa düşüyor — bulut da yakınsasın.
+ * Sert silseydik bir sonraki çekmede geri gelirlerdi.
+ *
+ * Hesap `src/lib/settings-merge.ts` içinde ve test ediliyor; burada
+ * yalnızca okuma ve yazma var.
+ */
+export function consolidateSettings(userId: string, now: UnixMs = Date.now()): void {
+  const rows = getDb().select().from(appSettings)
+    .where(alive(appSettings, userId))
+    .orderBy(asc(appSettings.createdAt), asc(appSettings.id))
+    .all();
+
+  const merge = mergeSettingsRows(rows.map((r) => ({
+    id: r.id,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    dayCutoffHour: r.dayCutoffHour,
+    defaultVehicleId: r.defaultVehicleId,
+    defaultEarningSourceId: r.defaultEarningSourceId,
+    regionCode: r.regionCode,
+    onboardingCompletedAt: r.onboardingCompletedAt ?? null,
+  })));
+  if (!merge) return;
+
+  if (Object.keys(merge.patch).length > 0) {
+    withOutbox('app_settings', merge.survivor.id, 'upsert', (tx) => {
+      tx.update(appSettings)
+        .set({ ...merge.patch, updatedAt: now })
+        .where(eq(appSettings.id, merge.survivor.id)).run();
+    }, now);
+  }
+
+  for (const id of merge.removeIds) {
+    softDeleteRow(appSettings, 'app_settings', id, now);
+  }
 }
 
 /**
