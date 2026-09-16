@@ -14,7 +14,7 @@ import {
 } from '@/lib/business-date';
 import type { DaySummary } from '@/lib/day-summary';
 import type { Shift } from '@/db/schema/earnings';
-import type { Kurus } from '@/lib/money';
+import { type Kurus, formatDecimal } from '@/lib/money';
 import { resolveShiftDuration } from '@/lib/shift';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
@@ -85,7 +85,7 @@ export default function RecordsScreen() {
     for (const r of listRidesInRange(userId, from, to)) {
       push(r.businessDate, {
         id: r.id, kind: 'sefer', at: r.occurredAt, title: 'Sefer',
-        detail: r.distanceMeters ? `${(r.distanceMeters / 1000).toFixed(1)} km` : '',
+        detail: r.distanceMeters ? `${formatDecimal(r.distanceMeters / 1000)} km` : '',
         amount: r.grossAmountKurus, incoming: true,
       });
     }
@@ -98,7 +98,7 @@ export default function RecordsScreen() {
     for (const f of listFuelLogsInRange(userId, from, to)) {
       push(f.businessDate, {
         id: f.id, kind: 'yakit', at: f.occurredAt, title: 'Yakıt',
-        detail: `${(f.volumePer1000 / 1000).toFixed(1)} lt`,
+        detail: `${formatDecimal(f.volumePer1000 / 1000)} lt`,
         amount: f.totalAmountKurus, incoming: false,
       });
     }

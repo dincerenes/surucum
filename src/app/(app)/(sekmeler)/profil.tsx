@@ -11,7 +11,7 @@ import {
 import { getSyncStatus } from '@/sync/state';
 import { FUEL_TYPE_LABELS } from '@/db/schema/_shared';
 import { useAuth } from '@/lib/auth/auth-context';
-import { formatInteger, formatKurus } from '@/lib/money';
+import { formatDecimal, formatInteger, formatKurus } from '@/lib/money';
 import { useDriver } from '@/lib/use-driver';
 import { pendingCount } from '@/sync/push';
 import { HIT_SIZE, radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
@@ -71,7 +71,7 @@ export default function ProfileScreen() {
           </View>
           {info?.figures?.consumptionPer100Km ? (
             <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-              Ortalama tüketim {(info.figures.consumptionPer100Km / 1000).toFixed(1)} lt/100km
+              Ortalama tüketim {formatDecimal(info.figures.consumptionPer100Km / 1000)} lt/100km
               {info.figures.unitPriceKurus
                 ? ` · son yakıt ${formatKurus(info.figures.unitPriceKurus)}/lt`
                 : ''}

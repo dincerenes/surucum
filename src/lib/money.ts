@@ -311,6 +311,25 @@ function trimZero(n: number): string {
 }
 
 /**
+ * Para OLMAYAN ondalık sayı: 17.85 → "17,9"
+ *
+ * Türkçede ondalık ayracı VİRGÜL. `toFixed()` çıktısı nokta veriyor ve
+ * ekranda "17.9 lt" diye görünüyordu — aynı ekranda paranın "892,50 ₺"
+ * olduğu yerde. İki farklı ayraç, sürücünün hangi işaretin ne anlama
+ * geldiğini sorgulaması demek; gerçek cihazda görülüp düzeltildi.
+ *
+ * Binlik ayracı da ekleniyor: uzun dönemde kilometre binlere çıkıyor.
+ */
+export function formatDecimal(value: number, digits: number = 1): string {
+  if (!Number.isFinite(value)) return '0';
+  const negative = value < 0;
+  const fixed = Math.abs(value).toFixed(digits);
+  const [whole, frac] = fixed.split('.');
+  const body = frac ? `${groupThousands(whole)},${frac}` : groupThousands(whole);
+  return negative ? `${MINUS}${body}` : body;
+}
+
+/**
  * Tutarın DÜZENLENEBİLİR metin hâli: 23150 → "231,50"
  *
  * `formatKurus` KULLANILMAZ. Onun çıktısı binlik ayracı ve ₺ taşıyor;

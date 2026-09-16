@@ -4,7 +4,7 @@ import {
   asKurus, fromLira, asBps, percentToBps, bpsToPercent,
   roundHalfAwayFromZero, add, subtract, sum, multiply,
   applyRate, netAfterRate, allocate, allocateByWeights,
-  formatKurus, formatKurusCompact, formatBps, formatInteger, formatAmountForInput,
+  formatKurus, formatKurusCompact, formatBps, formatInteger, formatAmountForInput, formatDecimal,
   parseAmount, parseRate,
   type Kurus,
 } from './money.ts';
@@ -280,5 +280,30 @@ describe('formatAmountForInput — düzenleme alanı', () => {
     assert.equal(formatAmountForInput(null), '');
     assert.equal(formatAmountForInput(undefined), '');
     assert.equal(formatAmountForInput(NaN), '');
+  });
+});
+
+describe('formatDecimal — ondalık ayracı VİRGÜL', () => {
+  it('Türkçe ayraç kullanır, nokta değil', () => {
+    assert.equal(formatDecimal(17.85), '17,9');
+    assert.equal(formatDecimal(7.5), '7,5');
+  });
+
+  it('binlik ayracı nokta, ondalık virgül', () => {
+    assert.equal(formatDecimal(1234.56), '1.234,6');
+  });
+
+  it('basamak sayısı ayarlanabilir', () => {
+    assert.equal(formatDecimal(17.849, 2), '17,85');
+    assert.equal(formatDecimal(17.5, 0), '18');
+  });
+
+  it('negatifte tipografik eksi', () => {
+    assert.equal(formatDecimal(-3.2), '−3,2');
+  });
+
+  it('bozuk girdi çökmüyor', () => {
+    assert.equal(formatDecimal(NaN), '0');
+    assert.equal(formatDecimal(Infinity), '0');
   });
 });

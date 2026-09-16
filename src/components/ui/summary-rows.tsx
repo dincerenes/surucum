@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { AmountText } from './amount-text';
 import type { DaySummary } from '@/lib/day-summary';
 import type { Kurus } from '@/lib/money';
-import { add, formatInteger } from '@/lib/money';
+import { add, formatDecimal, formatInteger } from '@/lib/money';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 /**
@@ -85,7 +85,7 @@ export function ProfitRows({
             label={
               data.fuelVolume == null
                 ? 'Yakıt'
-                : `Yakıt · ${(data.fuelVolume / 1000).toFixed(1)} lt`
+                : `Yakıt · ${formatDecimal(data.fuelVolume / 1000)} lt`
             }
             value={data.fuelPaid}
           />
