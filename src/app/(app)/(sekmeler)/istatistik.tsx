@@ -10,7 +10,7 @@ import {
   type BusinessDate, WEEKDAYS_TR, addDays, startOfMonth, startOfWeek,
   todayBusinessDate,
 } from '@/lib/business-date';
-import { formatKurus } from '@/lib/money';
+import { formatInteger, formatKurus } from '@/lib/money';
 import {
   type DayEntry, type PeriodTotals, calculatePeriodTotals, percentChange,
   summarizeByWeekday,
@@ -153,7 +153,7 @@ export default function StatsScreen() {
               <Metric value={String(totals.rideCount)} label="toplam sefer" />
               <Metric
                 value={totals.distanceKm != null
-                  ? Math.round(totals.distanceKm).toLocaleString('tr-TR') : '—'}
+                  ? formatInteger(totals.distanceKm) : '—'}
                 label="toplam km"
               />
             </View>

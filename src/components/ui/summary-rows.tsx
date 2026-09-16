@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { AmountText } from './amount-text';
 import type { DaySummary } from '@/lib/day-summary';
 import type { Kurus } from '@/lib/money';
-import { add } from '@/lib/money';
+import { add, formatInteger } from '@/lib/money';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 /**
@@ -201,7 +201,7 @@ function MissingData({ notes }: { notes: readonly string[] }) {
 
 /** Uzun dönemlerde kilometre binlere çıkıyor — ayraçsız okunmuyor. */
 function formatKm(km: number): string {
-  return Math.round(km).toLocaleString('tr-TR');
+  return formatInteger(km);
 }
 
 const styles = StyleSheet.create({

@@ -11,7 +11,7 @@ import {
 import { getSyncStatus } from '@/sync/state';
 import { FUEL_TYPE_LABELS } from '@/db/schema/_shared';
 import { useAuth } from '@/lib/auth/auth-context';
-import { formatKurus } from '@/lib/money';
+import { formatInteger, formatKurus } from '@/lib/money';
 import { useDriver } from '@/lib/use-driver';
 import { pendingCount } from '@/sync/push';
 import { HIT_SIZE, radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
@@ -63,7 +63,7 @@ export default function ProfileScreen() {
           <View style={styles.chips}>
             {info?.fuels ? <Tag text={info.fuels} /> : null}
             {vehicle.initialOdometerKm ? (
-              <Tag text={`${vehicle.initialOdometerKm.toLocaleString('tr-TR')} km`} />
+              <Tag text={`${formatInteger(vehicle.initialOdometerKm)} km`} />
             ) : null}
             {vehicle.wearPerKmKurus > 0 ? (
               <Tag text={`${formatKurus(vehicle.wearPerKmKurus)}/km yıpranma`} />

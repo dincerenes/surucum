@@ -235,6 +235,24 @@ function groupThousands(digits: string): string {
 }
 
 /**
+ * Para OLMAYAN tam sayılar için binlik ayracı: 1234 → "1.234"
+ *
+ * `toLocaleString('tr-TR')` KULLANILMIYOR. Hermes'in ICU verisi platforma
+ * göre eksik olabiliyor ve locale yok sayıldığında çıktı "1,234" oluyor —
+ * Türkçe okuyan bir sürücü bunu bin iki yüz otuz dört değil, bir virgül
+ * iki üç dört diye okur. Kilometre ve sayaç değerleri para kadar kritik
+ * değil ama aynı ekranda paranın yanında duruyorlar; iki farklı ayraç
+ * görmek sayının tamamına olan güveni sarsıyor.
+ */
+export function formatInteger(value: number): string {
+  if (!Number.isFinite(value)) return '0';
+  const rounded = Math.round(value);
+  const negative = rounded < 0;
+  const body = groupThousands(String(Math.abs(rounded)));
+  return negative ? `${MINUS}${body}` : body;
+}
+
+/**
  * Türkçe para biçimi: 1.234,56 ₺
  *
  * Intl yerine elle biçimlendiriyoruz çünkü Hermes'in Intl desteği

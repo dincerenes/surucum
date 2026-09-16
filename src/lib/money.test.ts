@@ -1,10 +1,10 @@
-import { test, describe } from 'node:test';
+import { test, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   asKurus, fromLira, asBps, percentToBps, bpsToPercent,
   roundHalfAwayFromZero, add, subtract, sum, multiply,
   applyRate, netAfterRate, allocate, allocateByWeights,
-  formatKurus, formatKurusCompact, formatBps,
+  formatKurus, formatKurusCompact, formatBps, formatInteger,
   parseAmount, parseRate,
   type Kurus,
 } from './money.ts';
@@ -227,5 +227,31 @@ describe('girdi okuma — sürücü hızlı yazar, biçim tutarsızdır', () => 
     assert.equal(parseRate('101'), null, '%100 üstü reddedilmeli');
     assert.equal(parseRate('-5'), null);
     assert.equal(parseRate('abc'), null);
+  });
+});
+
+describe('formatInteger — para olmayan tam sayılar', () => {
+  it('binlik ayracı NOKTA, Türkçe biçim', () => {
+    assert.equal(formatInteger(1234), '1.234');
+    assert.equal(formatInteger(1234567), '1.234.567');
+  });
+
+  it('dört haneden kısa sayıda ayraç yok', () => {
+    assert.equal(formatInteger(0), '0');
+    assert.equal(formatInteger(999), '999');
+  });
+
+  it('ondalık yuvarlanıyor — kilometre tam sayı gösterilir', () => {
+    assert.equal(formatInteger(238.6), '239');
+    assert.equal(formatInteger(238.4), '238');
+  });
+
+  it('negatifte tipografik eksi kullanılıyor, düz tire değil', () => {
+    assert.equal(formatInteger(-1234), '−1.234');
+  });
+
+  it('bozuk girdi çökmüyor', () => {
+    assert.equal(formatInteger(NaN), '0');
+    assert.equal(formatInteger(Infinity), '0');
   });
 });
