@@ -14,7 +14,7 @@ export { Card } from './card';
 export { AmountText } from './amount-text';
 export { Chip, ChipRow, ChipGrid } from './chip';
 export { AmountInput, AboveKeyboard, previewAmount } from './amount-input';
-export { SummaryRows } from './summary-rows';
+export { SummaryRows, ProfitRows, type ProfitRowsData } from './summary-rows';
 export { GoalBar } from './goal-bar';
 export { SheetHeader, sheetStyles } from './sheet';
 export { PageHeader } from './page-header';

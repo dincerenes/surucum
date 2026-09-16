@@ -1,0 +1,177 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+import { calculatePeriodTotals, percentChange, summarizeByWeekday } from './stats.ts';
+import type { DayEntry } from './stats.ts';
+import { asBusinessDate } from './business-date.ts';
+import { calculateDaySummary } from './day-summary.ts';
+import type { Kurus } from './money.ts';
+
+const k = (n: number) => n as Kurus;
+
+/** Tek vardiyalı, tek seferlik bir gün üretir. */
+function day(
+  date: string,
+  opts: {
+    gross?: number;
+    commission?: number;
+    expense?: number;
+    km?: number | null;
+    minutes?: number | null;
+    wearPerKm?: number;
+  } = {},
+): DayEntry {
+  const {
+    gross = 0, commission = 0, expense = 0, km = null,
+    minutes = null, wearPerKm = 250,
+  } = opts;
+
+  return {
+    date: asBusinessDate(date),
+    summary: calculateDaySummary({
+      rides: gross > 0
+        ? [{ grossAmountKurus: k(gross), commissionKurus: k(0), tipKurus: k(0) }]
+        : [],
+      expenses: expense > 0 ? [{ amountKurus: k(expense) }] : [],
+      fuelLogs: [],
+      shifts: [{
+        startedAt: 0,
+        endedAt: 1,
+        workedMinutes: minutes,
+        distanceKm: km,
+        commissionKurus: commission > 0 ? k(commission) : null,
+        wearPerKmKurus: k(wearPerKm),
+      }],
+      now: 1,
+    }),
+  };
+}
+
+describe('dönem toplamları', () => {
+  it('boş dönem sıfırlarla döner, oranlar null', () => {
+    const t = calculatePeriodTotals([]);
+    assert.equal(t.dayCount, 0);
+    assert.equal(t.revenue, 0);
+    assert.equal(t.perHour, null);
+    assert.equal(t.perKm, null);
+    assert.equal(t.perDay, null);
+    assert.equal(t.distanceKm, null);
+  });
+
+  it('günlerin üç satırı toplanıyor', () => {
+    const t = calculatePeriodTotals([
+      day('2026-09-14', { gross: 100_000, commission: 20_000, km: 100 }),
+      day('2026-09-15', { gross: 200_000, commission: 40_000, km: 200 }),
+    ]);
+
+    assert.equal(t.dayCount, 2);
+    assert.equal(t.revenue, 300_000);
+    assert.equal(t.commission, 60_000);
+    assert.equal(t.cashProfit, 240_000);
+    // Yıpranma: (100 + 200) km × 250 kuruş = 75.000
+    assert.equal(t.wearShare, 75_000);
+    assert.equal(t.trueProfit, 165_000);
+    assert.equal(t.distanceKm, 300);
+  });
+
+  it('ekrandaki satırlar toplanınca gerçek kâra ULAŞIYOR', () => {
+    const t = calculatePeriodTotals([
+      day('2026-09-14', { gross: 447_50, commission: 215_50, expense: 150_00, km: 238 }),
+    ]);
+
+    assert.equal(
+      t.revenue - t.commission - t.fuelPaid - t.expensesPaid,
+      t.cashProfit,
+    );
+    assert.equal(t.cashProfit - t.wearShare, t.trueProfit);
+  });
+
+  it('kilometre HİÇ girilmemişse null — sıfır değil', () => {
+    const t = calculatePeriodTotals([
+      day('2026-09-14', { gross: 100_000, km: null }),
+      day('2026-09-15', { gross: 100_000, km: null }),
+    ]);
+    assert.equal(t.distanceKm, null);
+    assert.equal(t.perKm, null);
+    assert.equal(t.daysMissingDistance, 2);
+  });
+
+  it('bazı günlerin kilometresi varsa toplam bilinenlerden gelir', () => {
+    const t = calculatePeriodTotals([
+      day('2026-09-14', { gross: 100_000, km: 120 }),
+      day('2026-09-15', { gross: 100_000, km: null }),
+    ]);
+    assert.equal(t.distanceKm, 120);
+    assert.equal(t.daysMissingDistance, 1);
+  });
+
+  it('gün başına ortalama yalnızca ÇALIŞILAN günlere bölünür', () => {
+    const t = calculatePeriodTotals([
+      day('2026-09-14', { gross: 100_000 }),
+      day('2026-09-15', { gross: 200_000 }),
+    ]);
+    assert.equal(t.perDay, 150_000);
+  });
+});
+
+describe('haftanın günleri', () => {
+  it('yedi gün de dönüyor, kaydı olmayanın ortalaması null', () => {
+    const stats = summarizeByWeekday([]);
+    assert.equal(stats.length, 7);
+    for (const s of stats) {
+      assert.equal(s.dayCount, 0);
+      assert.equal(s.average, null);
+      assert.equal(s.ratio, 0);
+    }
+  });
+
+  it('TOPLAM değil ORTALAMA karşılaştırılıyor', () => {
+    // 14 Eylül 2026 Pazartesi, 15'i Salı.
+    const stats = summarizeByWeekday([
+      // İki Pazartesi, her biri 100 TL → ortalama 100
+      day('2026-09-14', { gross: 10_000 }),
+      day('2026-09-21', { gross: 10_000 }),
+      // Tek Salı, 150 TL → ortalama 150, toplamı daha düşük
+      day('2026-09-15', { gross: 15_000 }),
+    ]);
+
+    const pazartesi = stats[0];
+    const sali = stats[1];
+
+    assert.equal(pazartesi.cashProfit, 20_000);  // toplamı daha yüksek
+    assert.equal(sali.cashProfit, 15_000);
+
+    assert.equal(pazartesi.average, 10_000);
+    assert.equal(sali.average, 15_000);
+
+    // Oran ortalamadan geliyor: Salı en iyi gün.
+    assert.equal(sali.ratio, 1);
+    assert.equal(pazartesi.ratio, 10_000 / 15_000);
+  });
+
+  it('zararlı gün şeritte sıfır oran alır — zarar tonun içinde saklanmaz', () => {
+    const stats = summarizeByWeekday([
+      day('2026-09-14', { gross: 10_000, expense: 30_000 }),  // Pazartesi: zarar
+      day('2026-09-15', { gross: 20_000 }),                    // Salı: kâr
+    ]);
+
+    assert.ok(stats[0].average! < 0);
+    assert.equal(stats[0].ratio, 0);
+    assert.equal(stats[1].ratio, 1);
+  });
+});
+
+describe('yüzde değişim', () => {
+  it('artış ve azalış', () => {
+    assert.equal(percentChange(k(150), k(100)), 50);
+    assert.equal(percentChange(k(50), k(100)), -50);
+  });
+
+  it('önceki dönem sıfırsa null — yüzde sonsuz olmaz', () => {
+    assert.equal(percentChange(k(100), k(0)), null);
+  });
+
+  it('önceki dönem negatifse null — işaret yüzdenin içinde kaybolmaz', () => {
+    assert.equal(percentChange(k(100), k(-50)), null);
+  });
+});

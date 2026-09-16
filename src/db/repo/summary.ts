@@ -61,6 +61,122 @@ export function getRangeSummary(
   });
 }
 
+/**
+ * Aralıktaki her GÜNÜN ayrı özeti — istatistik ekranının girdisi.
+ *
+ * Gün gün `getDaySummary` çağırmıyoruz: altmış gün için üç yüz sorgu
+ * demekti ve ekran açılırken donuyordu. Dört toplu okuma yapılıp satırlar
+ * bellekte güne göre gruplanıyor, aritmetik yine aynı test edilmiş
+ * fonksiyondan geçiyor.
+ *
+ * KAYDI OLMAYAN GÜN LİSTEDE YOK. Boş günü sıfır kazançlı bir gün gibi
+ * döndürmek ortalamaları bozar: sürücü çalışmadığı Pazar'ı "0 ₺ kazandığı
+ * gün" olarak saymaz ve haklıdır.
+ */
+export function listDaySummaries(
+  userId: string, from: BusinessDate, to: BusinessDate, now: UnixMs = Date.now(),
+): Array<{ date: BusinessDate; summary: DaySummary }> {
+  const rides = groupByDate(readRidesByDay(userId, from, to));
+  const expenses = groupByDate(readExpensesByDay(userId, from, to));
+  const fuel = groupByDate(readFuelLogsByDay(userId, from, to));
+  const shifts = groupByDate(readShiftRowsByDay(userId, from, to));
+
+  const dates = new Set<BusinessDate>([
+    ...rides.keys(), ...expenses.keys(), ...fuel.keys(), ...shifts.keys(),
+  ]);
+
+  return [...dates]
+    .sort((a, b) => (a < b ? 1 : -1))
+    .map((date) => ({
+      date,
+      summary: calculateDaySummary({
+        rides: rides.get(date) ?? [],
+        expenses: expenses.get(date) ?? [],
+        fuelLogs: fuel.get(date) ?? [],
+        shifts: shifts.get(date) ?? [],
+        now,
+      }),
+    }));
+}
+
+/** İş gününe göre gruplar. Satırın kendi `businessDate`'i anahtardır. */
+function groupByDate<T extends { businessDate: BusinessDate }>(
+  rows: readonly T[],
+): Map<BusinessDate, T[]> {
+  const map = new Map<BusinessDate, T[]>();
+  for (const row of rows) {
+    const list = map.get(row.businessDate);
+    if (list) list.push(row);
+    else map.set(row.businessDate, [row]);
+  }
+  return map;
+}
+
+function readRidesByDay(userId: string, from: BusinessDate, to: BusinessDate) {
+  return getDb().select({
+    businessDate: rides.businessDate,
+    grossAmountKurus: rides.grossAmountKurus,
+    commissionKurus: rides.commissionKurus,
+    tipKurus: rides.tipKurus,
+  }).from(rides).where(and(
+    alive(rides, userId),
+    gte(rides.businessDate, from),
+    lte(rides.businessDate, to),
+  )).all();
+}
+
+function readExpensesByDay(userId: string, from: BusinessDate, to: BusinessDate) {
+  return getDb().select({
+    businessDate: expenses.businessDate,
+    amountKurus: expenses.amountKurus,
+  }).from(expenses).where(and(
+    alive(expenses, userId),
+    gte(expenses.businessDate, from),
+    lte(expenses.businessDate, to),
+  )).all();
+}
+
+function readFuelLogsByDay(userId: string, from: BusinessDate, to: BusinessDate) {
+  return getDb().select({
+    businessDate: fuelLogs.businessDate,
+    totalAmountKurus: fuelLogs.totalAmountKurus,
+  }).from(fuelLogs).where(and(
+    alive(fuelLogs, userId),
+    gte(fuelLogs.businessDate, from),
+    lte(fuelLogs.businessDate, to),
+  )).all();
+}
+
+function readShiftRowsByDay(
+  userId: string, from: BusinessDate, to: BusinessDate,
+): Array<ShiftRow & { businessDate: BusinessDate }> {
+  return getDb().select({
+    businessDate: shifts.businessDate,
+    startedAt: shifts.startedAt,
+    endedAt: shifts.endedAt,
+    workedMinutes: shifts.workedMinutes,
+    distanceKm: shifts.distanceKm,
+    commissionKurus: shifts.commissionKurus,
+    fuelConsumptionPer100Km: shifts.fuelConsumptionPer100Km,
+    fuelPriceKurus: shifts.fuelPriceKurus,
+    wearPerKmKurus: vehicles.wearPerKmKurus,
+  })
+    .from(shifts)
+    .leftJoin(vehicles, eq(shifts.vehicleId, vehicles.id))
+    .where(and(
+      alive(shifts, userId),
+      gte(shifts.businessDate, from),
+      lte(shifts.businessDate, to),
+    ))
+    .all()
+    .map((r) => ({
+      ...r,
+      commissionKurus: r.commissionKurus as Kurus | null,
+      fuelPriceKurus: r.fuelPriceKurus as Kurus | null,
+      wearPerKmKurus: r.wearPerKmKurus as Kurus | null,
+    }));
+}
+
 // ---------------------------------------------------------------------------
 // Okuma — hepsi yalnızca özetin ihtiyaç duyduğu sütunları çekiyor
 // ---------------------------------------------------------------------------
