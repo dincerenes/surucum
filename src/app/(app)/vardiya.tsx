@@ -3,13 +3,16 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AboveKeyboard, AmountInput, Button, PageHeader, RideList } from '@/components/ui';
+import { AboveKeyboard, AmountInput, Button, RideList } from '@/components/ui';
+import { SheetHeader } from '@/components/ui/sheet';
 import { useDbValue } from '@/db/use-db';
 import {
   deleteShift, getShift, getVehicle, listRidesInShift, updateShiftTotals,
 } from '@/db/repo';
 import { formatBusinessDate, formatClock } from '@/lib/business-date';
-import { type Kurus, ZERO, add, formatKurus, parseAmount } from '@/lib/money';
+import {
+  type Kurus, ZERO, add, formatAmountForInput, formatKurus, parseAmount,
+} from '@/lib/money';
 import { calculateShiftStats } from '@/lib/shift';
 import { calculateWearShare } from '@/lib/profit';
 import { calculateFuelCost } from '@/lib/fuel-cost';
@@ -75,29 +78,29 @@ export default function ShiftDetailScreen() {
   const kmText = km ?? numberInput(shift.distanceKm);
   const hoursText = hours ?? (shift.workedMinutes
     ? numberInput(Math.round((shift.workedMinutes / 60) * 10) / 10) : '');
-  const commissionText = commission ?? amountInput(shift.commissionKurus);
+  const commissionText = commission ?? formatAmountForInput(shift.commissionKurus);
   const consumptionText = consumption
     ?? numberInput(shift.fuelConsumptionPer100Km
       ? shift.fuelConsumptionPer100Km / 1000 : null);
-  const priceText = price ?? amountInput(shift.fuelPriceKurus);
+  const priceText = price ?? formatAmountForInput(shift.fuelPriceKurus);
 
   const kmValue = readNumber(kmText);
+  const hoursValue = readNumber(hoursText);
+  const consumptionValue = readNumber(consumptionText);
+
+  /** Tüketim ekranda lt/100km, veritabanında 100 km başına mililitre. */
+  const consumptionPer100Km = consumptionValue != null
+    ? Math.round(consumptionValue * 1000) : null;
+
   const wear = calculateWearShare(kmValue, wearPerKmKurus as Kurus | null);
-  const fuel = calculateFuelCost(
-    kmValue,
-    readNumber(consumptionText) != null
-      ? Math.round(readNumber(consumptionText)! * 1000) : null,
-    parseAmount(priceText),
-  );
+  const fuel = calculateFuelCost(kmValue, consumptionPer100Km, parseAmount(priceText));
 
   function kaydet() {
     updateShiftTotals(shift.id, {
       distanceKm: kmValue,
-      workedMinutes: readNumber(hoursText) != null
-        ? Math.round(readNumber(hoursText)! * 60) : null,
+      workedMinutes: hoursValue != null ? Math.round(hoursValue * 60) : null,
       commissionKurus: parseAmount(commissionText) as Kurus | null,
-      fuelConsumptionPer100Km: readNumber(consumptionText) != null
-        ? Math.round(readNumber(consumptionText)! * 1000) : null,
+      fuelConsumptionPer100Km: consumptionPer100Km,
       fuelPriceKurus: parseAmount(priceText) as Kurus | null,
     });
     requestSync();
@@ -143,7 +146,7 @@ export default function ShiftDetailScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <PageHeader />
+        <SheetHeader title="Vardiya" />
 
         <View style={styles.head}>
           <Text style={[styles.eyebrow, { color: colors.textFaint }]}>
@@ -254,12 +257,6 @@ function Row({
 function numberInput(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return '';
   return String(value).replace('.', ',');
-}
-
-function amountInput(value: Kurus | null | undefined): string {
-  if (value == null) return '';
-  const lira = value / 100;
-  return (Number.isInteger(lira) ? String(lira) : lira.toFixed(2)).replace('.', ',');
 }
 
 /** Boş ve okunamayan girdi `null` — sıfıra DÜŞMEZ, yoksa pay sıfırlanır. */

@@ -209,7 +209,13 @@ export default function EndShiftScreen() {
                   <Chip
                     key={c.id}
                     label={c.name}
-                    selected={categoryId === c.id}
+                    /*
+                     * Seçili hâl, kaydın GERÇEKTEN gideceği kategoriyi
+                     * gösteriyor. `categoryId === c.id` yazsaydık hiçbir
+                     * çip seçili görünmezken kayıt ilkine giderdi: sürücü
+                     * otopark parasını yemek olarak kaydederdi.
+                     */
+                    selected={selectedCategory === c.id}
                     onPress={() => setCategoryId(c.id)}
                   />
                 ))}

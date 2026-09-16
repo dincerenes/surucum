@@ -4,7 +4,7 @@ import {
   asKurus, fromLira, asBps, percentToBps, bpsToPercent,
   roundHalfAwayFromZero, add, subtract, sum, multiply,
   applyRate, netAfterRate, allocate, allocateByWeights,
-  formatKurus, formatKurusCompact, formatBps, formatInteger,
+  formatKurus, formatKurusCompact, formatBps, formatInteger, formatAmountForInput,
   parseAmount, parseRate,
   type Kurus,
 } from './money.ts';
@@ -253,5 +253,32 @@ describe('formatInteger — para olmayan tam sayılar', () => {
   it('bozuk girdi çökmüyor', () => {
     assert.equal(formatInteger(NaN), '0');
     assert.equal(formatInteger(Infinity), '0');
+  });
+});
+
+describe('formatAmountForInput — düzenleme alanı', () => {
+  it('kuruşsuz tutar tam sayı yazılır', () => {
+    assert.equal(formatAmountForInput(K(25000)), '250');
+  });
+
+  it('kuruşlu tutar virgülle yazılır', () => {
+    assert.equal(formatAmountForInput(K(18750)), '187,50');
+    assert.equal(formatAmountForInput(K(5)), '0,05');
+  });
+
+  it('BİNLİK AYRACI YOK — girdi alanı ham sayı tutar', () => {
+    assert.equal(formatAmountForInput(K(231050)), '2310,50');
+  });
+
+  it('parseAmount gidiş-dönüş değeri korur', () => {
+    for (const v of [0, 5, 100, 18750, 231050, 99999999]) {
+      assert.equal(parseAmount(formatAmountForInput(K(v))), v, `değer: ${v}`);
+    }
+  });
+
+  it('boş ve bozuk girdi boş metin', () => {
+    assert.equal(formatAmountForInput(null), '');
+    assert.equal(formatAmountForInput(undefined), '');
+    assert.equal(formatAmountForInput(NaN), '');
   });
 });

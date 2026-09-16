@@ -123,6 +123,19 @@ export function earningsPerKm(
   return asKurus(roundHalfAwayFromZero(amount / distanceKm));
 }
 
+/**
+ * ÇALIŞILAN gün başına ortalama, kuruş. Gün yoksa `null`.
+ *
+ * Payda çalışılan gün sayısıdır, takvim günü değil: sürücü çalışmadığı
+ * Pazar'ı "0 ₺ kazandığı gün" olarak saymaz ve haklıdır.
+ */
+export function earningsPerDay(
+  amount: Kurus, dayCount: number,
+): Kurus | null {
+  if (!Number.isFinite(dayCount) || dayCount <= 0) return null;
+  return asKurus(roundHalfAwayFromZero(amount / dayCount));
+}
+
 /** Sefer başına ortalama, kuruş. Sefer yoksa `null`. */
 export function earningsPerRide(
   amount: Kurus, rideCount: number,

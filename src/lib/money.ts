@@ -310,6 +310,29 @@ function trimZero(n: number): string {
     : String(rounded).replace('.', ',');
 }
 
+/**
+ * Tutarın DÜZENLENEBİLİR metin hâli: 23150 → "231,50"
+ *
+ * `formatKurus` KULLANILMAZ. Onun çıktısı binlik ayracı ve ₺ taşıyor;
+ * "2.310,50 ₺" metnini bir giriş alanına koyup sürücünün rakamın
+ * ortasına dokunmasını istediğimizde ayraç yerinde kalıyor ve girdi
+ * bozuluyor. Düzenleme alanı ham sayı tutar, gösterim değil.
+ *
+ * `parseAmount` bu çıktıyı aynen geri okur — gidiş-dönüş değeri korur.
+ */
+export function formatAmountForInput(value: Kurus | number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '';
+  const v = Math.trunc(value);
+  const negative = v < 0;
+  const magnitude = Math.abs(v);
+  const whole = Math.floor(magnitude / KURUS_PER_LIRA);
+  const cents = magnitude % KURUS_PER_LIRA;
+  const body = cents === 0
+    ? String(whole)
+    : `${whole},${String(cents).padStart(2, '0')}`;
+  return negative ? `-${body}` : body;
+}
+
 /** Oranı yüzde olarak biçimlendirir: 2550 bps → "%25,5" */
 export function formatBps(bps: BasisPoints): string {
   const pct = bps / 100;

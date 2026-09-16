@@ -6,7 +6,7 @@
  * Buraya hesap yazılmaz.
  */
 
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { getDb } from '../client';
 import { expenses, fuelLogs, rides, shifts, vehicles } from '../schema';
 import { type UnixMs, alive } from './_base';
@@ -97,6 +97,30 @@ export function listDaySummaries(
         now,
       }),
     }));
+}
+
+/**
+ * Kullanıcının EN ESKİ kaydının iş günü. Hiç kaydı yoksa `null`.
+ *
+ * "Tümü" dönemi bunu başlangıç alıyor. Sabit bir pencere (örneğin son iki
+ * yıl) kullansaydık etiket "Tümü" derken daha eski kayıtlar sessizce
+ * dışarıda kalırdı: sürücü sayının yanlış olduğunu değil, kayıtlarının
+ * kaybolduğunu düşünür.
+ */
+export function getFirstRecordDate(userId: string): BusinessDate | null {
+  const dates = [
+    getDb().select({ d: rides.businessDate }).from(rides)
+      .where(alive(rides, userId)).orderBy(asc(rides.businessDate)).get()?.d,
+    getDb().select({ d: expenses.businessDate }).from(expenses)
+      .where(alive(expenses, userId)).orderBy(asc(expenses.businessDate)).get()?.d,
+    getDb().select({ d: fuelLogs.businessDate }).from(fuelLogs)
+      .where(alive(fuelLogs, userId)).orderBy(asc(fuelLogs.businessDate)).get()?.d,
+    getDb().select({ d: shifts.businessDate }).from(shifts)
+      .where(alive(shifts, userId)).orderBy(asc(shifts.businessDate)).get()?.d,
+  ].filter((d): d is BusinessDate => d != null);
+
+  if (dates.length === 0) return null;
+  return dates.reduce((a, b) => (a < b ? a : b));
 }
 
 /** İş gününe göre gruplar. Satırın kendi `businessDate`'i anahtardır. */

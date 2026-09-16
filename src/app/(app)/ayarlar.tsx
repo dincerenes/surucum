@@ -10,7 +10,7 @@ import {
 } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
 import { DEFAULT_CUTOFF_HOUR } from '@/lib/business-date';
-import { parseAmount } from '@/lib/money';
+import { formatAmountForInput, parseAmount } from '@/lib/money';
 import { requestSync } from '@/sync/scheduler';
 import { HIT_SIZE, radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 import { useState } from 'react';
@@ -50,7 +50,7 @@ export default function SettingsScreen() {
   const [goalText, setGoalText] = useState<string | null>(null);
 
   const cutoff = data?.cutoff ?? DEFAULT_CUTOFF_HOUR;
-  const goalValue = goalText ?? amountInput(data?.goal?.targetNetKurus ?? null);
+  const goalValue = goalText ?? formatAmountForInput(data?.goal?.targetNetKurus ?? null);
 
   function saatSec(hour: number) {
     if (!userId) return;
@@ -143,12 +143,6 @@ export default function SettingsScreen() {
       </Card>
     </ScrollView>
   );
-}
-
-function amountInput(value: number | null): string {
-  if (value == null) return '';
-  const lira = value / 100;
-  return (Number.isInteger(lira) ? String(lira) : lira.toFixed(2)).replace('.', ',');
 }
 
 const styles = StyleSheet.create({

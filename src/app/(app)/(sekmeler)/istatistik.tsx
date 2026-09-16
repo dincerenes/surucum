@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card, Chip, ChipRow, ProfitRows } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
-import { getCutoffHour, listDaySummaries } from '@/db/repo';
+import { getCutoffHour, getFirstRecordDate, listDaySummaries } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
   type BusinessDate, WEEKDAYS_TR, addDays, startOfMonth, startOfWeek,
@@ -26,9 +26,6 @@ const PERIOD_LABELS: Record<PeriodKey, string> = {
   month: 'Bu ay',
   all: 'Tümü',
 };
-
-/** "Tümü" için geriye bakılan gün sayısı. Sayfalama gerektirmeyecek kadar geniş. */
-const ALL_DAYS = 730;
 
 /**
  * Anlamlı bir karşılaştırma için gereken en az gün sayısı.
@@ -59,7 +56,9 @@ export default function StatsScreen() {
   const data = useDbValue(() => {
     if (!userId) return null;
     const today = todayBusinessDate(getCutoffHour(userId));
-    const { from, previousFrom, previousTo } = periodBounds(period, today);
+    /** "Tümü" ilk kayıttan başlar; sabit bir pencere eski günleri yutardı. */
+    const oldest = period === 'all' ? getFirstRecordDate(userId) : null;
+    const { from, previousFrom, previousTo } = periodBounds(period, today, oldest);
 
     const days = listDaySummaries(userId, from, today);
 
@@ -334,7 +333,9 @@ function periodNotes(totals: PeriodTotals): string[] {
  * sürücüye ayın kötü geçtiğini düşündürür. Önceki dönem de aynı sebeple
  * tam alınıyor ve karşılaştırma notunda gün sayısı yazılıyor.
  */
-function periodBounds(period: PeriodKey, today: BusinessDate): {
+function periodBounds(
+  period: PeriodKey, today: BusinessDate, oldest: BusinessDate | null,
+): {
   from: BusinessDate;
   previousFrom: BusinessDate | null;
   previousTo: BusinessDate | null;
@@ -354,7 +355,8 @@ function periodBounds(period: PeriodKey, today: BusinessDate): {
     return { from, previousFrom: startOfMonth(previousTo), previousTo };
   }
 
-  return { from: addDays(today, -ALL_DAYS), previousFrom: null, previousTo: null };
+  /** Hiç kayıt yoksa bugün — sorgu boş döner ve ekran boş durumu gösterir. */
+  return { from: oldest ?? today, previousFrom: null, previousTo: null };
 }
 
 const styles = StyleSheet.create({

@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, PageHeader } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import {
-  getSettings, listActiveVehicles, listVehicleFuelTypes, updateSettings,
+  getSettings, listActiveVehicles, listVehicleFuelTypes, resolveActiveVehicle,
+  updateSettings,
 } from '@/db/repo';
 import { FUEL_TYPE_LABELS, OWNERSHIP_LABELS } from '@/db/schema/_shared';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -34,12 +35,10 @@ export default function VehiclesScreen() {
     if (!userId) return null;
     const vehicles = listActiveVehicles(userId);
     return {
-      /**
-       * Varsayılan araç ayarda boşsa listenin ilki geçerli — `useDriver`
-       * da öyle davranıyor. İki yerin farklı araç seçmesi, sürücünün
-       * gördüğü aracı ile kaydın gittiği aracın ayrışması demekti.
-       */
-      activeId: getSettings(userId)?.defaultVehicleId ?? vehicles[0]?.id ?? null,
+      /** Çözümleme `useDriver` ile AYNI fonksiyondan — ikisi ayrışamaz. */
+      activeId: resolveActiveVehicle(
+        vehicles, getSettings(userId)?.defaultVehicleId,
+      )?.id ?? null,
       vehicles: vehicles.map((v) => ({
         vehicle: v,
         fuels: listVehicleFuelTypes(v.id)

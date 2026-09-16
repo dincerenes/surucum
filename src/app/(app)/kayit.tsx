@@ -10,7 +10,7 @@ import {
 } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatClock } from '@/lib/business-date';
-import { type Kurus, parseAmount } from '@/lib/money';
+import { type Kurus, formatAmountForInput, parseAmount } from '@/lib/money';
 import { requestSync } from '@/sync/scheduler';
 import { space, type as typeScale, useTheme } from '@/theme/use-theme';
 import { SheetHeader, sheetStyles } from '@/components/ui/sheet';
@@ -84,12 +84,12 @@ export default function EditRecordScreen() {
     : kind === 'gider' ? (record as { amountKurus: Kurus }).amountKurus
     : (record as { totalAmountKurus: Kurus }).totalAmountKurus;
 
-  const amountText = amount ?? toInput(currentAmount);
+  const amountText = amount ?? formatAmountForInput(currentAmount);
   const parsedAmount = parseAmount(amountText);
 
   const currentPrice = kind === 'yakit'
     ? (record as { unitPriceKurus: Kurus }).unitPriceKurus : null;
-  const priceText = price ?? (currentPrice ? toInput(currentPrice) : '');
+  const priceText = price ?? formatAmountForInput(currentPrice);
   const parsedPrice = parseAmount(priceText);
 
   const selectedCategory = categoryId
@@ -200,19 +200,6 @@ export default function EditRecordScreen() {
       </ScrollView>
     </AboveKeyboard>
   );
-}
-
-/**
- * Kuruşu düzenlenebilir metne çevirir.
- *
- * `formatKurus` KULLANILMIYOR: binlik ayracı olan "2.310,50" metni
- * `parseAmount`'a geri verildiğinde okunabilir ama sürücü rakamın
- * ortasına dokunup düzelttiğinde ayraç yerinde kalmıyor ve girdi
- * bozuluyor. Düzenleme alanı ham sayı tutar, gösterim değil.
- */
-function toInput(value: Kurus): string {
-  const lira = value / 100;
-  return (Number.isInteger(lira) ? String(lira) : lira.toFixed(2)).replace('.', ',');
 }
 
 const styles = StyleSheet.create({

@@ -17,7 +17,9 @@ import type { Goal } from '../schema/system';
 import type { GoalPeriod } from '../schema/_shared';
 import { type UnixMs, alive, softDeleteRow, stampNew, withOutbox } from './_base';
 import { getCutoffHour } from './settings';
-import { type BusinessDate, addDays, todayBusinessDate } from '@/lib/business-date';
+import {
+  type BusinessDate, addDays, maxBusinessDate, todayBusinessDate,
+} from '@/lib/business-date';
 import type { Kurus } from '@/lib/money';
 
 /**
@@ -43,7 +45,15 @@ export function setGoal(
     if (targetNetKurus != null && targetNetKurus === current.targetNetKurus) {
       return current;
     }
-    closeGoal(current.id, addDays(today, -1), now);
+    /**
+     * Bitiş günü başlangıçtan ÖNCE olamaz.
+     *
+     * Hedef konduğu gün değiştirilirse "dün" damgası, startDate'i bugün
+     * olan bir satıra endDate = dün yazardı ve satır negatif uzunlukta
+     * bir dönem olarak buluta giderdi. Aynı gün değişen hedef, o gün
+     * başlayıp o gün biten bir hedeftir.
+     */
+    closeGoal(current.id, maxBusinessDate(current.startDate, addDays(today, -1)), now);
   }
 
   if (targetNetKurus == null || !Number.isFinite(targetNetKurus) || targetNetKurus <= 0) {

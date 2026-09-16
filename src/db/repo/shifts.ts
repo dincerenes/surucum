@@ -107,10 +107,19 @@ export function endShift(
   );
 }
 
-/** Kapanmış vardiyanın mesafe/süre bilgisini sonradan düzeltir. */
+/**
+ * Kapanmış vardiyanın mesafe/süre bilgisini sonradan düzeltir.
+ *
+ * Tüketim ve fiyat burada da ARACA HATIRLATILIYOR, `endShift`'te olduğu
+ * gibi. Hatırlatmasaydık: vardiyayı tüketim girmeden kapatıp sonradan
+ * detaydan düzelten sürücünün aracında değer boş kalır ve bir sonraki
+ * vardiya sonunda alan yine boş gelirdi — aynı sayıyı her seferinde
+ * yeniden yazmak zorunda kalırdı.
+ */
 export function updateShiftTotals(
   id: string, input: EndShiftInput, now: UnixMs = Date.now(),
 ): void {
+  const current = getShift(id);
   withOutbox('shifts', id, 'upsert', (tx) => {
     tx.update(shifts).set({
       ...(input.commissionKurus !== undefined
@@ -127,6 +136,12 @@ export function updateShiftTotals(
       updatedAt: now,
     }).where(eq(shifts.id, id)).run();
   }, now);
+
+  if (current) {
+    rememberStatedFuelFigures(
+      current.vehicleId, input.fuelConsumptionPer100Km, input.fuelPriceKurus, now,
+    );
+  }
 }
 
 export function deleteShift(id: string, now: UnixMs = Date.now()): void {

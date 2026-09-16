@@ -13,7 +13,9 @@
 import { type Kurus, ZERO, add, sum } from './money.ts';
 import { type BusinessDate, weekdayIndex } from './business-date.ts';
 import type { DaySummary } from './day-summary.ts';
-import { earningsPerHour, earningsPerKm, earningsPerRide } from './shift.ts';
+import {
+  earningsPerDay, earningsPerHour, earningsPerKm, earningsPerRide,
+} from './shift.ts';
 
 export interface DayEntry {
   date: BusinessDate;
@@ -94,7 +96,7 @@ export function calculatePeriodTotals(days: readonly DayEntry[]): PeriodTotals {
     perHour: earningsPerHour(cashProfit, durationMinutes),
     perKm: earningsPerKm(cashProfit, distanceKm),
     perRide: earningsPerRide(cashProfit, rideCount),
-    perDay: dayCount > 0 ? earningsPerRide(cashProfit, dayCount) : null,
+    perDay: earningsPerDay(cashProfit, dayCount),
     daysMissingDistance: days.filter((d) => d.summary.distanceKm == null).length,
   };
 }
@@ -135,9 +137,7 @@ export function summarizeByWeekday(days: readonly DayEntry[]): WeekdayStat[] {
     bucket.count += 1;
   }
 
-  const averages = buckets.map((b) => (
-    b.count > 0 ? earningsPerRide(b.total, b.count) : null
-  ));
+  const averages = buckets.map((b) => earningsPerDay(b.total, b.count));
 
   const best = averages.reduce<number>(
     (acc, a) => (a != null && a > acc ? a : acc), 0,

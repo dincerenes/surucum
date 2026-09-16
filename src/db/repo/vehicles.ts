@@ -201,6 +201,21 @@ export function listActiveVehicles(userId: string): Vehicle[] {
   return listVehicles(userId).filter((v) => v.isActive);
 }
 
+/**
+ * Kullanımdaki araç — TEK ÇÖZÜMLEME YOLU.
+ *
+ * Ayardaki varsayılan pasifleştirilmiş olabilir; o zaman listenin ilkine
+ * düşülüyor. Bu kural iki yerde ayrı ayrı yazılmıştı ve ayrışmışlardı:
+ * `useDriver` ilk aracı kullanıp vardiyayı ona bağlarken Araçlarım ekranı
+ * ham kimliğe baktığı için hiçbir karta AKTİF rozeti basmıyordu — sürücü
+ * hangi aracın kullanıldığını göremiyordu.
+ */
+export function resolveActiveVehicle(
+  vehicles: readonly Vehicle[], defaultVehicleId: string | null | undefined,
+): Vehicle | null {
+  return vehicles.find((v) => v.id === defaultVehicleId) ?? vehicles[0] ?? null;
+}
+
 export function getVehicle(id: string): Vehicle | undefined {
   return getDb().select().from(vehicles).where(aliveById(vehicles, id)).get();
 }
