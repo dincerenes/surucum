@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AmountText, Card, SummaryRows } from '@/components/ui';
+import { AmountText, Button, Card, SummaryRows } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import {
   getCutoffHour, getDaySummary, listExpensesInRange, listFuelLogsInRange,
@@ -128,9 +128,28 @@ export default function RecordsScreen() {
       ]}
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
-        <Text style={[typeScale.display, { color: colors.text, marginBottom: space.md }]}>
-          Kayıtlar
-        </Text>
+        <View style={styles.header}>
+          <Text style={[typeScale.display, { color: colors.text }]}>Kayıtlar</Text>
+
+          {/*
+            * Gider ve yakıt VARDİYADAN BAĞIMSIZ da girilebilmeli.
+            *
+            * İkisine tek giriş Anasayfa'daki açık vardiya butonlarıydı:
+            * vardiya kapalıyken sürücünün otoparka ödediği parayı yazacak
+            * hiçbir yeri yoktu. Kayıt için önce vardiya başlatmak, kaydı
+            * hiç girmemeye yol açıyor.
+            */}
+          <View style={styles.actions}>
+            <Button
+              label="Gider" variant="secondary" plus
+              style={styles.half} onPress={() => router.push('/gider')}
+            />
+            <Button
+              label="Yakıt" variant="secondary" plus
+              style={styles.half} onPress={() => router.push('/yakit')}
+            />
+          </View>
+        </View>
       }
       ListEmptyComponent={
         <View style={[styles.empty, { borderColor: colors.border }]}>
@@ -248,6 +267,9 @@ function ShiftRows({ shifts }: { shifts: readonly Shift[] }) {
 const styles = StyleSheet.create({
   page: { paddingHorizontal: space.xl, paddingBottom: space.xxxl, gap: space.lg },
   pageEmpty: { flexGrow: 1 },
+  header: { gap: space.md, marginBottom: space.md },
+  actions: { flexDirection: 'row', gap: space.md },
+  half: { flex: 1 },
   card: { gap: space.lg },
   list: { borderWidth: 1, borderRadius: radius.md, overflow: 'hidden' },
   row: {

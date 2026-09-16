@@ -3,11 +3,16 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AboveKeyboard, AmountInput, Button, SummaryRows } from '@/components/ui';
+import {
+  AboveKeyboard, AmountInput, Button, Chip, ChipGrid, SummaryRows,
+} from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
-import { endShift, getDaySummary, getKnownFuelFigures } from '@/db/repo';
+import {
+  addExpense, endShift, getDaySummary, getKnownFuelFigures,
+  listActiveExpenseCategories, seedSystemCategories,
+} from '@/db/repo';
 import type { BusinessDate } from '@/lib/business-date';
-import { type Kurus, parseAmount } from '@/lib/money';
+import { type Kurus, formatKurus, parseAmount } from '@/lib/money';
 import { useDriver } from '@/lib/use-driver';
 import { requestSync } from '@/sync/scheduler';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
@@ -15,11 +20,18 @@ import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 /**
  * Vardiya bitirme sihirbazı — ürünün ödül anı.
  *
- * Üç adım, hepsi ATLANABİLİR. Hiçbir soru akışı bloklamıyor: eksik
+ * Dört adım, hepsi ATLANABİLİR. Hiçbir soru akışı bloklamıyor: eksik
  * bırakılan alan hesabı eksiltiyor ve özet bunu açıkça söylüyor.
  *
  * Sıra önemli — maliyetler önce, özet en sonda. Özet ödül; başta
  * gösterilirse geri kalanı doldurmaya kimse devam etmez.
+ *
+ * GİDER ADIMINDA YAKIT ÇİPİ YOK. Tasarım listesinde vardı ama bir önceki
+ * adım zaten tüketimi ve litre fiyatını soruyor: gün hesabı yakıtı
+ * ondan üretiyor ve kaydedilen dolumu yok sayıyor (ikisi birden
+ * sayılsaydı aynı yakıt iki kez düşülürdü). İki adım arayla aynı şeyi
+ * iki kez sormak, sürücüye girdiğinin sayılmadığı bir alan sunmaktır.
+ * Dolum kaydı gerekiyorsa Kayıtlar'daki "Yakıt" oradan giriliyor.
  */
 export default function EndShiftScreen() {
   const { colors } = useTheme();
@@ -53,11 +65,48 @@ export default function EndShiftScreen() {
     known?.unitPriceKurus ? String(known.unitPriceKurus / 100).replace('.', ',') : '',
   );
 
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [expenseRaw, setExpenseRaw] = useState('');
+  /** Bu adımda eklenenler — sürücü ne girdiğini görmeden devam etmemeli. */
+  const [added, setAdded] = useState<Array<{ name: string; amount: Kurus }>>([]);
+
+  const categories = useDbValue(() => {
+    if (!userId) return [];
+    seedSystemCategories(userId);
+    return listActiveExpenseCategories(userId);
+  }, [userId]);
+
   /** Özet adımında gösterilecek, HENÜZ KAYDEDİLMEMİŞ hesap. */
   const preview = useDbValue(() => {
     if (!userId) return null;
     return getDaySummary(userId, summaryDate);
   }, [userId, summaryDate, step]);
+
+  const expenseAmount = parseAmount(expenseRaw);
+  const selectedCategory = categoryId ?? categories[0]?.id ?? null;
+  const canAddExpense = expenseAmount != null && expenseAmount > 0
+    && selectedCategory != null;
+
+  /**
+   * Gider ANINDA yazılıyor, özete kadar bekletilmiyor.
+   *
+   * Beklettiğimizde sürücü sihirbazı yarıda bıraktığında girdiği kalemler
+   * kayboluyordu. Kayıt yazıldıktan sonra listede görünüyor; yanlış
+   * girileni Kayıtlar'dan düzeltmek mümkün.
+   */
+  function giderEkle() {
+    if (!userId || !canAddExpense || !selectedCategory) return;
+    addExpense(userId, {
+      categoryId: selectedCategory,
+      amountKurus: expenseAmount as Kurus,
+      vehicleId: vehicle?.id ?? null,
+      businessDate: openShift?.businessDate,
+    });
+    const name = categories.find((c) => c.id === selectedCategory)?.name ?? 'Gider';
+    setAdded((cur) => [...cur, { name, amount: expenseAmount as Kurus }]);
+    setExpenseRaw('');
+    requestSync();
+  }
 
   function kapat() {
     if (!userId || !openShift) return;
@@ -77,7 +126,7 @@ export default function EndShiftScreen() {
       fuelPriceKurus: parseAmount(price) as Kurus | null,
     });
     requestSync();
-    setStep(3);
+    setStep(4);
   }
 
   return (
@@ -86,7 +135,12 @@ export default function EndShiftScreen() {
         backgroundColor: colors.background, paddingTop: insets.top + space.md,
       }]}>
         <View style={styles.head}>
-          {step < 3 ? (
+          {/*
+            * Özet adımında (4) geri yok: vardiya o noktada KAPANMIŞ ve
+            * geri dönmek sürücüye kapanmamış gibi bir ekran gösterirdi.
+            * Gider adımından (3) geri dönülebilir — orada henüz kapanma yok.
+            */}
+          {step < 4 ? (
             <Pressable onPress={() => (step === 1 ? router.back() : setStep(step - 1))}>
               <Text style={[typeScale.bodyStrong, { color: colors.textSoft }]}>
                 {step === 1 ? 'Vazgeç' : 'Geri'}
@@ -94,7 +148,7 @@ export default function EndShiftScreen() {
             </Pressable>
           ) : <View />}
           <View style={styles.dots}>
-            {[1, 2, 3].map((n) => (
+            {[1, 2, 3, 4].map((n) => (
               <View
                 key={n}
                 style={[styles.dot, {
@@ -144,7 +198,50 @@ export default function EndShiftScreen() {
             </>
           ) : null}
 
-          {step === 3 && preview ? (
+          {step === 3 ? (
+            <>
+              <StepTitle
+                title="Ekstra gider var mı?"
+                note="Yoksa geç. Girdiğin her kalem bugünün cebe kalanından düşer."
+              />
+              <ChipGrid>
+                {categories.map((c) => (
+                  <Chip
+                    key={c.id}
+                    label={c.name}
+                    selected={categoryId === c.id}
+                    onPress={() => setCategoryId(c.id)}
+                  />
+                ))}
+              </ChipGrid>
+              <AmountInput
+                label="Tutar" value={expenseRaw} onChangeText={setExpenseRaw}
+              />
+              <Button
+                label="Gideri ekle"
+                variant="secondary"
+                disabled={!canAddExpense}
+                onPress={giderEkle}
+              />
+
+              {added.length > 0 ? (
+                <View style={[styles.added, { borderColor: colors.border }]}>
+                  {added.map((e, i) => (
+                    <View key={`${e.name}-${i}`} style={styles.addedRow}>
+                      <Text style={[typeScale.body, { color: colors.text }]}>{e.name}</Text>
+                      <Text style={[typeScale.body, {
+                        color: colors.negative, fontVariant: ['tabular-nums'],
+                      }]}>
+                        {'\u2212'}{formatKurus(e.amount)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </>
+          ) : null}
+
+          {step === 4 && preview ? (
             <>
               <StepTitle title="Vardiya kapandı" note="" />
               <SummaryRows summary={preview} />
@@ -156,6 +253,8 @@ export default function EndShiftScreen() {
           {step === 1 ? (
             <Button label="Devam" onPress={() => setStep(2)} />
           ) : step === 2 ? (
+            <Button label="Devam" onPress={() => setStep(3)} />
+          ) : step === 3 ? (
             <Button label="Özeti gör" onPress={kapat} />
           ) : (
             <Button label="Bitir" onPress={() => router.back()} />
@@ -187,5 +286,9 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', gap: space.xs },
   dot: { width: 22, height: 4, borderRadius: radius.pill },
   body: { paddingTop: space.lg, paddingBottom: space.xl, gap: space.lg },
+  added: { borderWidth: 1, borderRadius: radius.md, padding: space.md, gap: space.sm },
+  addedRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline',
+  },
   foot: { paddingTop: space.md },
 });
