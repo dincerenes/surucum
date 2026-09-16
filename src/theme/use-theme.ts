@@ -1,9 +1,10 @@
-import { useColorScheme } from 'react-native';
-import { palette, type Colors, type ColorScheme } from './tokens';
+/**
+ * Tema erişiminin tek kapısı.
+ *
+ * Gerçek uygulama `theme-context.tsx` içinde: tercih orada BİR KEZ
+ * okunuyor. Bu dosya yalnızca yeniden dışa aktarıyor ki uygulamadaki
+ * yüzlerce `@/theme/use-theme` importu olduğu gibi kalsın.
+ */
 
-export function useTheme(): { colors: Colors; scheme: ColorScheme } {
-  const scheme: ColorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  return { colors: palette[scheme], scheme };
-}
-
+export { ThemeProvider, useTheme } from './theme-context';
 export * from './tokens';

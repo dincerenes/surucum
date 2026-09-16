@@ -84,6 +84,23 @@ export const outbox = sqliteTable(
 );
 
 /**
+ * CİHAZ tercihleri — anahtar/değer, yerel kalır, buluta GİTMEZ.
+ *
+ * Tema burada duruyor, `app_settings`'te değil ve bu bilinçli: aynı hesabı
+ * iki cihazda kullanan sürücünün telefonu koyu, tableti açık olabilir.
+ * Senkronlasaydık bir cihazda yapılan seçim diğerinin ekranını da
+ * çevirirdi.
+ *
+ * Kesme saati ise tersine HESABA aittir (`app_settings.day_cutoff_hour`):
+ * kaydın hangi güne yazıldığını belirliyor ve cihaza göre değişemez.
+ */
+export const devicePrefs = sqliteTable('device_prefs', {
+  key: text().primaryKey(),
+  value: text(),
+  updatedAt: integer().notNull(),
+});
+
+/**
  * Senkron durumu — çekme imleci, son başarılı senkron zamanı gibi
  * anahtar/değer çiftleri. Yerel kalır.
  */
@@ -97,5 +114,6 @@ export type AppSettings = typeof appSettings.$inferSelect;
 export type NewAppSettings = typeof appSettings.$inferInsert;
 export type Goal = typeof goals.$inferSelect;
 export type NewGoal = typeof goals.$inferInsert;
+export type DevicePref = typeof devicePrefs.$inferSelect;
 export type OutboxEntry = typeof outbox.$inferSelect;
 export type NewOutboxEntry = typeof outbox.$inferInsert;

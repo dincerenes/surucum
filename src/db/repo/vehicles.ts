@@ -14,7 +14,9 @@ import {
 } from '../schema/_shared';
 import { vehicleFuelTypes, vehicles } from '../schema';
 import type { Vehicle, VehicleFuelType } from '../schema/vehicles';
-import { type Tx, type UnixMs, alive, aliveById, enqueue, stampNew, withOutbox } from './_base';
+import {
+  type Tx, type UnixMs, alive, aliveById, enqueue, softDeleteRow, stampNew, withOutbox,
+} from './_base';
 import { newId } from '@/lib/id';
 
 export interface NewVehicleInput {
@@ -112,6 +114,53 @@ export function updateVehicle(
       updatedAt: now,
     }).where(eq(vehicles.id, id)).run();
   }, now);
+}
+
+/**
+ * Aracın yakıt tiplerini yeniden kurar.
+ *
+ * Çıkarılan tip YUMUŞAK SİLİNİYOR, satır tablodan kaldırılmıyor: geçmiş
+ * dolum kayıtları o tipe bağlı ve sert silme senkronda kaydı diriltir.
+ * Kalan tipler korunuyor — yeniden yazsaydık her düzenlemede ölçülmüş
+ * tüketim ve son bilinen fiyat sıfırlanırdı.
+ */
+export function setVehicleFuelTypes(
+  userId: string, vehicleId: string, fuelTypes: readonly FuelType[],
+  now: UnixMs = Date.now(),
+): void {
+  const wanted = [...new Set(fuelTypes)];
+  if (wanted.length === 0) return;
+
+  const current = listVehicleFuelTypes(vehicleId);
+
+  for (const row of current) {
+    if (!wanted.includes(row.fuelType)) {
+      softDeleteRow(vehicleFuelTypes, 'vehicle_fuel_types', row.id, now);
+    }
+  }
+
+  getDb().transaction((tx) => {
+    wanted.forEach((fuelType, index) => {
+      const existing = current.find((r) => r.fuelType === fuelType);
+      const primary = index === 0;
+
+      if (existing) {
+        if (existing.isPrimary === primary) return;
+        tx.update(vehicleFuelTypes)
+          .set({ isPrimary: primary, updatedAt: now })
+          .where(eq(vehicleFuelTypes.id, existing.id)).run();
+        enqueue(tx, 'vehicle_fuel_types', existing.id, 'upsert', now);
+        return;
+      }
+
+      const id = newId();
+      tx.insert(vehicleFuelTypes).values({
+        id, userId, createdAt: now, updatedAt: now, deletedAt: null,
+        vehicleId, fuelType, isPrimary: primary,
+      }).run();
+      enqueue(tx, 'vehicle_fuel_types', id, 'upsert', now);
+    });
+  });
 }
 
 /**

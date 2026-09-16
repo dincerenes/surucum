@@ -9,10 +9,22 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { getDb } from '@/db/client';
 import { AuthProvider } from '@/lib/auth/auth-context';
-import { space, useTheme } from '@/theme/use-theme';
+import { ThemeProvider, space, useTheme } from '@/theme/use-theme';
 import migrations from '../../drizzle/migrations';
 
+/**
+ * Sağlayıcılar İÇERİDE, tema dışarıda: `RootShell` kendi teması için
+ * sağlayıcıya ihtiyaç duyuyor ve migration'lar koşmadan önce de çiziliyor.
+ */
 export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootShell />
+    </ThemeProvider>
+  );
+}
+
+function RootShell() {
   const { colors, scheme } = useTheme();
   const { success, error } = useMigrations(getDb(), migrations);
 

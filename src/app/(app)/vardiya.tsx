@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AboveKeyboard, AmountInput, Button, RideList } from '@/components/ui';
+import { AboveKeyboard, AmountInput, Button, PageHeader, RideList } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import {
   deleteShift, getShift, getVehicle, listRidesInShift, updateShiftTotals,
@@ -143,6 +143,8 @@ export default function ShiftDetailScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <PageHeader />
+
         <View style={styles.head}>
           <Text style={[styles.eyebrow, { color: colors.textFaint }]}>
             {formatBusinessDate(shift.businessDate, 'long').toUpperCase()}

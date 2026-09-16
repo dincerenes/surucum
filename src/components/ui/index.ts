@@ -17,5 +17,6 @@ export { AmountInput, AboveKeyboard, previewAmount } from './amount-input';
 export { SummaryRows } from './summary-rows';
 export { GoalBar } from './goal-bar';
 export { SheetHeader, sheetStyles } from './sheet';
+export { PageHeader } from './page-header';
 export { SelectField } from './select-field';
 export { RideList } from './ride-list';

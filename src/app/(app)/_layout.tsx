@@ -55,6 +55,9 @@ export default function AppLayout() {
       <Stack.Screen name="yakit" options={{ presentation: 'modal' }} />
       <Stack.Screen name="kayit" options={{ presentation: 'modal' }} />
       <Stack.Screen name="vardiya" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="ayarlar" />
+      <Stack.Screen name="araclar" />
+      <Stack.Screen name="arac-duzenle" />
       <Stack.Screen
         name="vardiya-bitir"
         options={{ presentation: 'fullScreenModal', gestureEnabled: false }}

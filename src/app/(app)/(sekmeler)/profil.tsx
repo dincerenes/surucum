@@ -1,34 +1,54 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Card } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
-import { getKnownFuelFigures, listVehicleFuelTypes } from '@/db/repo';
+import {
+  getActiveGoal, getKnownFuelFigures, getSettings, listActiveVehicles,
+  listVehicleFuelTypes,
+} from '@/db/repo';
 import { getSyncStatus } from '@/sync/state';
 import { FUEL_TYPE_LABELS } from '@/db/schema/_shared';
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatKurus } from '@/lib/money';
 import { useDriver } from '@/lib/use-driver';
 import { pendingCount } from '@/sync/push';
-import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
+import { HIT_SIZE, radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
-/** Profil — araç, hesap, senkron durumu. */
+/**
+ * Profil — hesap, aktif araç ve menü.
+ *
+ * Menü satırları BİR SATIR ÖZET taşıyor: "Ayarlar" tek başına ne
+ * bulacağını söylemiyor, "Kesme saati 04:00 · Koyu tema" söylüyor.
+ * Sürücü çoğu zaman girmeden cevabını alıyor.
+ */
 export default function ProfileScreen() {
-  const { colors } = useTheme();
+  const { colors, preference } = useTheme();
   const insets = useSafeAreaInsets();
   const { user, signOut } = useAuth();
   const { vehicle } = useDriver();
 
   const info = useDbValue(() => {
-    if (!vehicle) return null;
-    const fuels = listVehicleFuelTypes(vehicle.id);
+    if (!user?.id) return null;
     return {
-      fuels: fuels.map((f) => FUEL_TYPE_LABELS[f.fuelType]).join(' + '),
-      figures: getKnownFuelFigures(vehicle.id),
+      fuels: vehicle
+        ? listVehicleFuelTypes(vehicle.id)
+            .map((f) => FUEL_TYPE_LABELS[f.fuelType]).join(' + ')
+        : '',
+      figures: vehicle ? getKnownFuelFigures(vehicle.id) : null,
+      vehicleCount: listActiveVehicles(user.id).length,
+      cutoff: getSettings(user.id)?.dayCutoffHour ?? 4,
+      goal: getActiveGoal(user.id, 'daily')?.targetNetKurus ?? null,
       sync: getSyncStatus(),
       pending: pendingCount(),
     };
-  }, [vehicle?.id]);
+  }, [user?.id, vehicle?.id]);
+
+  const themeLabel =
+    preference === 'light' ? 'açık tema'
+    : preference === 'dark' ? 'koyu tema'
+    : 'cihazla aynı tema';
 
   return (
     <ScrollView
@@ -45,8 +65,11 @@ export default function ProfileScreen() {
             {vehicle.initialOdometerKm ? (
               <Tag text={`${vehicle.initialOdometerKm.toLocaleString('tr-TR')} km`} />
             ) : null}
+            {vehicle.wearPerKmKurus > 0 ? (
+              <Tag text={`${formatKurus(vehicle.wearPerKmKurus)}/km yıpranma`} />
+            ) : null}
           </View>
-          {info?.figures.consumptionPer100Km ? (
+          {info?.figures?.consumptionPer100Km ? (
             <Text style={[typeScale.caption, { color: colors.textFaint }]}>
               Ortalama tüketim {(info.figures.consumptionPer100Km / 1000).toFixed(1)} lt/100km
               {info.figures.unitPriceKurus
@@ -56,6 +79,27 @@ export default function ProfileScreen() {
           ) : null}
         </Card>
       ) : null}
+
+      <View style={[styles.menu, { borderColor: colors.border }]}>
+        <MenuRow
+          label="Araçlarım"
+          detail={
+            info && info.vehicleCount > 1
+              ? `${info.vehicleCount} araç · aktif ${vehicle?.label ?? '—'}`
+              : (vehicle?.label ?? 'Araç ekle')
+          }
+          onPress={() => router.push('/araclar')}
+          first
+        />
+        <MenuRow
+          label="Ayarlar"
+          detail={
+            `Kesme saati ${String(info?.cutoff ?? 4).padStart(2, '0')}:00 · ${themeLabel}`
+            + (info?.goal ? ` · hedef ${formatKurus(info.goal, { decimals: false })}` : '')
+          }
+          onPress={() => router.push('/ayarlar')}
+        />
+      </View>
 
       <Card title="Hesap">
         <Text style={[typeScale.body, { color: colors.text }]}>
@@ -75,6 +119,35 @@ export default function ProfileScreen() {
   );
 }
 
+function MenuRow({
+  label, detail, onPress, first = false,
+}: { label: string; detail: string; onPress: () => void; first?: boolean }) {
+  const { colors } = useTheme();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.row,
+        !first && { borderTopWidth: 1, borderTopColor: colors.border },
+        { backgroundColor: pressed ? colors.surfaceSunken : colors.surface },
+      ]}
+    >
+      <View style={styles.rowText}>
+        <Text style={[typeScale.bodyStrong, { color: colors.text }]}>{label}</Text>
+        <Text
+          style={[typeScale.caption, { color: colors.textFaint }]}
+          numberOfLines={1}
+        >
+          {detail}
+        </Text>
+      </View>
+      <Text style={[typeScale.title, { color: colors.textFaint }]}>›</Text>
+    </Pressable>
+  );
+}
+
 function Tag({ text }: { text: string }) {
   const { colors } = useTheme();
   return (
@@ -88,4 +161,14 @@ const styles = StyleSheet.create({
   page: { paddingHorizontal: space.xl, paddingBottom: space.xxxl, gap: space.lg },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   tag: { borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 4 },
+  menu: { borderWidth: 1, borderRadius: radius.md, overflow: 'hidden' },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    minHeight: HIT_SIZE,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+  },
+  rowText: { flex: 1, gap: 2 },
 });

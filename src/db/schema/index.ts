@@ -17,7 +17,7 @@ import { vehicles, vehicleFuelTypes } from './vehicles';
 import { earningSources, shifts, rides } from './earnings';
 import { expenseCategories, expenses, recurringExpenses } from './expenses';
 import { fuelLogs, fuelPrices } from './fuel';
-import { appSettings, goals, outbox, syncState } from './system';
+import { appSettings, devicePrefs, goals, outbox, syncState } from './system';
 
 /**
  * Buluta senkronlanan tablolar, YABANCI ANAHTAR SIRASIYLA.
@@ -58,4 +58,9 @@ export const SYNC_TABLES = {
 } as const;
 
 /** Senkronlanmayan tablolar — referans veri veya yerel defter. */
-export const LOCAL_ONLY_TABLES = { fuel_prices: fuelPrices, outbox, sync_state: syncState } as const;
+export const LOCAL_ONLY_TABLES = {
+  fuel_prices: fuelPrices,
+  outbox,
+  sync_state: syncState,
+  device_prefs: devicePrefs,
+} as const;

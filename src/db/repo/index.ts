@@ -14,4 +14,5 @@ export * from './expenses';
 export * from './fuel';
 export * from './settings';
 export * from './goals';
+export * from './prefs';
 export * from './summary';

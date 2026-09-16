@@ -9,7 +9,7 @@
 import { useMemo } from 'react';
 import { useDbValue } from '@/db/use-db';
 import {
-  ensureSettings, getCutoffHour, getDailyGoalKurus, getDaySummary, getOpenShift,
+  ensureSettings, getDailyGoalKurus, getDaySummary, getOpenShift,
   listActiveVehicles, listRidesInShift, listRidesOnDate,
 } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -77,13 +77,22 @@ export function useDriver(): DriverState {
   const value = useDbValue(() => {
     if (!userId) return EMPTY;
 
-    ensureSettings(userId);
-    const cutoff = getCutoffHour(userId);
+    const settings = ensureSettings(userId);
+    const cutoff = settings.dayCutoffHour;
     const now = Date.now();
     const today = todayBusinessDate(cutoff, new Date(now));
 
+    /**
+     * Aktif araç AYARDAN geliyor, listenin ilkinden değil.
+     *
+     * Sürücü Araçlarım'dan başka bir aracı seçtiğinde vardiya ona
+     * bağlanmalı ve yıpranma payı onun oranından gelmeli. Listenin ilkine
+     * bakan bir okuma, sürücünün gördüğü araç ile kaydın gittiği aracı
+     * ayırırdı. Ayardaki araç pasifleştirilmişse listenin ilkine düşülüyor.
+     */
     const vehicles = listActiveVehicles(userId);
-    const vehicle = vehicles[0] ?? null;
+    const vehicle = vehicles.find((v) => v.id === settings.defaultVehicleId)
+      ?? vehicles[0] ?? null;
     const openShift = getOpenShift(userId) ?? null;
 
     // Vardiya açıkken defter onun gününde kalır, takvim dönse bile.
