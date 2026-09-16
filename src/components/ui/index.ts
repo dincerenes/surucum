@@ -15,6 +15,7 @@ export { AmountText } from './amount-text';
 export { Chip, ChipRow, ChipGrid } from './chip';
 export { AmountInput, AboveKeyboard, previewAmount } from './amount-input';
 export { SummaryRows } from './summary-rows';
+export { GoalBar } from './goal-bar';
 export { SheetHeader, sheetStyles } from './sheet';
 export { SelectField } from './select-field';
 export { RideList } from './ride-list';

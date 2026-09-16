@@ -10,9 +10,10 @@ import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { getDb } from '../client';
 import { shifts } from '../schema';
 import { rememberStatedFuelFigures } from './fuel';
+import { getCutoffHour } from './settings';
 import type { Shift } from '../schema/earnings';
 import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
-import { type BusinessDate, DEFAULT_CUTOFF_HOUR, toBusinessDate } from '@/lib/business-date';
+import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
 import type { Kurus } from '@/lib/money';
 
 /**
@@ -25,11 +26,14 @@ import type { Kurus } from '@/lib/money';
 export function startShift(
   userId: string,
   vehicleId: string,
-  cutoffHour: number = DEFAULT_CUTOFF_HOUR,
+  cutoffHour?: number,
   now: UnixMs = Date.now(),
 ): Shift {
   const open = getOpenShift(userId);
   if (open) return open;
+
+  /** Kesme saati ayardan okunuyor — vardiyanın günü ona bağlı. */
+  const cutoff = cutoffHour ?? getCutoffHour(userId);
 
   const stamp = stampNew(userId, now);
   return withOutbox('shifts', stamp.id, 'upsert', (tx) => (
@@ -38,7 +42,7 @@ export function startShift(
       vehicleId,
       startedAt: now,
       endedAt: null,
-      businessDate: toBusinessDate(now, cutoffHour),
+      businessDate: toBusinessDate(now, cutoff),
     }).returning().get()
   ), now);
 }

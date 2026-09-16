@@ -13,4 +13,5 @@ export * from './rides';
 export * from './expenses';
 export * from './fuel';
 export * from './settings';
+export * from './goals';
 export * from './summary';

@@ -9,12 +9,13 @@
 import { useMemo } from 'react';
 import { useDbValue } from '@/db/use-db';
 import {
-  ensureSettings, getCutoffHour, getDaySummary, getOpenShift,
+  ensureSettings, getCutoffHour, getDailyGoalKurus, getDaySummary, getOpenShift,
   listActiveVehicles, listRidesInShift, listRidesOnDate,
 } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
 import { type BusinessDate, todayBusinessDate } from '@/lib/business-date';
 import type { DaySummary } from '@/lib/day-summary';
+import { type GoalProgress, calculateGoalProgress } from '@/lib/goal';
 import { type Kurus, ZERO, add } from '@/lib/money';
 import { isShiftStale, resolveShiftDuration } from '@/lib/shift';
 import type { Ride, Shift } from '@/db/schema/earnings';
@@ -54,13 +55,19 @@ export interface DriverState {
 
   /** Açık vardiyanın cirosu — brüt, hiçbir kesinti düşülmemiş. */
   shiftGross: Kurus;
+
+  /**
+   * Günlük hedefin durumu. Hedef konmamışsa `null` — hedefsiz sürücüye
+   * boş bir çubuk göstermiyoruz.
+   */
+  goal: GoalProgress | null;
 }
 
 const EMPTY: DriverState = {
   userId: null, vehicle: null, needsSetup: true, openShift: null,
   shiftIsStale: false, openShiftMinutes: 0,
   today: todayBusinessDate(), summary: null, rides: [],
-  shiftRides: [], shiftGross: ZERO,
+  shiftRides: [], shiftGross: ZERO, goal: null,
 };
 
 export function useDriver(): DriverState {
@@ -83,6 +90,7 @@ export function useDriver(): DriverState {
     const activeDate = openShift?.businessDate ?? today;
 
     const shiftRides = openShift ? listRidesInShift(openShift.id) : [];
+    const summary = getDaySummary(userId, activeDate, now);
 
     return {
       userId,
@@ -94,10 +102,15 @@ export function useDriver(): DriverState {
         ? resolveShiftDuration({ ...openShift, distanceKm: openShift.distanceKm }, now).minutes
         : 0,
       today: activeDate,
-      summary: getDaySummary(userId, activeDate, now),
+      summary,
       rides: listRidesOnDate(userId, activeDate),
       shiftRides,
       shiftGross: shiftRides.reduce((sum, r) => add(sum, r.grossAmountKurus), ZERO),
+      /**
+       * Hedefin paydası CEBE KALAN. Ciro hedefi yakıtı ve komisyonu yok
+       * sayar; gerçek kâr ise kilometre girilene kadar eksik.
+       */
+      goal: calculateGoalProgress(getDailyGoalKurus(userId), summary.profit.cashProfit),
     } satisfies DriverState;
   }, [userId]);
 

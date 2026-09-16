@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, RideList, SummaryRows } from '@/components/ui';
+import { Button, GoalBar, RideList, SummaryRows } from '@/components/ui';
 import { startShift } from '@/db/repo';
 import { formatBusinessDate } from '@/lib/business-date';
 import { useDriver } from '@/lib/use-driver';
@@ -24,7 +24,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const state = useDriver();
 
-  const { summary, openShift, rides, vehicle, userId } = state;
+  const { summary, openShift, rides, vehicle, userId, goal } = state;
   const hasRecords = rides.length > 0 || (summary?.profit.revenue ?? 0) !== 0;
 
   function baslat() {
@@ -57,6 +57,8 @@ export default function HomeScreen() {
       ) : (
         <EmptyDay hasShift={openShift != null} />
       )}
+
+      {goal ? <GoalBar goal={goal} /> : null}
 
       {rides.length > 0 ? <RideList rides={rides} /> : null}
 

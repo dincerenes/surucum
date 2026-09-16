@@ -16,8 +16,9 @@ import { expenseCategories, expenses, recurringExpenses } from '../schema';
 import type { Expense, ExpenseCategory, RecurringExpense } from '../schema/expenses';
 import type { ExpenseKind, RecurrencePeriod } from '../schema/_shared';
 import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
+import { getCutoffHour } from './settings';
 import type { Kurus } from '@/lib/money';
-import { type BusinessDate, DEFAULT_CUTOFF_HOUR, toBusinessDate } from '@/lib/business-date';
+import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
 
 // ---------------------------------------------------------------------------
 // Kategoriler
@@ -143,10 +144,11 @@ export interface NewExpenseInput {
 export function addExpense(
   userId: string,
   input: NewExpenseInput,
-  cutoffHour: number = DEFAULT_CUTOFF_HOUR,
+  cutoffHour?: number,
   now: UnixMs = Date.now(),
 ): Expense {
   const occurredAt = input.occurredAt ?? now;
+  const cutoff = cutoffHour ?? getCutoffHour(userId);
   const stamp = stampNew(userId, now);
 
   return withOutbox('expenses', stamp.id, 'upsert', (tx) => (
@@ -156,7 +158,7 @@ export function addExpense(
       vehicleId: input.vehicleId ?? null,
       amountKurus: input.amountKurus,
       occurredAt,
-      businessDate: input.businessDate ?? toBusinessDate(occurredAt, cutoffHour),
+      businessDate: input.businessDate ?? toBusinessDate(occurredAt, cutoff),
       receiptPath: input.receiptPath ?? null,
       notes: input.notes?.trim() || null,
     }).returning().get()

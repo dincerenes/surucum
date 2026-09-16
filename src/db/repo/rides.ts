@@ -13,9 +13,10 @@ import type { Ride } from '../schema/earnings';
 import type { PaymentMethod } from '../schema/_shared';
 import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
 import { ensureDefaultEarningSource } from './earning-sources';
+import { getCutoffHour } from './settings';
 import { type BasisPoints, type Kurus } from '@/lib/money';
 import { calculateRideAmounts } from '@/lib/ride';
-import { type BusinessDate, DEFAULT_CUTOFF_HOUR, toBusinessDate } from '@/lib/business-date';
+import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
 
 export interface NewRideInput {
   grossAmountKurus: Kurus;
@@ -60,10 +61,19 @@ export interface NewRideInput {
 export function addRide(
   userId: string,
   input: NewRideInput,
-  cutoffHour: number = DEFAULT_CUTOFF_HOUR,
+  cutoffHour?: number,
   now: UnixMs = Date.now(),
 ): Ride {
   const occurredAt = input.occurredAt ?? now;
+  /**
+   * Kesme saati AYARDAN okunuyor, sabitten değil.
+   *
+   * Varsayılan parametre bırakıldığında her çağıranın ayarı elle
+   * geçirmesi gerekiyordu ve hiçbiri geçirmiyordu: okuma yolu sürücünün
+   * 06:00'sını kullanırken yazma yolu 04:00 varsayıyor, 05:00'te girilen
+   * sefer bir güne yazılıp başka bir günün defterinde aranıyordu.
+   */
+  const cutoff = cutoffHour ?? getCutoffHour(userId);
   const earningSourceId = input.earningSourceId
     ?? ensureDefaultEarningSource(userId, now).id;
 
@@ -77,7 +87,7 @@ export function addRide(
    *
    * Vardiya dışında girilen sefer kendi saatinden gün alır.
    */
-  const businessDate = resolveBusinessDate(input.shiftId, occurredAt, cutoffHour);
+  const businessDate = resolveBusinessDate(input.shiftId, occurredAt, cutoff);
 
   const amounts = calculateRideAmounts({
     grossAmountKurus: input.grossAmountKurus,

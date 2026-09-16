@@ -4,9 +4,9 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AboveKeyboard, AmountInput, Button } from '@/components/ui';
-import { completeOnboarding, startShift } from '@/db/repo';
+import { completeOnboarding, setGoal, startShift } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
-import { type Kurus, parseAmount } from '@/lib/money';
+import { parseAmount } from '@/lib/money';
 import { useDriver } from '@/lib/use-driver';
 import { requestSync } from '@/sync/scheduler';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
@@ -23,10 +23,15 @@ export default function ReadyStep() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { vehicle } = useDriver();
-  const [goal, setGoal] = useState('');
+  const [goalText, setGoalText] = useState('');
 
   function bitir(startNow: boolean) {
     if (!user?.id) return;
+    /**
+     * Hedef boş bırakılabilir — `setGoal` okunamayan girdiyi hedefsiz
+     * sayıyor. Soruyu sorup cevabı atmak, hiç sormamaktan kötü.
+     */
+    setGoal(user.id, parseAmount(goalText));
     completeOnboarding(user.id);
     if (startNow && vehicle) startShift(user.id, vehicle.id);
     requestSync();
@@ -44,8 +49,8 @@ export default function ReadyStep() {
 
           <AmountInput
             label="Günlük hedef · cebe kalan"
-            value={goal}
-            onChangeText={setGoal}
+            value={goalText}
+            onChangeText={setGoalText}
             hint="Hedefi ciroya değil cebe kalana koyuyoruz — kaç para kazandığın, kaç para döndürdüğün değil."
           />
 

@@ -13,8 +13,9 @@ import { fuelLogs, vehicleFuelTypes } from '../schema';
 import type { FuelLog } from '../schema/fuel';
 import type { FuelType } from '../schema/_shared';
 import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
+import { getCutoffHour } from './settings';
 import type { Kurus } from '@/lib/money';
-import { type BusinessDate, DEFAULT_CUTOFF_HOUR, toBusinessDate } from '@/lib/business-date';
+import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
 
 export interface NewFuelLogInput {
   vehicleId: string;
@@ -54,10 +55,11 @@ export interface NewFuelLogInput {
 export function addFuelLog(
   userId: string,
   input: NewFuelLogInput,
-  cutoffHour: number = DEFAULT_CUTOFF_HOUR,
+  cutoffHour?: number,
   now: UnixMs = Date.now(),
 ): FuelLog {
   const occurredAt = input.occurredAt ?? now;
+  const cutoff = cutoffHour ?? getCutoffHour(userId);
   const stamp = stampNew(userId, now);
 
   const row = withOutbox('fuel_logs', stamp.id, 'upsert', (tx) => (
@@ -66,7 +68,7 @@ export function addFuelLog(
       vehicleId: input.vehicleId,
       fuelType: input.fuelType,
       occurredAt,
-      businessDate: input.businessDate ?? toBusinessDate(occurredAt, cutoffHour),
+      businessDate: input.businessDate ?? toBusinessDate(occurredAt, cutoff),
       volumePer1000: Math.round(input.volumePer1000),
       unitPriceKurus: input.unitPriceKurus,
       totalAmountKurus: input.totalAmountKurus,
