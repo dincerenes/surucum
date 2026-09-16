@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AmountText } from './amount-text';
 import type { Ride } from '@/db/schema/earnings';
@@ -22,6 +23,9 @@ interface Props {
  * hem geri bildirim hem de yanlış girilen tutarı fark etme imkânı.
  *
  * En yeni üstte: sürücünün kontrol ettiği şey en son girdiği sefer.
+ *
+ * Satıra dokunmak düzenleme sayfasını açıyor: yanlış yazılan tutarı
+ * fark eden sürücünün onu düzeltebileceği en yakın yer burası.
  */
 export function RideList({ rides, limit = 8, emptyText }: Props) {
   const { colors } = useTheme();
@@ -47,11 +51,17 @@ export function RideList({ rides, limit = 8, emptyText }: Props) {
 
       <View style={[styles.list, { borderColor: colors.border }]}>
         {shown.map((ride, index) => (
-          <View
+          <Pressable
             key={ride.id}
-            style={[
+            onPress={() => router.push({
+              pathname: '/kayit', params: { tur: 'sefer', id: ride.id },
+            })}
+            accessibilityRole="button"
+            accessibilityLabel="Seferi düzenle"
+            style={({ pressed }) => [
               styles.row,
               index > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
+              pressed && { backgroundColor: colors.surfaceSunken },
             ]}
           >
             <Text style={[styles.time, { color: colors.textFaint }]}>
@@ -59,7 +69,7 @@ export function RideList({ rides, limit = 8, emptyText }: Props) {
             </Text>
             <View style={styles.spacer} />
             <AmountText value={ride.grossAmountKurus} size="bodyStrong" />
-          </View>
+          </Pressable>
         ))}
       </View>
 

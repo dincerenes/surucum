@@ -53,6 +53,8 @@ export default function AppLayout() {
       <Stack.Screen name="sefer" options={{ presentation: 'modal' }} />
       <Stack.Screen name="gider" options={{ presentation: 'modal' }} />
       <Stack.Screen name="yakit" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="kayit" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="vardiya" options={{ presentation: 'modal' }} />
       <Stack.Screen
         name="vardiya-bitir"
         options={{ presentation: 'fullScreenModal', gestureEnabled: false }}
