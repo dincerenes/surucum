@@ -128,6 +128,10 @@ async function pullTable(
       .from(table)
       .select('*')
       .eq('user_id', userId)
+      // `or` bunu zaten gerektiriyor; ayrıca yazılması Postgres'in
+      // (user_id, server_updated_at) index'inde aralık taraması yapmasını
+      // sağlıyor — yoksa her tur hesabın bütün satırlarını tarayabilir.
+      .gte('server_updated_at', from.ts)
       .or(keyFilter(from))
       .order('server_updated_at', { ascending: true })
       .order('id', { ascending: true })

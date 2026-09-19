@@ -1,6 +1,6 @@
 /**
  * Testler için Supabase/PostgREST taklidi — yalnızca senkronun kullandığı
- * yüzey: `from().select().eq().or().order().limit()`, `upsert()` ve
+ * yüzey: `from().select().eq().gte().or().order().limit()`, `upsert()` ve
  * `delete().in()`.
  *
  * Taklit edilen sunucu davranışları, çünkü senkron hataları tam olarak
@@ -220,6 +220,10 @@ export class FakeSupabase {
         select() { return query; },
         eq(column: string, value: unknown) {
           filters.push(comparison(column, 'eq', value));
+          return query;
+        },
+        gte(column: string, value: unknown) {
+          filters.push(comparison(column, 'gte', value));
           return query;
         },
         or(expression: string) {
