@@ -1,7 +1,12 @@
 # Sürücüm — Tasarım Brief'i
 
-Bu belge Claude Design'a verilecek girdidir. Ekran envanteri, durumlar,
+Bu belge Claude Design'a verilen girdidir. Ekran envanteri, durumlar,
 kısıtlar ve mevcut belirteçler burada.
+
+> **Bu bir süreç kaydıdır.** Sonraki turlar öncekileri geçersiz kılıyor:
+> bölüm B–H birinci turun hâlini anlatıyor, aşağıdaki "Tur 2" ve "Tur 3"
+> başlıkları onları daralttı. Uygulamanın bugünkü davranışı için README'ye
+> bakılmalı; çelişki varsa kod ve README esastır.
 
 ---
 
@@ -47,8 +52,8 @@ Bu ürünün varlık sebebi. Tek "Kâr" rakamına indiren tasarım reddedilir.
 | Satır | Ne demek | Ton |
 |---|---|---|
 | **Ciro** | Brüt hasılat | Nötr |
-| **Cebe kalan** | Ciro − komisyon − bugün fiilen ödenen yakıt ve gider. **Yalnızca gerçekleşmiş nakit, hiçbir tahmin yok.** | Vurgulu — sürücünün her gün baktığı sayı |
-| **Gerçek kâr** | Cebe kalan − sabit gider günlük payı − km yıpranma payı. Tahakkuk ve tahmin içerir. | En büyük vurgu ama farklı karakterde |
+| **Cebe kalan** | Ciro − komisyon − yakıt − gider. Yakıt pompada ödenen tutar değil, o gün yakılan yakıt: tüketim × km × litre fiyatı. | Vurgulu — sürücünün her gün baktığı sayı |
+| **Gerçek kâr** | Cebe kalan − km yıpranma payı. (Sabit gider günlük payı v1'de YOK, bkz. Tur 3.) | En büyük vurgu ama farklı karakterde |
 
 **2 ile 3 arasındaki fark ürünün tüm hikâyesi.** Sürücü cebinde 480 TL görürken
 aslında o gün zarar etmiş olabilir. Tasarım bu farkı görünür kılmalı.
@@ -144,10 +149,10 @@ Bu uygulamanın kalbi. Üç durum da ayrı tasarlanmalı.
    - "Kaç saat çalıştın?" (otomatik hesaplanmış süre önceden dolu gelir,
      sürücü düzeltebilir)
 10. **Adım 2 — Giderler**
-    - Hazır çipler: **Yakıt · Yemek · Otopark · Yıkama · Ceza · Diğer**
-    - Yakıt seçilirse ek alanlar: litre, birim fiyat, **"Depoyu tam doldurdun mu?"**
-      (tüketim ölçümünün anahtarı)
+    - Hazır çipler: **Yemek · Otopark · Yıkama · Ceza · Diğer**
     - Birden fazla gider eklenebilir
+    - *(Birinci turda burada bir "Yakıt" çipi ve tam depo soruları vardı;
+      Tur 3'te kaldırıldı — yakıt ayrı bir adımda tüketimden hesaplanıyor.)*
 11. **Adım 3 — ÖZET** ← ürünün ödül anı
     - **Üç satır**, tam vurguyla
     - Yıpranma payı sessiz gri satır olarak altta
@@ -170,8 +175,8 @@ Bu uygulamanın kalbi. Üç durum da ayrı tasarlanmalı.
 19. **Araç düzenle**
 20. **Kazanç kaynaklarım** — liste, ekle, düzenle, oran değiştir
 21. **Sabit giderler** — kiralık plaka bedeli, kasko, MTV, muayene.
-    Tutar + dönem (günlük/haftalık/aylık/3 aylık/yıllık). Bunlar **güne bölünüp**
-    gerçek kâr satırından düşülür — ekran bunu açıklamalı.
+    *(Tur 3'te kapsam dışına çıktı: v1'de güne bölünmüyor, sıradan gider
+    olarak giriliyor. Ekran tasarlanmadı.)*
 22. **Ayarlar** — gün kesme saati (varsayılan 04:00, gece vardiyası için),
     tema (açık/koyu/sistem), il
 23. **Çıkış**
@@ -360,7 +365,14 @@ Ekranda görünen tek şey: **tutar alanı ve Kaydet.**
 3. **Yakıt fiyatı** (önceden dolu, son dolumdan)
 4. **Bugün uygulamaya ödediğin komisyon** — tek rakam
 5. **Ekstra gider eklemek ister misin?** — çipler:
-   Yemek · Otopark · Yıkama · Ceza · **Yakıt** · Diğer
+   Yemek · Otopark · Yıkama · Ceza · Diğer
+
+   **Yakıt çipi YOK.** Bir önceki adım tüketimi ve litre fiyatını zaten
+   soruyor; gün hesabı yakıtı ondan üretiyor ve kaydedilen dolumu yok
+   sayıyor (ikisi birden sayılsaydı aynı yakıt iki kez düşülürdü). İki
+   adım arayla aynı şeyi sormak, sürücüye girdiğinin sayılmadığı bir alan
+   sunmaktır. Dolum kaydı gerekiyorsa Kayıtlar'daki "Yakıt" girişinden
+   yapılıyor.
 6. **ÖZET**
 
 ## Özet TAM OLARAK bu yapıda
