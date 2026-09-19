@@ -43,9 +43,9 @@ export default function ShiftDetailScreen() {
   const id = params.id ?? '';
 
   /**
-   * Kimlik URL'den geliyor; vardiya yalnızca BU HESABINSA açılır. Aracın
-   * oranı da yalnızca aynı hesabın aracından okunur — gün özetiyle aynı
-   * kural, yoksa iki ekran farklı yıpranma gösterirdi.
+   * Kimlik URL'den geliyor; vardiya yalnızca BU HESABINSA açılır. Yıpranma
+   * oranı gün özetiyle AYNI kuraldan: önce vardiyanın kopyası, yoksa aynı
+   * hesabın aracı — yoksa iki ekran farklı yıpranma gösterirdi.
    */
   const data = useDbValue(() => {
     if (!id || !userId) return null;
@@ -60,7 +60,7 @@ export default function ShiftDetailScreen() {
       shift,
       rides,
       gross,
-      wearPerKmKurus: vehicle?.wearPerKmKurus ?? null,
+      wearPerKmKurus: shift.wearPerKmKurus ?? vehicle?.wearPerKmKurus ?? null,
       stats: calculateShiftStats(shift, gross, rides.length, Date.now()),
     };
   }, [id, userId]);

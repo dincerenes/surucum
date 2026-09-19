@@ -95,6 +95,24 @@ export const shifts = sqliteTable(
     fuelPriceKurus: kurus(),
 
     /**
+     * Kilometre başına yıpranma payı, kuruş — vardiya AÇILDIĞI ANDA
+     * aracın katsayısının KOPYASI. Kullanıcıya sorulmaz, düzenlenmez
+     * (kural 6); tüketim ve fiyatın kopyalanmasıyla aynı mantık.
+     *
+     * Neden kopya: rapor eskiden aracın BUGÜNKÜ katsayısını okuyordu.
+     * Aracın yalnızca adı değiştirilse bile katsayı güncel sabitle yeniden
+     * yazılıyor ve bütün geçmiş vardiyaların gerçek kârı kayıyordu;
+     * aracını satın alan kiralık sürücünün geçmişi de sıfırdan 250'ye
+     * çıkıyordu. Sahiplik değişince geçmişe uygulanıp uygulanmayacağını
+     * sürücü seçiyor (bkz. `updateVehicle`).
+     *
+     * Boşsa (bu sütundan önce açılmış ve buluttan öyle inmiş vardiya)
+     * okuma aracın katsayısına düşer. Mevcut satırlar migration'da aracın
+     * o anki katsayısıyla dolduruldu — KESİN GEÇMİŞ BİLİNMİYORDU.
+     */
+    wearPerKmKurus: kurus(),
+
+    /**
      * Vardiya boyunca yapılan kilometre — sürücü vardiya sonunda yazar.
      * Kilometre SAYACI değil, KAT EDİLEN yoldur; sürücü "bugün 280 yaptım"
      * der, sayaç okumaz. Km yıpranma payının tek girdisi budur.

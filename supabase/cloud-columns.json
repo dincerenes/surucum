@@ -77,7 +77,8 @@
       "worked_minutes": "integer",
       "commission_kurus": "bigint",
       "fuel_consumption_per_100km": "integer",
-      "fuel_price_kurus": "bigint"
+      "fuel_price_kurus": "bigint",
+      "wear_per_km_kurus": "bigint"
     },
     "rides": {
       "created_at": "bigint",
@@ -259,7 +260,8 @@
       "worked_minutes",
       "commission_kurus",
       "fuel_consumption_per_100km",
-      "fuel_price_kurus"
+      "fuel_price_kurus",
+      "wear_per_km_kurus"
     ],
     "vehicle_fuel_types": [
       "id",

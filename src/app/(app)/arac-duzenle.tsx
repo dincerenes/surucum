@@ -8,8 +8,8 @@ import {
 } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import {
-  createVehicle, deactivateVehicle, getVehicle, listActiveVehicles,
-  listVehicleFuelTypes, setVehicleFuelTypes, updateSettings, updateVehicle,
+  countShiftsAffectedByOwnership, createVehicle, deactivateVehicle, getVehicle,
+  listActiveVehicles, listVehicleFuelTypes, setVehicleFuelTypes, updateSettings, updateVehicle,
 } from '@/db/repo';
 import {
   FUEL_TYPE_LABELS, type FuelType, OWNERSHIP_LABELS, OWNERSHIP_TYPES,
@@ -84,7 +84,13 @@ export default function VehicleEditScreen() {
     .filter((p) => p && p !== OTHER_OPTION).join(' ');
   const finalLabel = labelText.trim() || derived || 'Aracım';
 
-  const wear = defaultWearPerKm(ownershipValue);
+  /**
+   * Gösterilen katsayı, KAYDEDİLECEK olan: sahiplik değişmediyse aracın
+   * kendi değeri (eski bir araçta 300 olabilir), değiştiyse yeni sahipliğin
+   * katsayısı. Repo da tam olarak bunu yazıyor.
+   */
+  const ownershipChanged = v != null && ownershipValue !== v.ownership;
+  const wear = v && !ownershipChanged ? v.wearPerKmKurus : defaultWearPerKm(ownershipValue);
   const valid = fuelValue.length > 0;
 
   function pickMake(next: string) {
@@ -98,7 +104,31 @@ export default function VehicleEditScreen() {
       : [...fuelValue, f]);
   }
 
+  /**
+   * Sahiplik değiştiyse ve bu, geçmiş vardiyaların gerçek kârını
+   * değiştirecekse TEK SORU soruluyor. Katsayının kendisi ne soruluyor
+   * ne soruda gösteriliyor; sürücü yalnızca ne olduğunu söylüyor:
+   * yanlış mı girmişti, yoksa aracın durumu bugün mü değişti?
+   */
   function kaydet() {
+    if (!userId || !valid) return;
+    if (v && ownershipChanged
+      && countShiftsAffectedByOwnership(userId, v.id, ownershipValue) > 0) {
+      Alert.alert(
+        'Bu değişiklik geçmiş vardiyalarına da uygulansın mı?',
+        'Sahipliği yanlış girdiysen geçmiş de düzelir. Aracı yeni aldıysan '
+          + 'ya da kiraladıysan geçmiş olduğu gibi kalır.',
+        [
+          { text: 'Evet, yanlış girmiştim', onPress: () => kaydetVe(true) },
+          { text: 'Hayır, bugünden itibaren', onPress: () => kaydetVe(false) },
+        ],
+      );
+      return;
+    }
+    kaydetVe(false);
+  }
+
+  function kaydetVe(applyWearToPastShifts: boolean) {
     if (!userId || !valid) return;
     const km = Number(odometerText.replace(/[.\s]/g, '').replace(',', '.'));
     const odometerKm = Number.isFinite(km) && km > 0 ? Math.round(km) : null;
@@ -109,9 +139,10 @@ export default function VehicleEditScreen() {
         make: makeValue,
         model: modelValue,
         modelYear: yearValue ? Number(yearValue) : null,
-        ownership: ownershipValue,
+        // Yalnızca değiştiyse: katsayı sahiplik DEĞİŞİNCE yeniden atanıyor.
+        ...(ownershipChanged ? { ownership: ownershipValue } : {}),
         initialOdometerKm: odometerKm,
-      });
+      }, Date.now(), { applyWearToPastShifts });
       if (!saved) {
         Alert.alert('Araç bulunamadı', 'Bu araç silinmiş olabilir. Değişiklik kaydedilmedi.');
         return;

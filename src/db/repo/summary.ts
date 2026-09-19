@@ -6,7 +6,7 @@
  * Buraya hesap yazılmaz.
  */
 
-import { and, asc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, lte, sql } from 'drizzle-orm';
 import { getDb } from '../client';
 import { expenses, fuelLogs, rides, shifts, vehicles } from '../schema';
 import { type UnixMs, alive } from './_base';
@@ -28,6 +28,16 @@ const ownVehicleOfShift = and(
   eq(shifts.vehicleId, vehicles.id),
   eq(vehicles.userId, shifts.userId),
 );
+
+/**
+ * Vardiyanın yıpranma katsayısı: önce VARDİYANIN KOPYASI, yoksa aracın.
+ *
+ * Kopya vardiya açılırken alınıyor; araç sonradan düzenlense de geçmiş
+ * günün gerçek kârı kaymıyor. Araca yalnızca kopyası olmayan (bu
+ * sütundan önceki bir sürümde açılıp buluttan öyle inmiş) vardiyada
+ * düşülüyor.
+ */
+const shiftWear = sql<number | null>`coalesce(${shifts.wearPerKmKurus}, ${vehicles.wearPerKmKurus})`;
 
 /**
  * Bir iş gününün özeti.
@@ -197,7 +207,7 @@ function readShiftRowsByDay(
     commissionKurus: shifts.commissionKurus,
     fuelConsumptionPer100Km: shifts.fuelConsumptionPer100Km,
     fuelPriceKurus: shifts.fuelPriceKurus,
-    wearPerKmKurus: vehicles.wearPerKmKurus,
+    wearPerKmKurus: shiftWear,
   })
     .from(shifts)
     .leftJoin(vehicles, ownVehicleOfShift)
@@ -250,10 +260,11 @@ function readFuelLogs(userId: string, from: BusinessDate, to: BusinessDate = fro
 }
 
 /**
- * Vardiyaları ARACIN yıpranma oranıyla birlikte okur.
+ * Vardiyaları yıpranma oranıyla birlikte okur — vardiyanın kopyası,
+ * yoksa aracın oranı (`shiftWear`).
  *
  * Oran vardiyanın üzerinde taşınıyor: aynı iş gününde iki farklı araçla
- * çalışılabilir ve her aracın oranı farklıdır. Araç silinmişse oran boş
+ * çalışılabilir ve her aracın oranı farklıdır. İkisi de yoksa oran boş
  * gelir ve o vardiyanın payı hesaplanmaz — uydurulmaz.
  *
  * Birleştirme aracın SAHİBİNİ de koşula koyuyor (`ownVehicleOfShift`).
@@ -269,7 +280,7 @@ function readShiftRows(
     commissionKurus: shifts.commissionKurus,
     fuelConsumptionPer100Km: shifts.fuelConsumptionPer100Km,
     fuelPriceKurus: shifts.fuelPriceKurus,
-    wearPerKmKurus: vehicles.wearPerKmKurus,
+    wearPerKmKurus: shiftWear,
   })
     .from(shifts)
     .leftJoin(vehicles, ownVehicleOfShift)

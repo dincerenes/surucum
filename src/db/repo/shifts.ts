@@ -28,6 +28,9 @@ import { toWholePositive } from '@/lib/whole-number';
  *
  * Araç BU HESABIN olmalı: yıpranma payı vardiyanın aracından okunuyor ve
  * yabancı bir araç, sürücünün kârını başka birinin oranıyla hesaplatır.
+ *
+ * Aracın yıpranma katsayısı vardiyaya KOPYALANIR: sonradan araç
+ * düzenlense de bu vardiyanın gerçek kârı kaymaz (bkz. `shifts` şeması).
  */
 export function startShift(
   userId: string,
@@ -42,6 +45,7 @@ export function startShift(
   /** Kesme saati ayardan okunuyor — vardiyanın günü ona bağlı. */
   const cutoff = cutoffHour ?? getCutoffHour(userId);
 
+  const wearPerKmKurus = vehicleWear(userId, vehicleId);
   const stamp = stampNew(userId, now);
   return withOutbox('shifts', stamp.id, 'upsert', (tx) => (
     tx.insert(shifts).values({
@@ -49,9 +53,17 @@ export function startShift(
       vehicleId,
       startedAt: now,
       endedAt: null,
+      wearPerKmKurus,
       businessDate: toBusinessDate(now, cutoff),
     }).returning().get()
   ), now);
+}
+
+/** Aracın bugünkü katsayısı — yalnızca bu hesabın aracıysa. */
+function vehicleWear(userId: string, vehicleId: string): Kurus | null {
+  return getDb().select({ w: vehicles.wearPerKmKurus }).from(vehicles)
+    .where(and(eq(vehicles.id, vehicleId), eq(vehicles.userId, userId)))
+    .get()?.w ?? null;
 }
 
 export interface EndShiftInput {
@@ -102,6 +114,13 @@ export function endShift(
 
   const changed = updateOwned(shifts, 'shifts', userId, id, {
     endedAt: current.endedAt ?? now,
+    /**
+     * Kopyası olmayan vardiya (bu sütundan önceki bir sürümde açılıp
+     * buluttan öyle inmiş) kapanırken bir kez doldurulur. Dolu olan
+     * ASLA değiştirilmez — düzeltme yalnızca sahiplik sorusundan geçer.
+     */
+    ...(current.wearPerKmKurus == null
+      ? { wearPerKmKurus: vehicleWear(userId, current.vehicleId) } : {}),
     commissionKurus: sanitizeAmount(input.commissionKurus),
     fuelConsumptionPer100Km: toWholePositive(input.fuelConsumptionPer100Km),
     fuelPriceKurus: sanitizeAmount(input.fuelPriceKurus),

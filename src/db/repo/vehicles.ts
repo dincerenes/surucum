@@ -7,12 +7,14 @@
  * modelde iki sonuç.
  */
 
-import { and, asc, desc, eq, isNotNull } from 'drizzle-orm';
+import {
+  and, asc, count, desc, eq, isNotNull, isNull, ne, or, sql,
+} from 'drizzle-orm';
 import { getDb } from '../client';
 import {
   type FuelType, type OwnershipType, defaultWearPerKm,
 } from '../schema/_shared';
-import { vehicleFuelTypes, vehicles } from '../schema';
+import { shifts, vehicleFuelTypes, vehicles } from '../schema';
 import type { Vehicle, VehicleFuelType } from '../schema/vehicles';
 import {
   type Tx, type UnixMs, alive, enqueue, ownedById, stampNew, updateOwned,
@@ -85,34 +87,103 @@ function insertFuelTypes(
 
 export type VehiclePatch = Partial<Omit<NewVehicleInput, 'fuelTypes'>>;
 
+export interface UpdateVehicleOptions {
+  /**
+   * Sahiplik değişiyorsa yeni katsayı GEÇMİŞ VARDİYALARA da yazılsın mı?
+   *
+   * Sürücüye tek soru olarak soruluyor: "yanlış girmiştim" (evet) ile
+   * "aracı bugün satın aldım / kiraladım" (hayır) iki ayrı gerçek.
+   * Kurulum sahiplik sormuyor ve "kendi aracım" varsayıyor; kiralık
+   * aracın sürücüsünün ilk düzeltmesi çoğu zaman bir yanlışın düzeltmesi.
+   */
+  applyWearToPastShifts?: boolean;
+}
+
 /**
  * Aracı günceller.
  *
- * SAHİPLİK DEĞİŞİRSE YIPRANMA PAYI DA DEĞİŞİR. Bu bilinçli: sahiplik
- * alanı sürücünün aracın bugünkü durumu hakkındaki beyanıdır. Kiralık
- * aracı satın aldıysa yıpranma artık onun cebinden çıkıyor demektir ve
- * maliyet modeli buna uymak zorunda.
+ * YIPRANMA KATSAYISI YALNIZCA SAHİPLİK GERÇEKTEN DEĞİŞİNCE yeniden atanır.
+ * Eskiden ekran her kayıtta sahipliği gönderiyor, repo da koşulsuz
+ * güncel sabiti yazıyordu: yalnızca adı değiştirilen 300 kuruşluk eski
+ * bir aracın katsayısı 250'ye iniyordu. Sütunun var olma sebebi tam
+ * tersiydi — varsayılan sabiti değiştirdiğimizde mevcut araçlar kaymasın.
  *
- * (Bu, sütunun var olma sebebiyle çelişmiyor: sütun, İLERİDE VARSAYILAN
- * SABİTİ biz değiştirirsek geçmiş kayıtlar kaymasın diye duruyor.)
+ * Sahiplik değişince geçmiş vardiyalar `applyWearToPastShifts`'e göre:
+ * - evet: kopyaları yeni katsayıya güncellenir,
+ * - hayır: kopyalar olduğu gibi kalır; kopyası HİÇ olmayan eski
+ *   vardiyalar aracın ESKİ katsayısıyla dondurulur, yoksa okuma araca
+ *   düştüğü için onlar da sessizce yeni katsayıya geçerdi.
+ * Güncellenen her vardiya kuyruğa girer. Hepsi TEK İŞLEMDE.
  */
 export function updateVehicle(
   userId: string, id: string, patch: VehiclePatch, now: UnixMs = Date.now(),
+  options: UpdateVehicleOptions = {},
 ): boolean {
-  return updateOwned(vehicles, 'vehicles', userId, id, {
-    ...(patch.label !== undefined ? { label: patch.label.trim() } : {}),
-    ...(patch.plate !== undefined ? { plate: normalize(patch.plate) } : {}),
-    ...(patch.make !== undefined ? { make: normalize(patch.make) } : {}),
-    ...(patch.model !== undefined ? { model: normalize(patch.model) } : {}),
-    ...(patch.modelYear !== undefined ? { modelYear: toWholePositive(patch.modelYear) } : {}),
-    ...(patch.initialOdometerKm !== undefined
-      ? { initialOdometerKm: toWholePositive(patch.initialOdometerKm) } : {}),
-    ...(patch.notes !== undefined ? { notes: normalize(patch.notes) } : {}),
-    ...(patch.ownership !== undefined ? {
-      ownership: patch.ownership,
-      wearPerKmKurus: defaultWearPerKm(patch.ownership),
-    } : {}),
-  }, now);
+  const current = getVehicle(userId, id);
+  if (!current) return false;
+
+  const ownershipChanged = patch.ownership !== undefined
+    && patch.ownership !== current.ownership;
+  const nextWear = ownershipChanged
+    ? defaultWearPerKm(patch.ownership as OwnershipType)
+    : current.wearPerKmKurus;
+
+  return getDb().transaction((tx) => {
+    const { changes } = tx.update(vehicles).set({
+      ...(patch.label !== undefined ? { label: patch.label.trim() } : {}),
+      ...(patch.plate !== undefined ? { plate: normalize(patch.plate) } : {}),
+      ...(patch.make !== undefined ? { make: normalize(patch.make) } : {}),
+      ...(patch.model !== undefined ? { model: normalize(patch.model) } : {}),
+      ...(patch.modelYear !== undefined ? { modelYear: toWholePositive(patch.modelYear) } : {}),
+      ...(patch.initialOdometerKm !== undefined
+        ? { initialOdometerKm: toWholePositive(patch.initialOdometerKm) } : {}),
+      ...(patch.notes !== undefined ? { notes: normalize(patch.notes) } : {}),
+      ...(ownershipChanged
+        ? { ownership: patch.ownership, wearPerKmKurus: nextWear } : {}),
+      updatedAt: now,
+    }).where(ownedById(vehicles, userId, id)).run() as unknown as { changes: number };
+    if (changes === 0) return false;
+    enqueue(tx, 'vehicles', id, 'upsert', now);
+
+    if (!ownershipChanged) return true;
+
+    const apply = options.applyWearToPastShifts === true;
+    const target = apply ? nextWear : current.wearPerKmKurus;
+    const affected = tx.select({ id: shifts.id }).from(shifts).where(and(
+      alive(shifts, userId),
+      eq(shifts.vehicleId, id),
+      apply
+        ? or(isNull(shifts.wearPerKmKurus), ne(shifts.wearPerKmKurus, target))
+        : isNull(shifts.wearPerKmKurus),
+    )).all();
+
+    for (const s of affected) {
+      tx.update(shifts).set({ wearPerKmKurus: target, updatedAt: now })
+        .where(ownedById(shifts, userId, s.id)).run();
+      enqueue(tx, 'shifts', s.id, 'upsert', now);
+    }
+    return true;
+  });
+}
+
+/**
+ * Sahiplik `ownership` yapılırsa gerçek kârı DEĞİŞECEK geçmiş vardiya
+ * sayısı. Sıfırsa sürücüye soru sorulmaz — cevabı hiçbir şeyi
+ * değiştirmeyecek bir soru, sorulmamış olmalı (ör. kendi aracı →
+ * kiralık plaka: ikisinde de katsayı aynı).
+ */
+export function countShiftsAffectedByOwnership(
+  userId: string, vehicleId: string, ownership: OwnershipType,
+): number {
+  const vehicle = getVehicle(userId, vehicleId);
+  if (!vehicle || vehicle.ownership === ownership) return 0;
+
+  const next = defaultWearPerKm(ownership);
+  return getDb().select({ n: count() }).from(shifts).where(and(
+    alive(shifts, userId),
+    eq(shifts.vehicleId, vehicleId),
+    sql`coalesce(${shifts.wearPerKmKurus}, ${vehicle.wearPerKmKurus}) <> ${next}`,
+  )).get()?.n ?? 0;
 }
 
 /**
