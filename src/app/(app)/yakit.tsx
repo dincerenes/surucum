@@ -27,8 +27,8 @@ export default function AddFuelScreen() {
   const [fuelType, setFuelType] = useState<FuelType | null>(null);
 
   const fuels = useDbValue(
-    () => (vehicle ? listVehicleFuelTypes(vehicle.id) : []),
-    [vehicle?.id],
+    () => (userId && vehicle ? listVehicleFuelTypes(userId, vehicle.id) : []),
+    [userId, vehicle?.id],
   );
 
   const selected = fuelType ?? fuels[0]?.fuelType ?? 'gasoline';

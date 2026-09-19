@@ -6,11 +6,13 @@
  * bir önceki iş gününe yazılır.
  */
 
-import { asc, eq } from 'drizzle-orm';
+import { asc } from 'drizzle-orm';
 import { getDb } from '../client';
-import { appSettings } from '../schema';
+import { appSettings, earningSources, vehicles } from '../schema';
 import type { AppSettings } from '../schema/system';
-import { type UnixMs, alive, softDeleteRow, stampNew, withOutbox } from './_base';
+import {
+  type UnixMs, alive, assertOwnedIfSet, softDeleteRow, stampNew, updateOwned, withOutbox,
+} from './_base';
 import { DEFAULT_CUTOFF_HOUR } from '@/lib/business-date';
 import { mergeSettingsRows } from '@/lib/settings-merge';
 
@@ -85,15 +87,11 @@ export function consolidateSettings(userId: string, now: UnixMs = Date.now()): v
   if (!merge) return;
 
   if (Object.keys(merge.patch).length > 0) {
-    withOutbox('app_settings', merge.survivor.id, 'upsert', (tx) => {
-      tx.update(appSettings)
-        .set({ ...merge.patch, updatedAt: now })
-        .where(eq(appSettings.id, merge.survivor.id)).run();
-    }, now);
+    updateOwned(appSettings, 'app_settings', userId, merge.survivor.id, merge.patch, now);
   }
 
   for (const id of merge.removeIds) {
-    softDeleteRow(appSettings, 'app_settings', id, now);
+    softDeleteRow(appSettings, 'app_settings', userId, id, now);
   }
 }
 
@@ -115,24 +113,31 @@ export interface SettingsPatch {
   onboardingCompletedAt?: UnixMs | null;
 }
 
+/**
+ * Ayarı günceller.
+ *
+ * Varsayılan araç ve kaynak BU HESABIN olmalı — yeni vardiya o araca
+ * bağlanıyor. Denetim her yazmadan önce: reddedilen bir istek ayar
+ * satırı bile açmasın.
+ */
 export function updateSettings(
   userId: string, patch: SettingsPatch, now: UnixMs = Date.now(),
 ): void {
+  assertOwnedIfSet(vehicles, 'vehicles', userId, patch.defaultVehicleId);
+  assertOwnedIfSet(earningSources, 'earning_sources', userId, patch.defaultEarningSourceId);
+
   const current = ensureSettings(userId, now);
 
-  withOutbox('app_settings', current.id, 'upsert', (tx) => {
-    tx.update(appSettings).set({
-      ...(patch.dayCutoffHour !== undefined
-        ? { dayCutoffHour: clampHour(patch.dayCutoffHour) } : {}),
-      ...(patch.defaultVehicleId !== undefined
-        ? { defaultVehicleId: patch.defaultVehicleId } : {}),
-      ...(patch.defaultEarningSourceId !== undefined
-        ? { defaultEarningSourceId: patch.defaultEarningSourceId } : {}),
-      ...(patch.regionCode !== undefined ? { regionCode: patch.regionCode } : {}),
-      ...(patch.onboardingCompletedAt !== undefined
-        ? { onboardingCompletedAt: patch.onboardingCompletedAt } : {}),
-      updatedAt: now,
-    }).where(eq(appSettings.id, current.id)).run();
+  updateOwned(appSettings, 'app_settings', userId, current.id, {
+    ...(patch.dayCutoffHour !== undefined
+      ? { dayCutoffHour: clampHour(patch.dayCutoffHour) } : {}),
+    ...(patch.defaultVehicleId !== undefined
+      ? { defaultVehicleId: patch.defaultVehicleId } : {}),
+    ...(patch.defaultEarningSourceId !== undefined
+      ? { defaultEarningSourceId: patch.defaultEarningSourceId } : {}),
+    ...(patch.regionCode !== undefined ? { regionCode: patch.regionCode } : {}),
+    ...(patch.onboardingCompletedAt !== undefined
+      ? { onboardingCompletedAt: patch.onboardingCompletedAt } : {}),
   }, now);
 }
 

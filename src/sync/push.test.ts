@@ -73,7 +73,7 @@ describe('gönderim sürerken yapılan düzeltme', () => {
     server.hooks.duringUpsert = () => {
       if (deleted) return;
       deleted = true;
-      softDeleteRow(goals, 'goals', id, 3000);
+      softDeleteRow(goals, 'goals', A, id, 3000);
     };
     await pushOutbox(server.client(), A);
 

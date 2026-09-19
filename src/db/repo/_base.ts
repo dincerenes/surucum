@@ -6,12 +6,17 @@
  * kayıt buluta hiç gitmez ve bunu kimse fark etmez — bu yüzden ikisi
  * ayrılamaz, `withOutbox` dışında ham insert/update yazılmaz.
  *
+ * İKİNCİ KURAL: var olan tek bir kayda dokunan her yol — okuma dahil —
+ * sahibini de koşula koyar (`ownedById`). Güncelleme ve silme bu yüzden
+ * `updateOwned` / `softDeleteRow` üzerinden gider.
+ *
  * Fonksiyonlar SENKRONDUR. `expo-sqlite` sürücüsü senkron çalışıyor ve
  * arayüzün ağ değil, veritabanı bile beklememesi gerekiyor: sürücü
  * tutarı yazar, ekran o an güncellenir.
  */
 
 import { and, eq, isNull, sql } from 'drizzle-orm';
+import type { SQLiteTable, SQLiteUpdateSetSource } from 'drizzle-orm/sqlite-core';
 import { getDb } from '../client';
 import { newId } from '@/lib/id';
 
@@ -130,11 +135,76 @@ export function alive<T extends { userId: any; deletedAt: any }>(
   return and(eq(table.userId, userId), isNull(table.deletedAt));
 }
 
-/** Tek kaydın silinmemiş hâli için koşul. */
-export function aliveById<T extends { id: any; deletedAt: any }>(
-  table: T, id: string,
+/**
+ * Tek kaydın koşulu: kimlik, SAHİP ve silinmemiş — üçü birden.
+ *
+ * Kimlik tek başına YETMEZ. Aynı cihazda birden fazla hesap açılabiliyor
+ * ve çıkışta yerel veri hesap başına saklanıyor; yalnızca kimlikle
+ * okuyan ya da yazan bir fonksiyon, B oturumunda A'nın kaydını gösterir,
+ * düzeltir ve kuyruğa koyar — A girince de buluta götürür. Ekranlar
+ * kimliği URL'den aldığı için süzgeç arayüzde değil, burada durmak
+ * zorunda.
+ */
+export function ownedById<T extends { id: any; userId: any; deletedAt: any }>(
+  table: T, userId: string, id: string,
 ) {
-  return and(eq(table.id, id), isNull(table.deletedAt));
+  return and(eq(table.id, id), eq(table.userId, userId), isNull(table.deletedAt));
+}
+
+/**
+ * İlişkilendirilmek istenen kayıt bu hesaba ait değil ya da silinmiş.
+ *
+ * Sessizce düzeltilmiyor, AÇIKÇA reddediliyor: yabancı vardiyaya bağlanan
+ * sefer o vardiyanın gününü alır, yabancı araçla açılan vardiya o aracın
+ * yıpranma oranıyla hesaplanır. İkisi de sürücünün göremeyeceği yanlış
+ * sayılar üretir.
+ */
+export class ForeignRecordError extends Error {
+  readonly tableName: SyncedTableName;
+  readonly rowId: string;
+
+  constructor(tableName: SyncedTableName, rowId: string) {
+    super(`Kayıt bulunamadı ya da bu hesaba ait değil (${tableName}: ${rowId}).`);
+    this.name = 'ForeignRecordError';
+    this.tableName = tableName;
+    this.rowId = rowId;
+  }
+}
+
+/** Kayıt bu hesabın ve silinmemiş mi? Değilse `ForeignRecordError`. */
+export function assertOwned<T extends SQLiteTable & { id: any; userId: any; deletedAt: any }>(
+  table: T, tableName: SyncedTableName, userId: string, id: string,
+): void {
+  const row = getDb().select({ id: table.id }).from(table as any)
+    .where(ownedById(table, userId, id)).get();
+  if (!row) throw new ForeignRecordError(tableName, id);
+}
+
+/** Boş değilse sahipliğini denetler — isteğe bağlı ilişkiler için. */
+export function assertOwnedIfSet<T extends SQLiteTable & { id: any; userId: any; deletedAt: any }>(
+  table: T, tableName: SyncedTableName, userId: string, id: string | null | undefined,
+): void {
+  if (id != null) assertOwned(table, tableName, userId, id);
+}
+
+/**
+ * Sahibine ait, silinmemiş TEK bir satırı günceller ve kuyruğa yazar.
+ *
+ * Satır değişmediyse — yabancı, silinmiş ya da hiç var olmayan kimlik —
+ * `false` döner ve kuyruğa HİÇBİR ŞEY yazılmaz. Kuyruğa yazmak ancak
+ * gerçekten bir satır değiştiyse anlamlı: gönderilecek başka bir şey yok.
+ *
+ * `updatedAt` burada damgalanıyor; çağıranın unutması mümkün olmasın.
+ */
+export function updateOwned<T extends SQLiteTable & { id: any; userId: any; deletedAt: any }>(
+  table: T,
+  tableName: SyncedTableName,
+  userId: string,
+  id: string,
+  set: SQLiteUpdateSetSource<T>,
+  now: UnixMs = Date.now(),
+): boolean {
+  return writeOwnedRow(table, tableName, userId, id, set, 'upsert', now);
 }
 
 /**
@@ -143,20 +213,45 @@ export function aliveById<T extends { id: any; deletedAt: any }>(
  * SERT SİLME YAPILMAZ. Cihaz A satırı gerçekten silerse, cihaz B kaydın
  * eski hâlini geri gönderir ve silinen kayıt dirilir.
  *
- * Tablo tipi burada genelleştirilemiyor: Drizzle'ın `update().set()`
- * imzası tabloya özgü. Tek yerde, açıkça daraltıyoruz — çağıranların
- * tamamı `schema` içindeki gerçek tablo nesnelerini veriyor.
+ * Yalnızca bu hesabın silinmemiş satırı silinir; aksi hâlde `false`
+ * döner ve kuyruk değişmez.
  */
-export function softDeleteRow<T extends { id: any; deletedAt: any }>(
+export function softDeleteRow<T extends SQLiteTable & { id: any; userId: any; deletedAt: any }>(
   table: T,
   tableName: SyncedTableName,
+  userId: string,
   id: string,
   now: UnixMs = Date.now(),
-): void {
-  withOutbox(tableName, id, 'delete', (tx) => {
-    (tx.update(table as any) as any)
-      .set({ deletedAt: now, updatedAt: now })
-      .where(eq(table.id, id))
-      .run();
-  }, now);
+): boolean {
+  return writeOwnedRow(
+    table, tableName, userId, id, { deletedAt: now } as SQLiteUpdateSetSource<T>, 'delete', now,
+  );
+}
+
+/**
+ * Güncelleme ve silmenin ortak gövdesi.
+ *
+ * Tablo tipi burada genelleştirilemiyor: Drizzle'ın `update().set()`
+ * imzası tabloya özgü. Tek yerde, açıkça daraltıyoruz — çağıranların
+ * tamamı `schema` içindeki gerçek tablo nesnelerini veriyor ve `set`'in
+ * tipi dışarıda tabloya göre denetleniyor.
+ */
+function writeOwnedRow<T extends SQLiteTable & { id: any; userId: any; deletedAt: any }>(
+  table: T,
+  tableName: SyncedTableName,
+  userId: string,
+  id: string,
+  set: SQLiteUpdateSetSource<T>,
+  operation: OutboxOperation,
+  now: UnixMs,
+): boolean {
+  return getDb().transaction((tx) => {
+    const { changes } = (tx.update(table as any) as any)
+      .set({ ...set, updatedAt: now })
+      .where(ownedById(table, userId, id))
+      .run() as { changes: number };
+    if (changes === 0) return false;
+    enqueue(tx, tableName, id, operation, now);
+    return true;
+  });
 }

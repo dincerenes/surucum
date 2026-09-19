@@ -44,12 +44,17 @@ export default function VehicleEditScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = params.id ?? null;
 
+  /**
+   * Kimlik URL'den geliyor; araç yalnızca BU HESABINSA açılır. Bulunamayan
+   * araç için ekleme formu AÇILMIYOR — sürücü düzenlediğini sanıp yeni bir
+   * araç eklerdi.
+   */
   const existing = useDbValue(() => {
-    if (!id) return null;
-    const vehicle = getVehicle(id);
+    if (!id || !userId) return null;
+    const vehicle = getVehicle(userId, id);
     if (!vehicle) return null;
-    return { vehicle, fuels: listVehicleFuelTypes(id).map((f) => f.fuelType) };
-  }, [id]);
+    return { vehicle, fuels: listVehicleFuelTypes(userId, id).map((f) => f.fuelType) };
+  }, [id, userId]);
 
   const otherVehicleCount = useDbValue(
     () => (userId ? listActiveVehicles(userId).filter((v) => v.id !== id).length : 0),
@@ -99,7 +104,7 @@ export default function VehicleEditScreen() {
     const odometerKm = Number.isFinite(km) && km > 0 ? Math.round(km) : null;
 
     if (v) {
-      updateVehicle(v.id, {
+      const saved = updateVehicle(userId, v.id, {
         label: finalLabel,
         make: makeValue,
         model: modelValue,
@@ -107,6 +112,10 @@ export default function VehicleEditScreen() {
         ownership: ownershipValue,
         initialOdometerKm: odometerKm,
       });
+      if (!saved) {
+        Alert.alert('Araç bulunamadı', 'Bu araç silinmiş olabilir. Değişiklik kaydedilmedi.');
+        return;
+      }
       setVehicleFuelTypes(userId, v.id, fuelValue);
     } else {
       const created = createVehicle(userId, {
@@ -152,12 +161,24 @@ export default function VehicleEditScreen() {
           text: 'Kaldır',
           style: 'destructive',
           onPress: () => {
-            deactivateVehicle(v.id);
+            if (!userId) return;
+            deactivateVehicle(userId, v.id);
             requestSync();
             router.back();
           },
         },
       ],
+    );
+  }
+
+  if (id && !existing) {
+    return (
+      <View style={[styles.page, {
+        backgroundColor: colors.background, paddingTop: insets.top + space.xxl,
+      }]}>
+        <Text style={[typeScale.title, { color: colors.text }]}>Araç bulunamadı</Text>
+        <Button label="Geri" variant="secondary" onPress={() => router.back()} />
+      </View>
     );
   }
 

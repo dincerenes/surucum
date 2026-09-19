@@ -12,10 +12,13 @@
 
 import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import { getDb } from '../client';
-import { expenseCategories, expenses, recurringExpenses } from '../schema';
+import { expenseCategories, expenses, recurringExpenses, vehicles } from '../schema';
 import type { Expense, ExpenseCategory, RecurringExpense } from '../schema/expenses';
 import type { ExpenseKind, RecurrencePeriod } from '../schema/_shared';
-import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
+import {
+  type UnixMs, alive, assertOwned, assertOwnedIfSet, ownedById, softDeleteRow, stampNew,
+  updateOwned, withOutbox,
+} from './_base';
 import { getCutoffHour } from './settings';
 import type { Kurus } from '@/lib/money';
 import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
@@ -107,11 +110,11 @@ export function listActiveExpenseCategories(userId: string): ExpenseCategory[] {
 }
 
 /** Kategoriyi gizler. Sistem kategorisi de gizlenebilir, silinemez. */
-export function hideExpenseCategory(id: string, now: UnixMs = Date.now()): void {
-  withOutbox('expense_categories', id, 'upsert', (tx) => {
-    tx.update(expenseCategories)
-      .set({ isActive: false, updatedAt: now })
-      .where(eq(expenseCategories.id, id)).run();
+export function hideExpenseCategory(
+  userId: string, id: string, now: UnixMs = Date.now(),
+): boolean {
+  return updateOwned(expenseCategories, 'expense_categories', userId, id, {
+    isActive: false,
   }, now);
 }
 
@@ -149,8 +152,12 @@ export function addExpense(
 ): Expense {
   const occurredAt = input.occurredAt ?? now;
   const cutoff = cutoffHour ?? getCutoffHour(userId);
-  const stamp = stampNew(userId, now);
 
+  // Kategori ve araç BU HESABIN olmalı — yabancı kimlik reddedilir.
+  assertOwned(expenseCategories, 'expense_categories', userId, input.categoryId);
+  assertOwnedIfSet(vehicles, 'vehicles', userId, input.vehicleId);
+
+  const stamp = stampNew(userId, now);
   return withOutbox('expenses', stamp.id, 'upsert', (tx) => (
     tx.insert(expenses).values({
       ...stamp,
@@ -165,26 +172,40 @@ export function addExpense(
   ), now);
 }
 
+/**
+ * Gideri düzeltir.
+ *
+ * Kayıt bu hesabın değilse `false` döner, hiçbir şey yazılmaz. Yeni
+ * bağlanan kategori ya da araç da bu hesabın olmalı; DEĞİŞMEYEN bağ
+ * yeniden denetlenmiyor — tutarı düzeltmek, eski bir bağ yüzünden
+ * reddedilmemeli.
+ */
 export function updateExpense(
-  id: string, patch: Partial<NewExpenseInput>, now: UnixMs = Date.now(),
-): void {
-  withOutbox('expenses', id, 'upsert', (tx) => {
-    tx.update(expenses).set({
-      ...(patch.categoryId !== undefined ? { categoryId: patch.categoryId } : {}),
-      ...(patch.amountKurus !== undefined ? { amountKurus: patch.amountKurus } : {}),
-      ...(patch.vehicleId !== undefined ? { vehicleId: patch.vehicleId } : {}),
-      ...(patch.notes !== undefined ? { notes: patch.notes?.trim() || null } : {}),
-      updatedAt: now,
-    }).where(eq(expenses.id, id)).run();
+  userId: string, id: string, patch: Partial<NewExpenseInput>, now: UnixMs = Date.now(),
+): boolean {
+  const current = getExpense(userId, id);
+  if (!current) return false;
+  if (patch.categoryId !== undefined && patch.categoryId !== current.categoryId) {
+    assertOwned(expenseCategories, 'expense_categories', userId, patch.categoryId);
+  }
+  if (patch.vehicleId !== undefined && patch.vehicleId !== current.vehicleId) {
+    assertOwnedIfSet(vehicles, 'vehicles', userId, patch.vehicleId);
+  }
+
+  return updateOwned(expenses, 'expenses', userId, id, {
+    ...(patch.categoryId !== undefined ? { categoryId: patch.categoryId } : {}),
+    ...(patch.amountKurus !== undefined ? { amountKurus: patch.amountKurus } : {}),
+    ...(patch.vehicleId !== undefined ? { vehicleId: patch.vehicleId } : {}),
+    ...(patch.notes !== undefined ? { notes: patch.notes?.trim() || null } : {}),
   }, now);
 }
 
-export function deleteExpense(id: string, now: UnixMs = Date.now()): void {
-  softDeleteRow(expenses, 'expenses', id, now);
+export function deleteExpense(userId: string, id: string, now: UnixMs = Date.now()): boolean {
+  return softDeleteRow(expenses, 'expenses', userId, id, now);
 }
 
-export function getExpense(id: string): Expense | undefined {
-  return getDb().select().from(expenses).where(aliveById(expenses, id)).get();
+export function getExpense(userId: string, id: string): Expense | undefined {
+  return getDb().select().from(expenses).where(ownedById(expenses, userId, id)).get();
 }
 
 export function listExpensesOnDate(userId: string, date: BusinessDate): Expense[] {
@@ -233,6 +254,9 @@ export interface NewRecurringExpenseInput {
 export function addRecurringExpense(
   userId: string, input: NewRecurringExpenseInput, now: UnixMs = Date.now(),
 ): RecurringExpense {
+  assertOwned(expenseCategories, 'expense_categories', userId, input.categoryId);
+  assertOwnedIfSet(vehicles, 'vehicles', userId, input.vehicleId);
+
   const stamp = stampNew(userId, now);
   return withOutbox('recurring_expenses', stamp.id, 'upsert', (tx) => (
     tx.insert(recurringExpenses).values({
@@ -249,25 +273,33 @@ export function addRecurringExpense(
   ), now);
 }
 
+/**
+ * Dönemsel gideri günceller.
+ *
+ * Kategori ve araç bu yoldan DEĞİŞMİYOR. Eskiden tipte görünüp sessizce
+ * yok sayılıyorlardı; tip artık bunu açıkça söylüyor ve bağı değişmeyen
+ * bir kaydın sahiplik denetimine de gerek kalmıyor.
+ */
 export function updateRecurringExpense(
-  id: string, patch: Partial<NewRecurringExpenseInput> & { isActive?: boolean },
+  userId: string, id: string,
+  patch: Omit<Partial<NewRecurringExpenseInput>, 'categoryId' | 'vehicleId'>
+    & { isActive?: boolean },
   now: UnixMs = Date.now(),
-): void {
-  withOutbox('recurring_expenses', id, 'upsert', (tx) => {
-    tx.update(recurringExpenses).set({
-      ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
-      ...(patch.amountKurus !== undefined ? { amountKurus: patch.amountKurus } : {}),
-      ...(patch.period !== undefined ? { period: patch.period } : {}),
-      ...(patch.startDate !== undefined ? { startDate: patch.startDate } : {}),
-      ...(patch.endDate !== undefined ? { endDate: patch.endDate } : {}),
-      ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}),
-      updatedAt: now,
-    }).where(eq(recurringExpenses.id, id)).run();
+): boolean {
+  return updateOwned(recurringExpenses, 'recurring_expenses', userId, id, {
+    ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
+    ...(patch.amountKurus !== undefined ? { amountKurus: patch.amountKurus } : {}),
+    ...(patch.period !== undefined ? { period: patch.period } : {}),
+    ...(patch.startDate !== undefined ? { startDate: patch.startDate } : {}),
+    ...(patch.endDate !== undefined ? { endDate: patch.endDate } : {}),
+    ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}),
   }, now);
 }
 
-export function deleteRecurringExpense(id: string, now: UnixMs = Date.now()): void {
-  softDeleteRow(recurringExpenses, 'recurring_expenses', id, now);
+export function deleteRecurringExpense(
+  userId: string, id: string, now: UnixMs = Date.now(),
+): boolean {
+  return softDeleteRow(recurringExpenses, 'recurring_expenses', userId, id, now);
 }
 
 export function listRecurringExpenses(userId: string): RecurringExpense[] {

@@ -74,14 +74,14 @@ describe('enqueue', () => {
 
   it('silme bekleyen güncellemeyi ezer', () => {
     const id = addGoal(A, 100);
-    softDeleteRow(goals, 'goals', id, 3000);
+    softDeleteRow(goals, 'goals', A, id, 3000);
     assert.equal(queue()[0].operation, 'delete');
     assert.equal(queue()[0].revision, 2);
   });
 
   it('VAR OLMAYAN kimlik kuyruğa yazılmaz', () => {
     editGoal('0199ffff-0000-7000-8000-000000000000', 5, 2000);
-    softDeleteRow(goals, 'goals', '0199ffff-0000-7000-8000-000000000001', 2000);
+    softDeleteRow(goals, 'goals', A, '0199ffff-0000-7000-8000-000000000001', 2000);
     assert.equal(queue().length, 0);
   });
 });

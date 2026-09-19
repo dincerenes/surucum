@@ -9,10 +9,12 @@
 
 import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { getDb } from '../client';
-import { fuelLogs, vehicleFuelTypes } from '../schema';
+import { fuelLogs, vehicleFuelTypes, vehicles } from '../schema';
 import type { FuelLog } from '../schema/fuel';
 import type { FuelType } from '../schema/_shared';
-import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
+import {
+  type UnixMs, alive, assertOwned, ownedById, softDeleteRow, stampNew, updateOwned, withOutbox,
+} from './_base';
 import { getCutoffHour } from './settings';
 import type { Kurus } from '@/lib/money';
 import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
@@ -60,8 +62,11 @@ export function addFuelLog(
 ): FuelLog {
   const occurredAt = input.occurredAt ?? now;
   const cutoff = cutoffHour ?? getCutoffHour(userId);
-  const stamp = stampNew(userId, now);
 
+  // Araç BU HESABIN olmalı — yabancı aracın fiyatı da güncellenirdi.
+  assertOwned(vehicles, 'vehicles', userId, input.vehicleId);
+
+  const stamp = stampNew(userId, now);
   const row = withOutbox('fuel_logs', stamp.id, 'upsert', (tx) => (
     tx.insert(fuelLogs).values({
       ...stamp,
@@ -80,41 +85,44 @@ export function addFuelLog(
     }).returning().get()
   ), now);
 
-  rememberUnitPrice(input.vehicleId, input.fuelType, input.unitPriceKurus, now);
+  rememberUnitPrice(userId, input.vehicleId, input.fuelType, input.unitPriceKurus, now);
   return row;
 }
 
+/**
+ * Dolumu düzeltir. Araç ve yakıt tipi bu yoldan DEĞİŞMİYOR — yalnızca
+ * tutarlar, sayaç ve notlar.
+ */
 export function updateFuelLog(
-  id: string, patch: Partial<NewFuelLogInput>, now: UnixMs = Date.now(),
-): void {
-  withOutbox('fuel_logs', id, 'upsert', (tx) => {
-    tx.update(fuelLogs).set({
-      ...(patch.volumePer1000 !== undefined
-        ? { volumePer1000: Math.round(patch.volumePer1000) } : {}),
-      ...(patch.unitPriceKurus !== undefined
-        ? { unitPriceKurus: patch.unitPriceKurus } : {}),
-      ...(patch.totalAmountKurus !== undefined
-        ? { totalAmountKurus: patch.totalAmountKurus } : {}),
-      ...(patch.odometerKm !== undefined ? { odometerKm: patch.odometerKm } : {}),
-      ...(patch.isFullTank !== undefined ? { isFullTank: patch.isFullTank } : {}),
-      ...(patch.stationName !== undefined
-        ? { stationName: patch.stationName?.trim() || null } : {}),
-      ...(patch.notes !== undefined ? { notes: patch.notes?.trim() || null } : {}),
-      updatedAt: now,
-    }).where(eq(fuelLogs.id, id)).run();
+  userId: string, id: string,
+  patch: Omit<Partial<NewFuelLogInput>, 'vehicleId' | 'fuelType'>,
+  now: UnixMs = Date.now(),
+): boolean {
+  return updateOwned(fuelLogs, 'fuel_logs', userId, id, {
+    ...(patch.volumePer1000 !== undefined
+      ? { volumePer1000: Math.round(patch.volumePer1000) } : {}),
+    ...(patch.unitPriceKurus !== undefined
+      ? { unitPriceKurus: patch.unitPriceKurus } : {}),
+    ...(patch.totalAmountKurus !== undefined
+      ? { totalAmountKurus: patch.totalAmountKurus } : {}),
+    ...(patch.odometerKm !== undefined ? { odometerKm: patch.odometerKm } : {}),
+    ...(patch.isFullTank !== undefined ? { isFullTank: patch.isFullTank } : {}),
+    ...(patch.stationName !== undefined
+      ? { stationName: patch.stationName?.trim() || null } : {}),
+    ...(patch.notes !== undefined ? { notes: patch.notes?.trim() || null } : {}),
   }, now);
 }
 
-export function deleteFuelLog(id: string, now: UnixMs = Date.now()): void {
-  softDeleteRow(fuelLogs, 'fuel_logs', id, now);
+export function deleteFuelLog(userId: string, id: string, now: UnixMs = Date.now()): boolean {
+  return softDeleteRow(fuelLogs, 'fuel_logs', userId, id, now);
 }
 
 // ---------------------------------------------------------------------------
 // Okuma
 // ---------------------------------------------------------------------------
 
-export function getFuelLog(id: string): FuelLog | undefined {
-  return getDb().select().from(fuelLogs).where(aliveById(fuelLogs, id)).get();
+export function getFuelLog(userId: string, id: string): FuelLog | undefined {
+  return getDb().select().from(fuelLogs).where(ownedById(fuelLogs, userId, id)).get();
 }
 
 export function listFuelLogsOnDate(userId: string, date: BusinessDate): FuelLog[] {
@@ -138,12 +146,11 @@ export function listFuelLogsInRange(
 }
 
 /** Aracın dolumları, yeniden eskiye. Tüketim hesabının girdisi. */
-export function listFuelLogsForVehicle(vehicleId: string): FuelLog[] {
+export function listFuelLogsForVehicle(userId: string, vehicleId: string): FuelLog[] {
   return getDb().select().from(fuelLogs)
-    .where(eq(fuelLogs.vehicleId, vehicleId))
+    .where(and(alive(fuelLogs, userId), eq(fuelLogs.vehicleId, vehicleId)))
     .orderBy(desc(fuelLogs.occurredAt))
-    .all()
-    .filter((r) => r.deletedAt == null);
+    .all();
 }
 
 /**
@@ -151,24 +158,24 @@ export function listFuelLogsForVehicle(vehicleId: string): FuelLog[] {
  *
  * Satır yoksa hiçbir şey yapmaz: araç o yakıtı kullanmıyor olarak
  * tanımlanmış demektir ve dolum kaydı yine de duruyor — sürücünün
- * girdiği veriyi reddetmiyoruz, sadece tahmine katmıyoruz.
+ * girdiği veriyi reddetmiyoruz, sadece tahmine katmıyoruz. Yakıt tipi
+ * araçtan çıkarılmışsa (yumuşak silinmiş) satırı da yok sayılır.
  */
 function rememberUnitPrice(
-  vehicleId: string, fuelType: FuelType, unitPriceKurus: Kurus, now: UnixMs,
+  userId: string, vehicleId: string, fuelType: FuelType, unitPriceKurus: Kurus, now: UnixMs,
 ): void {
   const row = getDb().select({ id: vehicleFuelTypes.id })
     .from(vehicleFuelTypes)
     .where(and(
+      alive(vehicleFuelTypes, userId),
       eq(vehicleFuelTypes.vehicleId, vehicleId),
       eq(vehicleFuelTypes.fuelType, fuelType),
     ))
     .get();
   if (!row) return;
 
-  withOutbox('vehicle_fuel_types', row.id, 'upsert', (tx) => {
-    tx.update(vehicleFuelTypes)
-      .set({ lastUnitPriceKurus: unitPriceKurus, updatedAt: now })
-      .where(eq(vehicleFuelTypes.id, row.id)).run();
+  updateOwned(vehicleFuelTypes, 'vehicle_fuel_types', userId, row.id, {
+    lastUnitPriceKurus: unitPriceKurus,
   }, now);
 }
 
@@ -184,6 +191,7 @@ function rememberUnitPrice(
  * beyan etti. Arayüz ikisini aynı şekilde göstermemeli.
  */
 export function rememberStatedFuelFigures(
+  userId: string,
   vehicleId: string,
   consumptionPer100Km: number | null | undefined,
   unitPriceKurus: Kurus | null | undefined,
@@ -202,33 +210,35 @@ export function rememberStatedFuelFigures(
    */
   const row = getDb().select({ id: vehicleFuelTypes.id })
     .from(vehicleFuelTypes)
-    .where(eq(vehicleFuelTypes.vehicleId, vehicleId))
+    .where(and(alive(vehicleFuelTypes, userId), eq(vehicleFuelTypes.vehicleId, vehicleId)))
     .orderBy(desc(vehicleFuelTypes.isPrimary))
     .get();
   if (!row) return;
 
-  withOutbox('vehicle_fuel_types', row.id, 'upsert', (tx) => {
-    tx.update(vehicleFuelTypes).set({
-      ...(hasConsumption
-        ? {
-            avgConsumptionPer100Km: Math.round(consumptionPer100Km),
-            isConsumptionMeasured: false,
-          }
-        : {}),
-      ...(hasPrice ? { lastUnitPriceKurus: unitPriceKurus } : {}),
-      updatedAt: now,
-    }).where(eq(vehicleFuelTypes.id, row.id)).run();
+  updateOwned(vehicleFuelTypes, 'vehicle_fuel_types', userId, row.id, {
+    ...(hasConsumption
+      ? {
+          avgConsumptionPer100Km: Math.round(consumptionPer100Km),
+          isConsumptionMeasured: false,
+        }
+      : {}),
+    ...(hasPrice ? { lastUnitPriceKurus: unitPriceKurus } : {}),
   }, now);
 }
 
-/** Vardiya sonu sihirbazının ön dolgusu: son bilinen tüketim ve fiyat. */
-export function getKnownFuelFigures(vehicleId: string): {
+/**
+ * Vardiya sonu sihirbazının ön dolgusu: son bilinen tüketim ve fiyat.
+ *
+ * Araçtan çıkarılmış (yumuşak silinmiş) yakıt tipi okunmaz — eskiden
+ * birincil sıralamada öne geçip kaldırılmış yakıtın fiyatını getirebiliyordu.
+ */
+export function getKnownFuelFigures(userId: string, vehicleId: string): {
   consumptionPer100Km: number | null;
   unitPriceKurus: Kurus | null;
   isMeasured: boolean;
 } {
   const row = getDb().select().from(vehicleFuelTypes)
-    .where(eq(vehicleFuelTypes.vehicleId, vehicleId))
+    .where(and(alive(vehicleFuelTypes, userId), eq(vehicleFuelTypes.vehicleId, vehicleId)))
     .orderBy(desc(vehicleFuelTypes.isPrimary))
     .get();
 

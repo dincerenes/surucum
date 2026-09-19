@@ -41,7 +41,7 @@ export default function VehiclesScreen() {
       )?.id ?? null,
       vehicles: vehicles.map((v) => ({
         vehicle: v,
-        fuels: listVehicleFuelTypes(v.id)
+        fuels: listVehicleFuelTypes(userId, v.id)
           .map((f) => FUEL_TYPE_LABELS[f.fuelType]).join(' + '),
       })),
     };

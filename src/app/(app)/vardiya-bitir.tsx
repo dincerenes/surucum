@@ -39,8 +39,8 @@ export default function EndShiftScreen() {
   const { userId, openShift, vehicle, today } = useDriver();
 
   const known = useDbValue(
-    () => (vehicle ? getKnownFuelFigures(vehicle.id) : null),
-    [vehicle?.id],
+    () => (userId && vehicle ? getKnownFuelFigures(userId, vehicle.id) : null),
+    [userId, vehicle?.id],
   );
 
   /**
@@ -116,7 +116,7 @@ export default function EndShiftScreen() {
     const hoursValue = Number(hours.replace(',', '.'));
     const consumptionValue = Number(consumption.replace(',', '.'));
 
-    endShift(openShift.id, {
+    endShift(userId, openShift.id, {
       distanceKm: Number.isFinite(kmValue) && kmValue > 0 ? kmValue : null,
       workedMinutes: Number.isFinite(hoursValue) && hoursValue > 0
         ? Math.round(hoursValue * 60) : null,

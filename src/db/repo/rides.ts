@@ -8,10 +8,13 @@
 
 import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import { getDb } from '../client';
-import { rides, shifts } from '../schema';
+import { earningSources, rides, shifts, vehicles } from '../schema';
 import type { Ride } from '../schema/earnings';
 import type { PaymentMethod } from '../schema/_shared';
-import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
+import {
+  type UnixMs, ForeignRecordError, alive, assertOwned, assertOwnedIfSet, ownedById,
+  softDeleteRow, stampNew, updateOwned, withOutbox,
+} from './_base';
 import { ensureDefaultEarningSource } from './earning-sources';
 import { getCutoffHour } from './settings';
 import { type BasisPoints, type Kurus } from '@/lib/money';
@@ -74,8 +77,6 @@ export function addRide(
    * sefer bir güne yazılıp başka bir günün defterinde aranıyordu.
    */
   const cutoff = cutoffHour ?? getCutoffHour(userId);
-  const earningSourceId = input.earningSourceId
-    ?? ensureDefaultEarningSource(userId, now).id;
 
   /**
    * SEFER, VARDİYASININ İŞ GÜNÜNE YAZILIR — kendi saatinden türetilmez.
@@ -87,7 +88,16 @@ export function addRide(
    *
    * Vardiya dışında girilen sefer kendi saatinden gün alır.
    */
-  const businessDate = resolveBusinessDate(input.shiftId, occurredAt, cutoff);
+  const businessDate = resolveBusinessDate(userId, input.shiftId, occurredAt, cutoff);
+
+  /**
+   * Bağlanan kaynak ve araç da BU HESABIN olmalı. Denetim her yazmadan
+   * önce: reddedilen bir kayıt yarım iz bırakmasın.
+   */
+  assertOwnedIfSet(earningSources, 'earning_sources', userId, input.earningSourceId);
+  assertOwnedIfSet(vehicles, 'vehicles', userId, input.vehicleId);
+  const earningSourceId = input.earningSourceId
+    ?? ensureDefaultEarningSource(userId, now).id;
 
   const amounts = calculateRideAmounts({
     grossAmountKurus: input.grossAmountKurus,
@@ -124,12 +134,26 @@ export function addRide(
  * Oran, kaydın kendi içindeki kopyadan alınır — kaynağın bugünkü oranından
  * değil. Sürücü bir seferin tutarını düzeltiyorsa o günkü şartlar geçerli
  * olmalı; aradan geçen sürede oran değiştiyse düzeltme onu getirmemeli.
+ *
+ * Vardiya, araç ve saat bu yoldan DEĞİŞMİYOR — iş günü onlara bağlı ve
+ * düzeltme bir seferi başka güne taşımamalı. Eskiden tipte görünüp
+ * sessizce yok sayılıyorlardı.
+ *
+ * Kayıt bu hesabın değilse `false` döner, hiçbir şey yazılmaz. Yeni bir
+ * kaynağa bağlanıyorsa o kaynak da bu hesabın olmalı; DEĞİŞMEYEN bağ
+ * yeniden denetlenmiyor — tutarı düzeltmek, eski bir bağ yüzünden
+ * reddedilmemeli.
  */
 export function updateRide(
-  id: string, patch: Partial<NewRideInput>, now: UnixMs = Date.now(),
-): void {
-  const current = getRide(id);
-  if (!current) return;
+  userId: string, id: string,
+  patch: Omit<Partial<NewRideInput>, 'shiftId' | 'vehicleId' | 'occurredAt'>,
+  now: UnixMs = Date.now(),
+): boolean {
+  const current = getRide(userId, id);
+  if (!current) return false;
+  if (patch.earningSourceId !== undefined && patch.earningSourceId !== current.earningSourceId) {
+    assertOwned(earningSources, 'earning_sources', userId, patch.earningSourceId);
+  }
 
   const amounts = calculateRideAmounts({
     grossAmountKurus: patch.grossAmountKurus ?? current.grossAmountKurus,
@@ -138,37 +162,34 @@ export function updateRide(
     tipKurus: patch.tipKurus ?? current.tipKurus,
   });
 
-  withOutbox('rides', id, 'upsert', (tx) => {
-    tx.update(rides).set({
-      ...(patch.earningSourceId !== undefined
-        ? { earningSourceId: patch.earningSourceId } : {}),
-      ...(patch.paymentMethod !== undefined
-        ? { paymentMethod: patch.paymentMethod } : {}),
-      ...(patch.distanceMeters !== undefined
-        ? { distanceMeters: patch.distanceMeters } : {}),
-      ...(patch.durationSeconds !== undefined
-        ? { durationSeconds: patch.durationSeconds } : {}),
-      ...(patch.notes !== undefined ? { notes: patch.notes?.trim() || null } : {}),
-      grossAmountKurus: amounts.grossAmountKurus,
-      commissionKurus: amounts.commissionKurus,
-      netAmountKurus: amounts.netAmountKurus,
-      commissionBps: amounts.commissionBps,
-      tipKurus: amounts.tipKurus,
-      updatedAt: now,
-    }).where(eq(rides.id, id)).run();
+  return updateOwned(rides, 'rides', userId, id, {
+    ...(patch.earningSourceId !== undefined
+      ? { earningSourceId: patch.earningSourceId } : {}),
+    ...(patch.paymentMethod !== undefined
+      ? { paymentMethod: patch.paymentMethod } : {}),
+    ...(patch.distanceMeters !== undefined
+      ? { distanceMeters: patch.distanceMeters } : {}),
+    ...(patch.durationSeconds !== undefined
+      ? { durationSeconds: patch.durationSeconds } : {}),
+    ...(patch.notes !== undefined ? { notes: patch.notes?.trim() || null } : {}),
+    grossAmountKurus: amounts.grossAmountKurus,
+    commissionKurus: amounts.commissionKurus,
+    netAmountKurus: amounts.netAmountKurus,
+    commissionBps: amounts.commissionBps,
+    tipKurus: amounts.tipKurus,
   }, now);
 }
 
-export function deleteRide(id: string, now: UnixMs = Date.now()): void {
-  softDeleteRow(rides, 'rides', id, now);
+export function deleteRide(userId: string, id: string, now: UnixMs = Date.now()): boolean {
+  return softDeleteRow(rides, 'rides', userId, id, now);
 }
 
 // ---------------------------------------------------------------------------
 // Okuma
 // ---------------------------------------------------------------------------
 
-export function getRide(id: string): Ride | undefined {
-  return getDb().select().from(rides).where(aliveById(rides, id)).get();
+export function getRide(userId: string, id: string): Ride | undefined {
+  return getDb().select().from(rides).where(ownedById(rides, userId, id)).get();
 }
 
 /** Bir iş gününün seferleri — en yeni üstte. */
@@ -180,12 +201,11 @@ export function listRidesOnDate(userId: string, date: BusinessDate): Ride[] {
 }
 
 /** Bir vardiyanın seferleri — eskiden yeniye, girildiği sırayla. */
-export function listRidesInShift(shiftId: string): Ride[] {
+export function listRidesInShift(userId: string, shiftId: string): Ride[] {
   return getDb().select().from(rides)
-    .where(eq(rides.shiftId, shiftId))
+    .where(and(alive(rides, userId), eq(rides.shiftId, shiftId)))
     .orderBy(asc(rides.occurredAt))
-    .all()
-    .filter((r) => r.deletedAt == null);
+    .all();
 }
 
 export function listRidesInRange(
@@ -201,14 +221,22 @@ export function listRidesInRange(
     .all();
 }
 
-/** Vardiyaya bağlı kayıtlar vardiyanın gününü alır. */
+/**
+ * Vardiyaya bağlı kayıtlar vardiyanın gününü alır.
+ *
+ * Vardiya bu hesabın değilse ya da silinmişse REDDEDİLİR. Sessizce kendi
+ * saatinden gün almak, sürücünün vardiyaya bağlı sandığı seferi başka
+ * bir güne yazabilirdi (kural 3); yabancı vardiyanın gününü almak ise
+ * başka bir hesabın defterine bakmaktır.
+ */
 function resolveBusinessDate(
-  shiftId: string | null | undefined, occurredAt: UnixMs, cutoffHour: number,
+  userId: string, shiftId: string | null | undefined, occurredAt: UnixMs, cutoffHour: number,
 ): BusinessDate {
   if (shiftId) {
     const shift = getDb().select({ businessDate: shifts.businessDate })
-      .from(shifts).where(eq(shifts.id, shiftId)).get();
-    if (shift) return shift.businessDate;
+      .from(shifts).where(ownedById(shifts, userId, shiftId)).get();
+    if (!shift) throw new ForeignRecordError('shifts', shiftId);
+    return shift.businessDate;
   }
   return toBusinessDate(occurredAt, cutoffHour);
 }

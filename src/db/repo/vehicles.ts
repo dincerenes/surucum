@@ -7,7 +7,7 @@
  * modelde iki sonuç.
  */
 
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { getDb } from '../client';
 import {
   type FuelType, type OwnershipType, defaultWearPerKm,
@@ -15,7 +15,7 @@ import {
 import { vehicleFuelTypes, vehicles } from '../schema';
 import type { Vehicle, VehicleFuelType } from '../schema/vehicles';
 import {
-  type Tx, type UnixMs, alive, aliveById, enqueue, softDeleteRow, stampNew, withOutbox,
+  type Tx, type UnixMs, alive, enqueue, ownedById, softDeleteRow, stampNew, updateOwned,
 } from './_base';
 import { newId } from '@/lib/id';
 
@@ -95,24 +95,21 @@ export type VehiclePatch = Partial<Omit<NewVehicleInput, 'fuelTypes'>>;
  * SABİTİ biz değiştirirsek geçmiş kayıtlar kaymasın diye duruyor.)
  */
 export function updateVehicle(
-  id: string, patch: VehiclePatch, now: UnixMs = Date.now(),
-): void {
-  withOutbox('vehicles', id, 'upsert', (tx) => {
-    tx.update(vehicles).set({
-      ...(patch.label !== undefined ? { label: patch.label.trim() } : {}),
-      ...(patch.plate !== undefined ? { plate: normalize(patch.plate) } : {}),
-      ...(patch.make !== undefined ? { make: normalize(patch.make) } : {}),
-      ...(patch.model !== undefined ? { model: normalize(patch.model) } : {}),
-      ...(patch.modelYear !== undefined ? { modelYear: patch.modelYear } : {}),
-      ...(patch.initialOdometerKm !== undefined
-        ? { initialOdometerKm: patch.initialOdometerKm } : {}),
-      ...(patch.notes !== undefined ? { notes: normalize(patch.notes) } : {}),
-      ...(patch.ownership !== undefined ? {
-        ownership: patch.ownership,
-        wearPerKmKurus: defaultWearPerKm(patch.ownership),
-      } : {}),
-      updatedAt: now,
-    }).where(eq(vehicles.id, id)).run();
+  userId: string, id: string, patch: VehiclePatch, now: UnixMs = Date.now(),
+): boolean {
+  return updateOwned(vehicles, 'vehicles', userId, id, {
+    ...(patch.label !== undefined ? { label: patch.label.trim() } : {}),
+    ...(patch.plate !== undefined ? { plate: normalize(patch.plate) } : {}),
+    ...(patch.make !== undefined ? { make: normalize(patch.make) } : {}),
+    ...(patch.model !== undefined ? { model: normalize(patch.model) } : {}),
+    ...(patch.modelYear !== undefined ? { modelYear: patch.modelYear } : {}),
+    ...(patch.initialOdometerKm !== undefined
+      ? { initialOdometerKm: patch.initialOdometerKm } : {}),
+    ...(patch.notes !== undefined ? { notes: normalize(patch.notes) } : {}),
+    ...(patch.ownership !== undefined ? {
+      ownership: patch.ownership,
+      wearPerKmKurus: defaultWearPerKm(patch.ownership),
+    } : {}),
   }, now);
 }
 
@@ -123,19 +120,29 @@ export function updateVehicle(
  * dolum kayıtları o tipe bağlı ve sert silme senkronda kaydı diriltir.
  * Kalan tipler korunuyor — yeniden yazsaydık her düzenlemede ölçülmüş
  * tüketim ve son bilinen fiyat sıfırlanırdı.
+ *
+ * Araç bu hesabın değilse `false` döner ve hiçbir şey yazılmaz.
  */
 export function setVehicleFuelTypes(
   userId: string, vehicleId: string, fuelTypes: readonly FuelType[],
   now: UnixMs = Date.now(),
-): void {
-  const wanted = [...new Set(fuelTypes)];
-  if (wanted.length === 0) return;
+): boolean {
+  /**
+   * Araç BU HESABIN olmalı. Denetlenmeden önce başka bir hesabın aracına
+   * bu hesabın adıyla yakıt satırı açılabiliyordu: sahibi B, aracı A'nın
+   * olan bir satır ne A'nın ne B'nin ekranında doğru görünür.
+   */
+  if (!getVehicle(userId, vehicleId)) return false;
 
-  const current = listVehicleFuelTypes(vehicleId);
+  // Boş liste yok sayılır: araç yakıtsız kalamaz.
+  const wanted = [...new Set(fuelTypes)];
+  if (wanted.length === 0) return true;
+
+  const current = listVehicleFuelTypes(userId, vehicleId);
 
   for (const row of current) {
     if (!wanted.includes(row.fuelType)) {
-      softDeleteRow(vehicleFuelTypes, 'vehicle_fuel_types', row.id, now);
+      softDeleteRow(vehicleFuelTypes, 'vehicle_fuel_types', userId, row.id, now);
     }
   }
 
@@ -148,7 +155,7 @@ export function setVehicleFuelTypes(
         if (existing.isPrimary === primary) return;
         tx.update(vehicleFuelTypes)
           .set({ isPrimary: primary, updatedAt: now })
-          .where(eq(vehicleFuelTypes.id, existing.id)).run();
+          .where(ownedById(vehicleFuelTypes, userId, existing.id)).run();
         enqueue(tx, 'vehicle_fuel_types', existing.id, 'upsert', now);
         return;
       }
@@ -161,6 +168,7 @@ export function setVehicleFuelTypes(
       enqueue(tx, 'vehicle_fuel_types', id, 'upsert', now);
     });
   });
+  return true;
 }
 
 /**
@@ -170,20 +178,16 @@ export function setVehicleFuelTypes(
  * kalır ve raporlar bozulur. Sürücü araç değiştirdiğinde eskisi
  * listeden çıkar, geçmişi durur.
  */
-export function deactivateVehicle(id: string, now: UnixMs = Date.now()): void {
-  withOutbox('vehicles', id, 'upsert', (tx) => {
-    tx.update(vehicles)
-      .set({ isActive: false, updatedAt: now })
-      .where(eq(vehicles.id, id)).run();
-  }, now);
+export function deactivateVehicle(
+  userId: string, id: string, now: UnixMs = Date.now(),
+): boolean {
+  return updateOwned(vehicles, 'vehicles', userId, id, { isActive: false }, now);
 }
 
-export function activateVehicle(id: string, now: UnixMs = Date.now()): void {
-  withOutbox('vehicles', id, 'upsert', (tx) => {
-    tx.update(vehicles)
-      .set({ isActive: true, updatedAt: now })
-      .where(eq(vehicles.id, id)).run();
-  }, now);
+export function activateVehicle(
+  userId: string, id: string, now: UnixMs = Date.now(),
+): boolean {
+  return updateOwned(vehicles, 'vehicles', userId, id, { isActive: true }, now);
 }
 
 // ---------------------------------------------------------------------------
@@ -216,16 +220,15 @@ export function resolveActiveVehicle(
   return vehicles.find((v) => v.id === defaultVehicleId) ?? vehicles[0] ?? null;
 }
 
-export function getVehicle(id: string): Vehicle | undefined {
-  return getDb().select().from(vehicles).where(aliveById(vehicles, id)).get();
+export function getVehicle(userId: string, id: string): Vehicle | undefined {
+  return getDb().select().from(vehicles).where(ownedById(vehicles, userId, id)).get();
 }
 
-export function listVehicleFuelTypes(vehicleId: string): VehicleFuelType[] {
+export function listVehicleFuelTypes(userId: string, vehicleId: string): VehicleFuelType[] {
   return getDb().select().from(vehicleFuelTypes)
-    .where(eq(vehicleFuelTypes.vehicleId, vehicleId))
+    .where(and(alive(vehicleFuelTypes, userId), eq(vehicleFuelTypes.vehicleId, vehicleId)))
     .orderBy(asc(vehicleFuelTypes.createdAt))
-    .all()
-    .filter((r) => r.deletedAt == null);
+    .all();
 }
 
 /** Boş ve yalnızca boşluktan oluşan metni `null`'a düşürür. */

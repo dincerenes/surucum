@@ -16,6 +16,20 @@ import { type DaySummary, type ShiftRow, calculateDaySummary } from '@/lib/day-s
 import { type BusinessDate, todayBusinessDate } from '@/lib/business-date';
 
 /**
+ * Vardiyanın aracı — yalnızca AYNI HESABINSA.
+ *
+ * Kimlikle birleştirmek yetmiyor: başka bir hesabın aracına bağlanmış bir
+ * vardiya (eski sürümde açılmış ya da buluttan öyle inmiş) o aracın
+ * oranıyla hesaplanıyordu. Sürücünün kendi kiralık aracında sıfır olan
+ * yıpranma payı, yabancı aracın 250 kuruşuyla düşülürdü. Böyle bir
+ * vardiyada oran boş kalır ve pay hesaplanmaz — uydurulmaz.
+ */
+const ownVehicleOfShift = and(
+  eq(shifts.vehicleId, vehicles.id),
+  eq(vehicles.userId, shifts.userId),
+);
+
+/**
  * Bir iş gününün özeti.
  *
  * `fixedShare` SIFIR ve v1'de öyle kalıyor: sabit gider tahakkuku yayın
@@ -186,7 +200,7 @@ function readShiftRowsByDay(
     wearPerKmKurus: vehicles.wearPerKmKurus,
   })
     .from(shifts)
-    .leftJoin(vehicles, eq(shifts.vehicleId, vehicles.id))
+    .leftJoin(vehicles, ownVehicleOfShift)
     .where(and(
       alive(shifts, userId),
       gte(shifts.businessDate, from),
@@ -241,6 +255,8 @@ function readFuelLogs(userId: string, from: BusinessDate, to: BusinessDate = fro
  * Oran vardiyanın üzerinde taşınıyor: aynı iş gününde iki farklı araçla
  * çalışılabilir ve her aracın oranı farklıdır. Araç silinmişse oran boş
  * gelir ve o vardiyanın payı hesaplanmaz — uydurulmaz.
+ *
+ * Birleştirme aracın SAHİBİNİ de koşula koyuyor (`ownVehicleOfShift`).
  */
 function readShiftRows(
   userId: string, from: BusinessDate, to: BusinessDate = from,
@@ -256,7 +272,7 @@ function readShiftRows(
     wearPerKmKurus: vehicles.wearPerKmKurus,
   })
     .from(shifts)
-    .leftJoin(vehicles, eq(shifts.vehicleId, vehicles.id))
+    .leftJoin(vehicles, ownVehicleOfShift)
     .where(and(
       alive(shifts, userId),
       gte(shifts.businessDate, from),

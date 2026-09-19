@@ -95,7 +95,7 @@ export function useDriver(): DriverState {
     // Vardiya açıkken defter onun gününde kalır, takvim dönse bile.
     const activeDate = openShift?.businessDate ?? today;
 
-    const shiftRides = openShift ? listRidesInShift(openShift.id) : [];
+    const shiftRides = openShift ? listRidesInShift(userId, openShift.id) : [];
     const summary = getDaySummary(userId, activeDate, now);
 
     return {

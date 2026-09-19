@@ -13,11 +13,13 @@
  * Uygulama hiçbir yerde üçüncü taraf marka adı taşımaz — tohum veride bile.
  */
 
-import { asc, eq } from 'drizzle-orm';
+import { asc } from 'drizzle-orm';
 import { getDb } from '../client';
 import { earningSources } from '../schema';
 import type { EarningSource } from '../schema/earnings';
-import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
+import {
+  type UnixMs, alive, ownedById, softDeleteRow, stampNew, updateOwned, withOutbox,
+} from './_base';
 import { type BasisPoints, clampBps } from '@/lib/money';
 import { pickDuplicatesToRemove } from '@/lib/settings-merge';
 
@@ -56,23 +58,22 @@ export type EarningSourcePatch = Partial<NewEarningSourceInput> & {
  * değişiklik yalnızca bundan sonraki seferleri etkiler.
  */
 export function updateEarningSource(
-  id: string, patch: EarningSourcePatch, now: UnixMs = Date.now(),
-): void {
-  withOutbox('earning_sources', id, 'upsert', (tx) => {
-    tx.update(earningSources).set({
-      ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
-      ...(patch.defaultCommissionBps !== undefined
-        ? { defaultCommissionBps: clampBps(patch.defaultCommissionBps) } : {}),
-      ...(patch.colorHex !== undefined ? { colorHex: patch.colorHex } : {}),
-      ...(patch.sortOrder !== undefined ? { sortOrder: patch.sortOrder } : {}),
-      ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}),
-      updatedAt: now,
-    }).where(eq(earningSources.id, id)).run();
+  userId: string, id: string, patch: EarningSourcePatch, now: UnixMs = Date.now(),
+): boolean {
+  return updateOwned(earningSources, 'earning_sources', userId, id, {
+    ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
+    ...(patch.defaultCommissionBps !== undefined
+      ? { defaultCommissionBps: clampBps(patch.defaultCommissionBps) } : {}),
+    ...(patch.colorHex !== undefined ? { colorHex: patch.colorHex } : {}),
+    ...(patch.sortOrder !== undefined ? { sortOrder: patch.sortOrder } : {}),
+    ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}),
   }, now);
 }
 
-export function deleteEarningSource(id: string, now: UnixMs = Date.now()): void {
-  softDeleteRow(earningSources, 'earning_sources', id, now);
+export function deleteEarningSource(
+  userId: string, id: string, now: UnixMs = Date.now(),
+): boolean {
+  return softDeleteRow(earningSources, 'earning_sources', userId, id, now);
 }
 
 export function listEarningSources(userId: string): EarningSource[] {
@@ -86,9 +87,9 @@ export function listActiveEarningSources(userId: string): EarningSource[] {
   return listEarningSources(userId).filter((s) => s.isActive);
 }
 
-export function getEarningSource(id: string): EarningSource | undefined {
+export function getEarningSource(userId: string, id: string): EarningSource | undefined {
   return getDb().select().from(earningSources)
-    .where(aliveById(earningSources, id)).get();
+    .where(ownedById(earningSources, userId, id)).get();
 }
 
 /**
@@ -115,7 +116,7 @@ export function ensureDefaultEarningSource(
    */
   const duplicates = pickDuplicatesToRemove(existing);
   if (duplicates) {
-    for (const id of duplicates.removeIds) deleteEarningSource(id, now);
+    for (const id of duplicates.removeIds) deleteEarningSource(userId, id, now);
     return duplicates.keep;
   }
 

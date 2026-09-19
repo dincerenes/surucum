@@ -15,7 +15,7 @@ import { getDb } from '../client';
 import { goals } from '../schema';
 import type { Goal } from '../schema/system';
 import type { GoalPeriod } from '../schema/_shared';
-import { type UnixMs, alive, softDeleteRow, stampNew, withOutbox } from './_base';
+import { type UnixMs, alive, softDeleteRow, stampNew, updateOwned, withOutbox } from './_base';
 import { getCutoffHour } from './settings';
 import {
   type BusinessDate, addDays, maxBusinessDate, todayBusinessDate,
@@ -53,7 +53,7 @@ export function setGoal(
      * bir dönem olarak buluta giderdi. Aynı gün değişen hedef, o gün
      * başlayıp o gün biten bir hedeftir.
      */
-    closeGoal(current.id, maxBusinessDate(current.startDate, addDays(today, -1)), now);
+    closeGoal(userId, current.id, maxBusinessDate(current.startDate, addDays(today, -1)), now);
   }
 
   if (targetNetKurus == null || !Number.isFinite(targetNetKurus) || targetNetKurus <= 0) {
@@ -74,16 +74,12 @@ export function setGoal(
 }
 
 /** Hedefi kapatır — silmez, bitiş gününü damgalar. */
-function closeGoal(id: string, endDate: BusinessDate, now: UnixMs): void {
-  withOutbox('goals', id, 'upsert', (tx) => {
-    tx.update(goals)
-      .set({ isActive: false, endDate, updatedAt: now })
-      .where(eq(goals.id, id)).run();
-  }, now);
+function closeGoal(userId: string, id: string, endDate: BusinessDate, now: UnixMs): void {
+  updateOwned(goals, 'goals', userId, id, { isActive: false, endDate }, now);
 }
 
-export function deleteGoal(id: string, now: UnixMs = Date.now()): void {
-  softDeleteRow(goals, 'goals', id, now);
+export function deleteGoal(userId: string, id: string, now: UnixMs = Date.now()): boolean {
+  return softDeleteRow(goals, 'goals', userId, id, now);
 }
 
 /** Dönemin yürürlükteki hedefi — en yenisi. */

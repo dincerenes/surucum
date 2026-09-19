@@ -8,11 +8,13 @@
 
 import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { getDb } from '../client';
-import { shifts } from '../schema';
+import { shifts, vehicles } from '../schema';
 import { rememberStatedFuelFigures } from './fuel';
 import { getCutoffHour } from './settings';
 import type { Shift } from '../schema/earnings';
-import { type UnixMs, alive, aliveById, softDeleteRow, stampNew, withOutbox } from './_base';
+import {
+  type UnixMs, alive, assertOwned, ownedById, softDeleteRow, stampNew, updateOwned, withOutbox,
+} from './_base';
 import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
 import type { Kurus } from '@/lib/money';
 
@@ -22,6 +24,9 @@ import type { Kurus } from '@/lib/money';
  * Açık vardiya varsa YENİSİ AÇILMAZ, mevcut olan döner. Sürücü butona
  * iki kez basarsa ya da uygulama iki kez açılırsa iki vardiya oluşması
  * TL/saat hesabını bozar ve sürücü bunu fark edemez.
+ *
+ * Araç BU HESABIN olmalı: yıpranma payı vardiyanın aracından okunuyor ve
+ * yabancı bir araç, sürücünün kârını başka birinin oranıyla hesaplatır.
  */
 export function startShift(
   userId: string,
@@ -29,6 +34,7 @@ export function startShift(
   cutoffHour?: number,
   now: UnixMs = Date.now(),
 ): Shift {
+  assertOwned(vehicles, 'vehicles', userId, vehicleId);
   const open = getOpenShift(userId);
   if (open) return open;
 
@@ -83,28 +89,27 @@ export interface EndShiftInput {
  * ama bitiş saati o düzeltmeyle kaymamalı.
  */
 export function endShift(
-  id: string, input: EndShiftInput = {}, now: UnixMs = Date.now(),
-): void {
-  const current = getShift(id);
-  if (!current) return;
+  userId: string, id: string, input: EndShiftInput = {}, now: UnixMs = Date.now(),
+): boolean {
+  const current = getShift(userId, id);
+  if (!current) return false;
 
-  withOutbox('shifts', id, 'upsert', (tx) => {
-    tx.update(shifts).set({
-      endedAt: current.endedAt ?? now,
-      commissionKurus: sanitizeAmount(input.commissionKurus),
-      fuelConsumptionPer100Km: sanitizePositive(input.fuelConsumptionPer100Km),
-      fuelPriceKurus: sanitizeAmount(input.fuelPriceKurus),
-      distanceKm: sanitizePositive(input.distanceKm),
-      workedMinutes: sanitizePositive(input.workedMinutes),
-      ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
-      updatedAt: now,
-    }).where(eq(shifts.id, id)).run();
+  const changed = updateOwned(shifts, 'shifts', userId, id, {
+    endedAt: current.endedAt ?? now,
+    commissionKurus: sanitizeAmount(input.commissionKurus),
+    fuelConsumptionPer100Km: sanitizePositive(input.fuelConsumptionPer100Km),
+    fuelPriceKurus: sanitizeAmount(input.fuelPriceKurus),
+    distanceKm: sanitizePositive(input.distanceKm),
+    workedMinutes: sanitizePositive(input.workedMinutes),
+    ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
   }, now);
+  if (!changed) return false;
 
   // Bir dahaki vardiya sonunda alanlar dolu gelsin diye araca hatırlatılıyor.
   rememberStatedFuelFigures(
-    current.vehicleId, input.fuelConsumptionPer100Km, input.fuelPriceKurus, now,
+    userId, current.vehicleId, input.fuelConsumptionPer100Km, input.fuelPriceKurus, now,
   );
+  return true;
 }
 
 /**
@@ -117,35 +122,34 @@ export function endShift(
  * yeniden yazmak zorunda kalırdı.
  */
 export function updateShiftTotals(
-  id: string, input: EndShiftInput, now: UnixMs = Date.now(),
-): void {
-  const current = getShift(id);
-  withOutbox('shifts', id, 'upsert', (tx) => {
-    tx.update(shifts).set({
-      ...(input.commissionKurus !== undefined
-        ? { commissionKurus: sanitizeAmount(input.commissionKurus) } : {}),
-      ...(input.fuelConsumptionPer100Km !== undefined
-        ? { fuelConsumptionPer100Km: sanitizePositive(input.fuelConsumptionPer100Km) } : {}),
-      ...(input.fuelPriceKurus !== undefined
-        ? { fuelPriceKurus: sanitizeAmount(input.fuelPriceKurus) } : {}),
-      ...(input.distanceKm !== undefined
-        ? { distanceKm: sanitizePositive(input.distanceKm) } : {}),
-      ...(input.workedMinutes !== undefined
-        ? { workedMinutes: sanitizePositive(input.workedMinutes) } : {}),
-      ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
-      updatedAt: now,
-    }).where(eq(shifts.id, id)).run();
-  }, now);
+  userId: string, id: string, input: EndShiftInput, now: UnixMs = Date.now(),
+): boolean {
+  const current = getShift(userId, id);
+  if (!current) return false;
 
-  if (current) {
-    rememberStatedFuelFigures(
-      current.vehicleId, input.fuelConsumptionPer100Km, input.fuelPriceKurus, now,
-    );
-  }
+  const changed = updateOwned(shifts, 'shifts', userId, id, {
+    ...(input.commissionKurus !== undefined
+      ? { commissionKurus: sanitizeAmount(input.commissionKurus) } : {}),
+    ...(input.fuelConsumptionPer100Km !== undefined
+      ? { fuelConsumptionPer100Km: sanitizePositive(input.fuelConsumptionPer100Km) } : {}),
+    ...(input.fuelPriceKurus !== undefined
+      ? { fuelPriceKurus: sanitizeAmount(input.fuelPriceKurus) } : {}),
+    ...(input.distanceKm !== undefined
+      ? { distanceKm: sanitizePositive(input.distanceKm) } : {}),
+    ...(input.workedMinutes !== undefined
+      ? { workedMinutes: sanitizePositive(input.workedMinutes) } : {}),
+    ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
+  }, now);
+  if (!changed) return false;
+
+  rememberStatedFuelFigures(
+    userId, current.vehicleId, input.fuelConsumptionPer100Km, input.fuelPriceKurus, now,
+  );
+  return true;
 }
 
-export function deleteShift(id: string, now: UnixMs = Date.now()): void {
-  softDeleteRow(shifts, 'shifts', id, now);
+export function deleteShift(userId: string, id: string, now: UnixMs = Date.now()): boolean {
+  return softDeleteRow(shifts, 'shifts', userId, id, now);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,8 +167,8 @@ export function getOpenShift(userId: string): Shift | undefined {
     .get();
 }
 
-export function getShift(id: string): Shift | undefined {
-  return getDb().select().from(shifts).where(aliveById(shifts, id)).get();
+export function getShift(userId: string, id: string): Shift | undefined {
+  return getDb().select().from(shifts).where(ownedById(shifts, userId, id)).get();
 }
 
 /** Bir iş gününün vardiyaları. */

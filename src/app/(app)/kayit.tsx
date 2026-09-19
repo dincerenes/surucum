@@ -45,17 +45,22 @@ export default function EditRecordScreen() {
   const params = useLocalSearchParams<{ tur: RecordKind; id: string }>();
   const kind: RecordKind = params.tur ?? 'sefer';
   const id = params.id ?? '';
+  const userId = user?.id ?? null;
 
+  /**
+   * Kimlik URL'den geliyor; kayıt yalnızca BU HESABINSA açılır. Başka bir
+   * hesabın kaydı "bulunamadı" görünür — varlığı bile ele verilmez.
+   */
   const record = useDbValue(() => {
-    if (!id) return null;
-    if (kind === 'sefer') return getRide(id) ?? null;
-    if (kind === 'gider') return getExpense(id) ?? null;
-    return getFuelLog(id) ?? null;
-  }, [kind, id]);
+    if (!id || !userId) return null;
+    if (kind === 'sefer') return getRide(userId, id) ?? null;
+    if (kind === 'gider') return getExpense(userId, id) ?? null;
+    return getFuelLog(userId, id) ?? null;
+  }, [kind, id, userId]);
 
   const categories = useDbValue(
-    () => (kind === 'gider' && user?.id ? listActiveExpenseCategories(user.id) : []),
-    [kind, user?.id],
+    () => (kind === 'gider' && userId ? listActiveExpenseCategories(userId) : []),
+    [kind, userId],
   );
 
   /**
@@ -98,12 +103,13 @@ export default function EditRecordScreen() {
   const valid = parsedAmount != null && parsedAmount > 0;
 
   function kaydet() {
-    if (!valid) return;
+    if (!valid || !userId) return;
 
+    let saved: boolean;
     if (kind === 'sefer') {
-      updateRide(id, { grossAmountKurus: parsedAmount as Kurus });
+      saved = updateRide(userId, id, { grossAmountKurus: parsedAmount as Kurus });
     } else if (kind === 'gider') {
-      updateExpense(id, {
+      saved = updateExpense(userId, id, {
         amountKurus: parsedAmount as Kurus,
         ...(selectedCategory ? { categoryId: selectedCategory } : {}),
       });
@@ -116,11 +122,21 @@ export default function EditRecordScreen() {
       const volume = parsedPrice && parsedPrice > 0
         ? Math.round((parsedAmount / parsedPrice) * 1000)
         : 0;
-      updateFuelLog(id, {
+      saved = updateFuelLog(userId, id, {
         totalAmountKurus: parsedAmount as Kurus,
         unitPriceKurus: (parsedPrice ?? 0) as Kurus,
         volumePer1000: volume,
       });
+    }
+
+    /**
+     * Kayıt bu arada silinmiş olabilir (başka cihazdan inen silme). Ekran
+     * kapanıp düzeltme yapılmış gibi davranmasın; sürücü kaydedilmediğini
+     * görmeli.
+     */
+    if (!saved) {
+      Alert.alert('Kayıt bulunamadı', 'Bu kayıt silinmiş olabilir. Düzeltme kaydedilmedi.');
+      return;
     }
 
     requestSync();
@@ -138,9 +154,11 @@ export default function EditRecordScreen() {
           text: 'Sil',
           style: 'destructive',
           onPress: () => {
-            if (kind === 'sefer') deleteRide(id);
-            else if (kind === 'gider') deleteExpense(id);
-            else deleteFuelLog(id);
+            if (!userId) return;
+            // Kayıt zaten yoksa silinecek bir şey de yok; ekran yine kapanır.
+            if (kind === 'sefer') deleteRide(userId, id);
+            else if (kind === 'gider') deleteExpense(userId, id);
+            else deleteFuelLog(userId, id);
             requestSync();
             router.back();
           },

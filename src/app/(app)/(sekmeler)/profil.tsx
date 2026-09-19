@@ -33,10 +33,10 @@ export default function ProfileScreen() {
     if (!user?.id) return null;
     return {
       fuels: vehicle
-        ? listVehicleFuelTypes(vehicle.id)
+        ? listVehicleFuelTypes(user.id, vehicle.id)
             .map((f) => FUEL_TYPE_LABELS[f.fuelType]).join(' + ')
         : '',
-      figures: vehicle ? getKnownFuelFigures(vehicle.id) : null,
+      figures: vehicle ? getKnownFuelFigures(user.id, vehicle.id) : null,
       vehicleCount: listActiveVehicles(user.id).length,
       cutoff: getSettings(user.id)?.dayCutoffHour ?? 4,
       goal: getActiveGoal(user.id, 'daily')?.targetNetKurus ?? null,

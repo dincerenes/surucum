@@ -9,6 +9,7 @@ import { useDbValue } from '@/db/use-db';
 import {
   deleteShift, getShift, getVehicle, listRidesInShift, updateShiftTotals,
 } from '@/db/repo';
+import { useAuth } from '@/lib/auth/auth-context';
 import { formatBusinessDate, formatClock } from '@/lib/business-date';
 import {
   type Kurus, ZERO, add, formatAmountForInput, formatKurus, parseAmount,
@@ -35,16 +36,24 @@ import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 export default function ShiftDetailScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const params = useLocalSearchParams<{ id: string }>();
   const id = params.id ?? '';
 
+  /**
+   * Kimlik URL'den geliyor; vardiya yalnızca BU HESABINSA açılır. Aracın
+   * oranı da yalnızca aynı hesabın aracından okunur — gün özetiyle aynı
+   * kural, yoksa iki ekran farklı yıpranma gösterirdi.
+   */
   const data = useDbValue(() => {
-    const shift = id ? getShift(id) : undefined;
+    if (!id || !userId) return null;
+    const shift = getShift(userId, id);
     if (!shift) return null;
 
-    const rides = listRidesInShift(shift.id);
+    const rides = listRidesInShift(userId, shift.id);
     const gross = rides.reduce((acc, r) => add(acc, r.grossAmountKurus), ZERO);
-    const vehicle = getVehicle(shift.vehicleId);
+    const vehicle = getVehicle(userId, shift.vehicleId);
 
     return {
       shift,
@@ -53,7 +62,7 @@ export default function ShiftDetailScreen() {
       wearPerKmKurus: vehicle?.wearPerKmKurus ?? null,
       stats: calculateShiftStats(shift, gross, rides.length, Date.now()),
     };
-  }, [id]);
+  }, [id, userId]);
 
   const [km, setKm] = useState<string | null>(null);
   const [hours, setHours] = useState<string | null>(null);
@@ -96,13 +105,19 @@ export default function ShiftDetailScreen() {
   const fuel = calculateFuelCost(kmValue, consumptionPer100Km, parseAmount(priceText));
 
   function kaydet() {
-    updateShiftTotals(shift.id, {
+    if (!userId) return;
+    const saved = updateShiftTotals(userId, shift.id, {
       distanceKm: kmValue,
       workedMinutes: hoursValue != null ? Math.round(hoursValue * 60) : null,
       commissionKurus: parseAmount(commissionText) as Kurus | null,
       fuelConsumptionPer100Km: consumptionPer100Km,
       fuelPriceKurus: parseAmount(priceText) as Kurus | null,
     });
+    // Vardiya bu arada silinmişse düzeltme yapılmış gibi kapanmıyoruz.
+    if (!saved) {
+      Alert.alert('Vardiya bulunamadı', 'Bu vardiya silinmiş olabilir. Düzeltme kaydedilmedi.');
+      return;
+    }
     requestSync();
     router.back();
   }
@@ -128,7 +143,8 @@ export default function ShiftDetailScreen() {
           text: 'Sil',
           style: 'destructive',
           onPress: () => {
-            deleteShift(shift.id);
+            if (!userId) return;
+            deleteShift(userId, shift.id);
             requestSync();
             router.back();
           },
