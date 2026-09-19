@@ -73,15 +73,27 @@ export function toCloudRow(
  *
  * `server_updated_at` ATILIR: yerelde böyle bir sütun yok ve olmamalı da —
  * o sunucunun imleci, cihazın uyduracağı bir değer değil.
+ *
+ * `columns` verilirse YERELDE OLMAYAN her sütun da atılır. Buluta sütun
+ * önce eklenir, uygulama sonra güncellenir; aradaki sürede eski
+ * istemciler o sütunu tanımıyor. Atılmasaydı SQLite "no such column"
+ * der, o tablonun çekmesi dururdu — ve eski ortak imleçle bütün
+ * tablolarınki. Sütunun değeri kaybolmaz, bulutta duruyor. Sütunu
+ * yerele ekleyen sürüm imleçleri sıfırlamalı (`resetPullCursor`): yoksa
+ * önceden inmiş satırlarda yeni sütun boş kalır ve o satır bir sonraki
+ * düzenlemede buluttaki değeri boşla ezer.
  */
 export function toLocalRow(
-  table: string, row: Record<string, unknown>,
+  table: string,
+  row: Record<string, unknown>,
+  columns?: ReadonlySet<string>,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const bools = new Set(BOOLEAN_COLUMNS[table] ?? []);
 
   for (const [key, value] of Object.entries(row)) {
     if (key === 'server_updated_at') continue;
+    if (columns && !columns.has(key)) continue;
     out[key] = bools.has(key) && value != null ? (value ? 1 : 0) : value;
   }
   return out;

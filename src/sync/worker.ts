@@ -5,27 +5,17 @@
  * güncellenir; bu modül arka planda çalışır. Senkron hiç çalışmasa da
  * uygulama eksiksiz işler — bulut yedek ve cihaz değiştirme içindir,
  * çalışmanın önkoşulu değil.
+ *
+ * Turun kendisi `turn.ts`'te; burada yalnızca ortam var: bulut istemcisi,
+ * oturum ve aynı anda tek tur kuralı.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabase, isCloudConfigured } from '@/lib/supabase';
-import { type PullResult, pullChanges } from './pull';
-import { type PushResult, clearTransientBackoff, pendingCount, pushOutbox } from './push';
-import { markError, markSuccess } from './state';
+import { guardFrom, type SyncGuard } from './guard';
+import { type SyncOutcome, type SyncSkipReason, syncTurn } from './turn';
 
-export type SyncSkipReason =
-  | 'cloud_not_configured'
-  | 'not_signed_in'
-  | 'already_running';
-
-export interface SyncOutcome {
-  ran: boolean;
-  skipped?: SyncSkipReason;
-  push?: PushResult;
-  pull?: PullResult;
-  errors: string[];
-  pending: number;
-}
+export type { SyncOutcome, SyncSkipReason };
 
 /**
  * Aynı anda iki tur çalışmasını engeller.
@@ -49,57 +39,33 @@ export interface RunSyncOptions {
 }
 
 export function runSync(options: RunSyncOptions = {}): Promise<SyncOutcome> {
-  if (inFlight) {
-    return Promise.resolve({
-      ran: false, skipped: 'already_running', errors: [], pending: pendingCount(),
-    });
-  }
+  if (inFlight) return Promise.resolve(skipped('already_running'));
 
   inFlight = execute(options).finally(() => { inFlight = null; });
   return inFlight;
 }
 
+function skipped(reason: SyncSkipReason): SyncOutcome {
+  return { ran: false, skipped: reason, errors: [], pending: 0, more: false };
+}
+
 async function execute(options: RunSyncOptions): Promise<SyncOutcome> {
-  if (!isCloudConfigured()) {
-    return {
-      ran: false, skipped: 'cloud_not_configured', errors: [],
-      pending: pendingCount(),
-    };
-  }
-
-  const supabase = getSupabase();
-  if (!supabase) {
-    return {
-      ran: false, skipped: 'cloud_not_configured', errors: [],
-      pending: pendingCount(),
-    };
-  }
-
-  const userId = await currentUserId(supabase);
-  if (!userId) {
-    return {
-      ran: false, skipped: 'not_signed_in', errors: [], pending: pendingCount(),
-    };
-  }
-
-  if (options.force) clearTransientBackoff();
+  const supabase = isCloudConfigured() ? getSupabase() : null;
+  if (!supabase) return skipped('cloud_not_configured');
 
   /**
-   * ÖNCE GÖNDER, SONRA ÇEK.
-   *
-   * Ters sırada, buluttan gelen eski bir sürüm cihazdaki gönderilmemiş
-   * düzeltmenin üzerine yazabilirdi. Gönderim önce çalışınca yerel
-   * değişiklikler sunucuya ulaşmış olur ve dönen kayıt zaten en günceli
-   * taşır.
+   * Hesap TURUN BAŞINDA bir kez belirlenir ve tur boyunca taşınır.
+   * Oturum arada değişirse bekçi turu durdurur (bkz. `guard.ts`).
    */
-  const push = await pushOutbox(supabase, userId);
-  const pull = await pullChanges(supabase, userId);
+  const userId = await currentUserId(supabase);
+  if (!userId) return skipped('not_signed_in');
 
-  const errors = [...push.errors, ...pull.errors];
-  if (errors.length === 0) markSuccess();
-  else markError(errors.join(' · '));
-
-  return { ran: true, push, pull, errors, pending: pendingCount() };
+  const watch = watchSession(supabase, userId);
+  try {
+    return await syncTurn(supabase, userId, { force: options.force, guard: watch.guard });
+  } finally {
+    watch.stop();
+  }
 }
 
 async function currentUserId(supabase: SupabaseClient): Promise<string | null> {
@@ -108,5 +74,23 @@ async function currentUserId(supabase: SupabaseClient): Promise<string | null> {
   return data.session?.user.id ?? null;
 }
 
-export { pendingCount };
+/**
+ * Tur boyunca oturumu izler. Çıkış, başka hesapla giriş ya da oturumun
+ * kaybolması — hesap turun başladığı hesap değilse bekçi düşer. Jeton
+ * yenilemesi aynı hesabı taşıdığı için turu durdurmaz.
+ */
+function watchSession(
+  supabase: SupabaseClient, userId: string,
+): { guard: SyncGuard; stop: () => void } {
+  let current = true;
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (session?.user.id !== userId) current = false;
+  });
+  return {
+    guard: guardFrom(() => current),
+    stop: () => data.subscription.unsubscribe(),
+  };
+}
+
+export { pendingCount } from './push';
 export { getSyncStatus, resetPullCursor } from './state';

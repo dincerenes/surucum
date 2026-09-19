@@ -74,6 +74,12 @@ describe('toLocalRow', () => {
     assert.equal(toLocalRow('vehicles', { is_active: null }).is_active, null);
   });
 
+  it('yerelde olmayan sütun atılır — buluta eklenen sütun eski istemciyi kırmaz', () => {
+    const row = toLocalRow('goals', { id: 'a', target_net_kurus: 5, yeni_bulut_sutunu: 'x' },
+      new Set(['id', 'target_net_kurus']));
+    assert.deepEqual(row, { id: 'a', target_net_kurus: 5 });
+  });
+
   it('gidiş-dönüş değeri korur', () => {
     const local = { id: 'a', user_id: 'u', is_active: 1, sort_order: 3, notes: null };
     const back = toLocalRow('vehicles', {

@@ -1,76 +1,88 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { isAfter, nextCursor } from './cursor.ts';
+import {
+  PULL_START, compareKeys, keyFilter, lookbackKey, maxKey, sameKey, tsMicros,
+} from './cursor.ts';
 
-const EPOCH = '1970-01-01T00:00:00.000Z';
-const T1 = '2026-08-27T10:00:00.000+00:00';
-const T2 = '2026-08-27T11:00:00.000+00:00';
-const T3 = '2026-08-27T12:00:00.000+00:00';
+const key = (ts: string, id = '0199a000-0000-7000-8000-000000000001') => ({ ts, id });
 
-describe('isAfter', () => {
-  it('Z ile +00:00 biçimleri doğru karşılaştırılır', () => {
-    // Metin karşılaştırması burada yanılırdı
-    assert.equal(isAfter('2026-08-27T10:00:00.000+00:00', '2026-08-27T09:00:00.000Z'), true);
-    assert.equal(isAfter('2026-08-27T09:00:00.000Z', '2026-08-27T10:00:00.000+00:00'), false);
+describe('tsMicros', () => {
+  it('mikrosaniyeyi KAYBETMEZ', () => {
+    const a = tsMicros('2026-09-19T10:00:00.123100+00:00');
+    const b = tsMicros('2026-09-19T10:00:00.123900+00:00');
+    assert.notEqual(a, b);
+    assert.equal((b as number) - (a as number), 800);
   });
 
-  it('aynı an daha yeni sayılmaz', () => {
-    assert.equal(isAfter('2026-08-27T10:00:00.000Z', '2026-08-27T10:00:00.000+00:00'), false);
+  it('kesir haneleri eksik olabilir', () => {
+    assert.equal(
+      tsMicros('2026-09-19T10:00:00.12+00:00'),
+      (tsMicros('2026-09-19T10:00:00+00:00') as number) + 120_000,
+    );
   });
 
-  it('çözümlenemeyen damga daha yeni sayılmaz — imleç yerinde kalır', () => {
-    assert.equal(isAfter('bozuk', T1), false);
-    assert.equal(isAfter(T1, 'bozuk'), false);
-    assert.equal(isAfter('', T1), false);
+  it('Z ve ofset aynı anı verir', () => {
+    assert.equal(
+      tsMicros('2026-09-19T10:00:00Z'),
+      tsMicros('2026-09-19T13:00:00+03:00'),
+    );
+  });
+
+  it('çözümlenemeyen damga null döner', () => {
+    assert.equal(tsMicros('bozuk'), null);
+    assert.equal(tsMicros(''), null);
+    assert.equal(tsMicros('2026-09-19 10:00:00'), null);
   });
 });
 
-describe('nextCursor', () => {
-  it('hiçbir tablo kesilmediyse en yüksek damgaya taşınır', () => {
-    const next = nextCursor(EPOCH, [
-      { lastSeen: T1, truncated: false },
-      { lastSeen: T3, truncated: false },
-    ], false);
-    assert.equal(next, T3);
+describe('compareKeys', () => {
+  it('aynı milisaniyedeki mikrosaniye farkını görür', () => {
+    assert.equal(compareKeys(
+      key('2026-09-19T10:00:00.123900+00:00'), key('2026-09-19T10:00:00.123100+00:00'),
+    ), 1);
   });
 
-  it('KESİLEN tablo imleci kendi son damgasında tutar', () => {
-    // A tablosu T1'de kesildi, B tablosu T3'e kadar indi.
-    // İmleç T3'e taşınsaydı A'nın T1–T3 arası satırları kaybolurdu.
-    const next = nextCursor(EPOCH, [
-      { lastSeen: T1, truncated: true },
-      { lastSeen: T3, truncated: false },
-    ], false);
-    assert.equal(next, T1);
+  it('damga eşitse kimlik sırası belirler', () => {
+    const ts = '2026-09-19T10:00:00.123456+00:00';
+    assert.equal(compareKeys({ ts, id: 'a' }, { ts, id: 'b' }), -1);
+    assert.equal(compareKeys({ ts, id: 'b' }, { ts, id: 'b' }), 0);
   });
 
-  it('birden fazla tablo kesildiyse EN DÜŞÜK son damga kazanır', () => {
-    const next = nextCursor(EPOCH, [
-      { lastSeen: T2, truncated: true },
-      { lastSeen: T1, truncated: true },
-      { lastSeen: T3, truncated: false },
-    ], false);
-    assert.equal(next, T1);
+  it('bozuk damga sessizce geçmez, hata verir', () => {
+    assert.throws(() => compareKeys(key('bozuk'), PULL_START), /çözümlenemedi/);
   });
 
-  it('hata varsa imleç HİÇ ilerlemez', () => {
-    const next = nextCursor(EPOCH, [
-      { lastSeen: T3, truncated: false },
-    ], true);
-    assert.equal(next, EPOCH);
+  it('maxKey geri gitmez', () => {
+    const early = key('2026-09-19T10:00:00+00:00');
+    const late = key('2026-09-19T11:00:00+00:00');
+    assert.equal(maxKey(late, early), late);
+    assert.equal(maxKey(early, late), late);
+  });
+});
+
+describe('keyFilter', () => {
+  it('değerleri tırnaklar — damgadaki + ve : ayrılmış karakterler', () => {
+    assert.equal(
+      keyFilter({ ts: '2026-09-19T10:00:00.123456+00:00', id: 'abc' }),
+      'server_updated_at.gt."2026-09-19T10:00:00.123456+00:00",'
+      + 'and(server_updated_at.eq."2026-09-19T10:00:00.123456+00:00",id.gt."abc")',
+    );
+  });
+});
+
+describe('lookbackKey', () => {
+  it('pencereyi damgadan geriye alır ve kimliği sıfırlar', () => {
+    const back = lookbackKey(key('2026-09-19T10:00:00.123456+00:00'), 120_000);
+    assert.equal(back.ts, '2026-09-19T09:58:00.123456+00:00');
+    assert.equal(back.id, PULL_START.id);
   });
 
-  it('hiç veri gelmediyse imleç yerinde kalır', () => {
-    assert.equal(nextCursor(T2, [], false), T2);
-    assert.equal(nextCursor(T2, [{ lastSeen: null, truncated: false }], false), T2);
+  it('hiç çekilmemiş tablo başlangıçta kalır', () => {
+    assert.ok(sameKey(lookbackKey(PULL_START, 120_000), PULL_START));
   });
 
-  it('imleç GERİ gitmez', () => {
-    const next = nextCursor(T3, [{ lastSeen: T1, truncated: false }], false);
-    assert.equal(next, T3);
-  });
-
-  it('bozuk damga imleci kaydırmaz', () => {
-    assert.equal(nextCursor(T2, [{ lastSeen: 'bozuk', truncated: false }], false), T2);
+  it('epoch civarında negatife düşmez', () => {
+    assert.equal(lookbackKey(key('1970-01-01T00:00:01+00:00'), 120_000).ts,
+      '1970-01-01T00:00:00.000000+00:00');
   });
 });

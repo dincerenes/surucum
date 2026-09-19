@@ -1,24 +1,22 @@
 /**
- * Senkron durumu — çekme imleci ve son sonuç.
+ * Senkron durumu — çekme imleçleri ve son sonuç.
  *
  * `sync_state` YEREL KALIR, buluta gitmez: imleç cihaza özgüdür. İki
  * cihaz aynı imleci paylaşsaydı, biri çektiğinde diğeri aynı kayıtları
  * hiç görmezdi.
+ *
+ * HER ANAHTAR HESABA BAĞLI. Eskiden tek bir imleç ve tek bir "son başarı"
+ * vardı: aynı cihazda A'dan çıkıp B ile girildiğinde B, A'nın imlecinden
+ * devam ediyor ve A'nın son damgasından eski bütün kayıtlarını hiç
+ * indirmiyordu; Profil de A'nın yedek durumunu B'ye gösteriyordu.
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, like } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import { syncState } from '@/db/schema';
-
-/**
- * Artımlı çekmenin imleci — `server_updated_at` değeri, ISO metin olarak.
- *
- * CİHAZ SAATİNE GÜVENİLMEZ: imleç her zaman sunucudan gelen damgadır.
- * Cihaz saati ileri alınmış olsaydı, aradaki tüm kayıtlar hiç çekilmezdi.
- */
-const PULL_CURSOR = 'pull_cursor';
-const LAST_SUCCESS = 'last_success_at';
-const LAST_ERROR = 'last_error';
+import { PULL_START, type PullKey, tsMicros } from './cursor';
+import { pendingCount, stuckCount } from './push';
+import { SYNC_TABLES } from './tables';
 
 export function readState(key: string): string | null {
   const row = getDb().select({ value: syncState.value })
@@ -37,50 +35,128 @@ export function writeState(key: string, value: string | null): void {
 }
 
 /**
- * Çekme imleci.
+ * Tablo + hesap başına çekme imleci.
  *
- * Hiç çekilmemişse epoch döner — ilk senkron her şeyi indirir. Bu
- * cihaz değiştirme senaryosunun ta kendisi: yeni telefonda veritabanı
- * boş ve tüm geçmişin inmesi gerekiyor.
+ * Tablo başına, çünkü tek ortak imleç bir tablonun hatasında bütün
+ * tabloları durduruyor, tur ortasında daha önce okunmuş bir tabloya
+ * yazılan kaydı da atlatıyordu (imleç, sonra okunan tablonun damgasına
+ * taşınıyordu).
  */
-export function getPullCursor(): string {
-  return readState(PULL_CURSOR) ?? '1970-01-01T00:00:00.000Z';
-}
+const pullKeyName = (userId: string, table: string) => `pull:${userId}:${table}`;
 
-export function setPullCursor(serverUpdatedAt: string): void {
-  writeState(PULL_CURSOR, serverUpdatedAt);
-}
-
-export function markSuccess(at: number = Date.now()): void {
-  writeState(LAST_SUCCESS, String(at));
-  writeState(LAST_ERROR, null);
-}
-
-export function markError(message: string): void {
-  writeState(LAST_ERROR, message.slice(0, 500));
-}
-
-export interface SyncStatus {
-  lastSuccessAt: number | null;
-  lastError: string | null;
-  cursor: string;
-}
-
-export function getSyncStatus(): SyncStatus {
-  const raw = readState(LAST_SUCCESS);
-  return {
-    lastSuccessAt: raw ? Number(raw) : null,
-    lastError: readState(LAST_ERROR),
-    cursor: getPullCursor(),
-  };
+/** Bir tablonun çekme durumu: imleç ve son çağrıda sonuna kadar inip inmediği. */
+export interface PullProgress {
+  key: PullKey;
+  /**
+   * Son çağrı tablonun SONUNA kadar indi mi? İndiyse sonraki çağrı
+   * geriye bakış penceresinden başlar. İnmediyse (sayfa sınırı) tam
+   * kaldığı yerden devam eder — yoksa pencere sayfa bütçesinden büyük
+   * olduğunda her çağrı aynı satırları okuyup hiç ilerlemezdi.
+   */
+  drained: boolean;
 }
 
 /**
- * Çekme imlecini sıfırlar — bir sonraki senkron her şeyi baştan indirir.
+ * Hiç çekilmemişse başlangıç döner — ilk senkron her şeyi indirir. Bu
+ * cihaz değiştirme senaryosunun ta kendisi: yeni telefonda veritabanı
+ * boş ve tüm geçmişin inmesi gerekiyor.
+ *
+ * Okunamayan kayıt da başlangıç sayılır: fazladan indirmek zararsız,
+ * atlamak geri dönüşsüz.
+ */
+export function getPullProgress(userId: string, table: string): PullProgress {
+  const raw = readState(pullKeyName(userId, table));
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as Partial<PullKey> & { drained?: unknown };
+      if (typeof parsed.ts === 'string' && typeof parsed.id === 'string'
+        && tsMicros(parsed.ts) !== null) {
+        return { key: { ts: parsed.ts, id: parsed.id }, drained: parsed.drained !== false };
+      }
+    } catch {
+      // Aşağıda başlangıca düşülüyor.
+    }
+  }
+  return { key: PULL_START, drained: true };
+}
+
+export function setPullProgress(userId: string, table: string, progress: PullProgress): void {
+  writeState(pullKeyName(userId, table), JSON.stringify({
+    ts: progress.key.ts, id: progress.key.id, drained: progress.drained,
+  }));
+}
+
+export function getPullKey(userId: string, table: string): PullKey {
+  return getPullProgress(userId, table).key;
+}
+
+/**
+ * Hesabın çekme imleçlerini sıfırlar — bir sonraki senkron her şeyi
+ * baştan indirir.
  *
  * Yerel veriyi silmez. Kayıp bir kaydın buluttan geri gelmesi gerektiğinde
  * ya da imlecin bozulduğundan şüphelenildiğinde kullanılır.
  */
-export function resetPullCursor(): void {
-  writeState(PULL_CURSOR, null);
+export function resetPullCursor(userId: string): void {
+  getDb().delete(syncState).where(like(syncState.key, `pull:${userId}:%`)).run();
+}
+
+const lastSuccessName = (userId: string) => `last_success_at:${userId}`;
+const lastErrorName = (userId: string) => `last_error:${userId}`;
+
+/**
+ * Tam bir yedek: bu hesabın kuyruğu boşaldı ve buluttaki her şey indi.
+ * Yalnızca bu koşulda yazılır — "son yedekleme" sürücüye bir söz.
+ */
+export function markSuccess(userId: string, at: number = Date.now()): void {
+  writeState(lastSuccessName(userId), String(at));
+  writeState(lastErrorName(userId), null);
+}
+
+export function markError(userId: string, message: string, at: number = Date.now()): void {
+  writeState(lastErrorName(userId), JSON.stringify({ at, message: message.slice(0, 500) }));
+}
+
+export interface SyncError {
+  at: number;
+  message: string;
+}
+
+export interface SyncStatus {
+  /** Son TAM yedek: kuyruk boştu ve bulut sonuna kadar indi. */
+  lastSuccessAt: number | null;
+  /** Son başarısız turun hatası; sonraki başarıda temizlenir. */
+  lastError: SyncError | null;
+  /** Bu hesabın buluta gitmeyi bekleyen kayıtları. */
+  pending: number;
+  /** Bekleyenlerden deneme eşiğini aşmış, büyük ihtimalle reddedilenler. */
+  stuck: number;
+}
+
+export function getSyncStatus(userId: string): SyncStatus {
+  const success = readState(lastSuccessName(userId));
+  return {
+    lastSuccessAt: success ? Number(success) : null,
+    lastError: parseError(readState(lastErrorName(userId))),
+    pending: pendingCount(userId),
+    stuck: stuckCount(userId),
+  };
+}
+
+function parseError(raw: string | null): SyncError | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<SyncError>;
+    if (typeof parsed.at === 'number' && typeof parsed.message === 'string') {
+      return { at: parsed.at, message: parsed.message };
+    }
+  } catch {
+    // Aşağıda ham metin olarak dönülüyor.
+  }
+  return { at: 0, message: raw };
+}
+
+/** Test ve tanı için: hesabın bütün tablo imleçleri. */
+export function pullKeys(userId: string): Record<string, PullKey> {
+  return Object.fromEntries(SYNC_TABLES.map((t) => [t, getPullKey(userId, t)]));
 }

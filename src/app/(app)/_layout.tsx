@@ -17,8 +17,8 @@ export default function AppLayout() {
   const { session, restoring, cloudAvailable } = useAuth();
   const { colors } = useTheme();
 
-  /** Senkron zamanlayıcısı oturum açıkken çalışır, çıkışta durur. */
-  useSync(Boolean(session));
+  /** Senkron zamanlayıcısı oturum açıkken çalışır, çıkışta ya da hesap değişince durur. */
+  useSync(session?.user.id ?? null);
 
   const { needsSetup } = useDriver();
 

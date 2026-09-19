@@ -40,8 +40,8 @@ export default function ProfileScreen() {
       vehicleCount: listActiveVehicles(user.id).length,
       cutoff: getSettings(user.id)?.dayCutoffHour ?? 4,
       goal: getActiveGoal(user.id, 'daily')?.targetNetKurus ?? null,
-      sync: getSyncStatus(),
-      pending: pendingCount(),
+      sync: getSyncStatus(user.id),
+      pending: pendingCount(user.id),
     };
   }, [user?.id, vehicle?.id]);
 

@@ -31,10 +31,23 @@ const FOREGROUND_INTERVAL_MS = 90_000;
  */
 const DEBOUNCE_MS = 3_000;
 
+/**
+ * Bitmeyen iş kalan turdan sonra yeni tura kadar beklenen süre.
+ *
+ * Yeni telefonda binlerce kayıt birkaç tura yayılıyor, tur sırasında
+ * girilen kayıt da o turda gitmiyor; ikisi de 90 saniyelik aralığı
+ * beklememeli. Art arda en fazla `MAX_FOLLOW_UPS` kez — bir hata turu
+ * sonsuz bir döngüye çevirmesin.
+ */
+const FOLLOW_UP_MS = 2_000;
+const MAX_FOLLOW_UPS = 20;
+
 type Listener = (outcome: SyncOutcome) => void;
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let debounceId: ReturnType<typeof setTimeout> | null = null;
+let followUpId: ReturnType<typeof setTimeout> | null = null;
+let followUps = 0;
 let appStateSub: { remove: () => void } | null = null;
 let listeners: Listener[] = [];
 let running = false;
@@ -42,7 +55,23 @@ let running = false;
 function fire(options: { force: boolean }): void {
   void runSync(options).then((outcome) => {
     for (const listener of listeners) listener(outcome);
+    if (outcome.skipped === 'already_running') return;
+
+    if (running && outcome.more && followUps < MAX_FOLLOW_UPS) {
+      followUps += 1;
+      scheduleFollowUp();
+    } else {
+      followUps = 0;
+    }
   });
+}
+
+function scheduleFollowUp(): void {
+  if (followUpId) clearTimeout(followUpId);
+  followUpId = setTimeout(() => {
+    followUpId = null;
+    fire({ force: false });
+  }, FOLLOW_UP_MS);
 }
 
 /**
@@ -67,6 +96,8 @@ export function stopSyncScheduler(): void {
   running = false;
   stopInterval();
   if (debounceId) { clearTimeout(debounceId); debounceId = null; }
+  if (followUpId) { clearTimeout(followUpId); followUpId = null; }
+  followUps = 0;
   appStateSub?.remove();
   appStateSub = null;
 }
