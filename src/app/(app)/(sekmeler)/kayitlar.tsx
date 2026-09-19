@@ -98,7 +98,10 @@ export default function RecordsScreen() {
     for (const f of listFuelLogsInRange(userId, from, to)) {
       push(f.businessDate, {
         id: f.id, kind: 'yakit', at: f.occurredAt, title: 'Yakıt',
-        detail: `${formatDecimal(f.volumePer1000 / 1000)} lt`,
+        // Fiyatsız dolumda hacim hesaplanamıyor ve 0 duruyor; "0,0 lt"
+        // sıfır litre almış gibi okunuyordu.
+        detail: f.volumePer1000 > 0
+          ? `${formatDecimal(f.volumePer1000 / 1000)} lt` : 'litre bilinmiyor',
         amount: f.totalAmountKurus, incoming: false,
       });
     }

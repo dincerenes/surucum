@@ -7,7 +7,7 @@
  * modelde iki sonuç.
  */
 
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull } from 'drizzle-orm';
 import { getDb } from '../client';
 import {
   type FuelType, type OwnershipType, defaultWearPerKm,
@@ -15,7 +15,7 @@ import {
 import { vehicleFuelTypes, vehicles } from '../schema';
 import type { Vehicle, VehicleFuelType } from '../schema/vehicles';
 import {
-  type Tx, type UnixMs, alive, enqueue, ownedById, softDeleteRow, stampNew, updateOwned,
+  type Tx, type UnixMs, alive, enqueue, ownedById, stampNew, updateOwned,
 } from './_base';
 import { newId } from '@/lib/id';
 import { toWholePositive } from '@/lib/whole-number';
@@ -123,6 +123,17 @@ export function updateVehicle(
  * Kalan tipler korunuyor — yeniden yazsaydık her düzenlemede ölçülmüş
  * tüketim ve son bilinen fiyat sıfırlanırdı.
  *
+ * Silinen satırın BİRİNCİL işareti de kalkıyor. Kalmasaydı araçta iki
+ * "birincil" olur ve ön dolgu hangisini okuyacağını bilemezdi — eskiden
+ * benzinli araçta silinmiş LPG satırının tüketimini getiriyordu.
+ *
+ * Aynı tip yeniden seçilirse YENİ SATIR AÇILMAZ, silinen satır DİRİLİR:
+ * aynı aracın aynı yakıtı için beyan edilen tüketim ve son fiyat hâlâ
+ * geçerli ve tabloda yinelenen satır birikmiyor.
+ *
+ * Hepsi TEK İŞLEMDE: yarıda kalan bir düzenleme aracı yakıtsız ya da
+ * birincilsiz bırakmasın.
+ *
  * Araç bu hesabın değilse `false` döner ve hiçbir şey yazılmaz.
  */
 export function setVehicleFuelTypes(
@@ -141,14 +152,17 @@ export function setVehicleFuelTypes(
   if (wanted.length === 0) return true;
 
   const current = listVehicleFuelTypes(userId, vehicleId);
-
-  for (const row of current) {
-    if (!wanted.includes(row.fuelType)) {
-      softDeleteRow(vehicleFuelTypes, 'vehicle_fuel_types', userId, row.id, now);
-    }
-  }
+  const removed = listRemovedVehicleFuelTypes(userId, vehicleId);
 
   getDb().transaction((tx) => {
+    for (const row of current) {
+      if (wanted.includes(row.fuelType)) continue;
+      tx.update(vehicleFuelTypes)
+        .set({ deletedAt: now, isPrimary: false, updatedAt: now })
+        .where(ownedById(vehicleFuelTypes, userId, row.id)).run();
+      enqueue(tx, 'vehicle_fuel_types', row.id, 'delete', now);
+    }
+
     wanted.forEach((fuelType, index) => {
       const existing = current.find((r) => r.fuelType === fuelType);
       const primary = index === 0;
@@ -159,6 +173,18 @@ export function setVehicleFuelTypes(
           .set({ isPrimary: primary, updatedAt: now })
           .where(ownedById(vehicleFuelTypes, userId, existing.id)).run();
         enqueue(tx, 'vehicle_fuel_types', existing.id, 'upsert', now);
+        return;
+      }
+
+      // Liste en son güncellenen önce geliyor: en taze değerler dirilir.
+      const revived = removed.find((r) => r.fuelType === fuelType);
+      if (revived) {
+        tx.update(vehicleFuelTypes)
+          .set({ deletedAt: null, isPrimary: primary, updatedAt: now })
+          .where(and(
+            eq(vehicleFuelTypes.id, revived.id), eq(vehicleFuelTypes.userId, userId),
+          )).run();
+        enqueue(tx, 'vehicle_fuel_types', revived.id, 'upsert', now);
         return;
       }
 
@@ -226,10 +252,34 @@ export function getVehicle(userId: string, id: string): Vehicle | undefined {
   return getDb().select().from(vehicles).where(ownedById(vehicles, userId, id)).get();
 }
 
+/**
+ * Aracın yakıt tipleri — BİRİNCİL ÖNCE, sonra eklenme sırası.
+ *
+ * Sıra `compareFuelTypes` ile aynı ve bilerek: yakıt ekranının varsayılan
+ * çipi ve araç düzenlemenin ilk seçili tipi listenin başından geliyor.
+ * Eklenme sırasıyla dönerken LPG'ye geçen araçta çip benzinde açılıyor,
+ * dolum benzine yazılıyor ve pompada girilen fiyat birincil LPG'ye hiç
+ * ulaşmıyordu; düzenleme ekranı da kaydedince birincili sessizce
+ * değiştiriyordu.
+ */
 export function listVehicleFuelTypes(userId: string, vehicleId: string): VehicleFuelType[] {
   return getDb().select().from(vehicleFuelTypes)
     .where(and(alive(vehicleFuelTypes, userId), eq(vehicleFuelTypes.vehicleId, vehicleId)))
-    .orderBy(asc(vehicleFuelTypes.createdAt))
+    .orderBy(
+      desc(vehicleFuelTypes.isPrimary), asc(vehicleFuelTypes.createdAt), asc(vehicleFuelTypes.id),
+    )
+    .all();
+}
+
+/** Araçtan çıkarılmış (yumuşak silinmiş) tipler — yalnızca diriltmek için. */
+function listRemovedVehicleFuelTypes(userId: string, vehicleId: string): VehicleFuelType[] {
+  return getDb().select().from(vehicleFuelTypes)
+    .where(and(
+      eq(vehicleFuelTypes.userId, userId),
+      eq(vehicleFuelTypes.vehicleId, vehicleId),
+      isNotNull(vehicleFuelTypes.deletedAt),
+    ))
+    .orderBy(desc(vehicleFuelTypes.updatedAt), desc(vehicleFuelTypes.id))
     .all();
 }
 

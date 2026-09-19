@@ -7,6 +7,7 @@ import { useDbValue } from '@/db/use-db';
 import { addFuelLog, listVehicleFuelTypes } from '@/db/repo';
 import { FUEL_TYPE_LABELS, type FuelType } from '@/db/schema/_shared';
 import { type Kurus, parseAmount } from '@/lib/money';
+import { isKnownUnitPrice, pickPrimaryFuelType } from '@/lib/fuel-type-pick';
 import { useDriver } from '@/lib/use-driver';
 import { requestSync } from '@/sync/scheduler';
 import { space, type as typeScale, useTheme } from '@/theme/use-theme';
@@ -31,10 +32,22 @@ export default function AddFuelScreen() {
     [userId, vehicle?.id],
   );
 
-  const selected = fuelType ?? fuels[0]?.fuelType ?? 'gasoline';
+  /**
+   * Varsayılan çip BİRİNCİL yakıt — ön dolgunun okuduğu satır. En eski
+   * tipte açıldığında LPG'ye geçmiş araçta dolum benzine yazılıyor ve
+   * pompada girilen fiyat vardiya sonuna hiç ulaşmıyordu.
+   */
+  const selected = fuelType ?? pickPrimaryFuelType(fuels)?.fuelType ?? 'gasoline';
   const totalKurus = parseAmount(total);
   const priceKurus = parseAmount(unitPrice);
-  const valid = totalKurus != null && totalKurus > 0 && vehicle != null;
+
+  /**
+   * Fiyat isteğe bağlı, ama YAZILDIYSA geçerli olmalı. Sıfır ya da eksi
+   * bir fiyat kayda "bilinmiyor" diye geçmez; sürücü yanlış yazmıştır.
+   */
+  const priceEntered = unitPrice.trim().length > 0;
+  const priceValid = !priceEntered || isKnownUnitPrice(priceKurus);
+  const valid = totalKurus != null && totalKurus > 0 && vehicle != null && priceValid;
 
   function kaydet() {
     if (!userId || !valid || !vehicle) return;
@@ -44,7 +57,7 @@ export default function AddFuelScreen() {
      * pompadaki litre fiyatını çoğu zaman hatırlıyor, litreyi hesaplamak
      * bizim işimiz.
      */
-    const volume = priceKurus && priceKurus > 0
+    const volume = isKnownUnitPrice(priceKurus)
       ? Math.round((totalKurus / priceKurus) * 1000)
       : 0;
 
@@ -52,7 +65,7 @@ export default function AddFuelScreen() {
       vehicleId: vehicle.id,
       fuelType: selected,
       totalAmountKurus: totalKurus as Kurus,
-      unitPriceKurus: (priceKurus ?? 0) as Kurus,
+      unitPriceKurus: (isKnownUnitPrice(priceKurus) ? priceKurus : 0) as Kurus,
       volumePer1000: volume,
       isFullTank: false,
       businessDate: openShift?.businessDate,
@@ -91,7 +104,9 @@ export default function AddFuelScreen() {
           value={unitPrice}
           onChangeText={setUnitPrice}
           unit="₺/lt"
-          hint="Zorunlu değil — girersen gün hesabı bu fiyatı kullanır."
+          hint={priceValid
+            ? 'Zorunlu değil — girersen bir sonraki vardiya sonunda litre fiyatı olarak önerilir.'
+            : 'Litre fiyatı sıfırdan büyük olmalı. Bilmiyorsan boş bırak.'}
         />
 
         <View style={styles.spacer} />

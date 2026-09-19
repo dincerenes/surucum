@@ -10,6 +10,7 @@
 import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { getDb } from '../client';
 import { fuelLogs, vehicleFuelTypes, vehicles } from '../schema';
+import { listVehicleFuelTypes } from './vehicles';
 import type { FuelLog } from '../schema/fuel';
 import type { FuelType } from '../schema/_shared';
 import {
@@ -19,6 +20,7 @@ import { getCutoffHour } from './settings';
 import type { Kurus } from '@/lib/money';
 import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
 import { toWholePositive } from '@/lib/whole-number';
+import { isKnownUnitPrice, pickPrimaryFuelType } from '@/lib/fuel-type-pick';
 
 export interface NewFuelLogInput {
   vehicleId: string;
@@ -162,18 +164,18 @@ export function listFuelLogsForVehicle(userId: string, vehicleId: string): FuelL
  * tanımlanmış demektir ve dolum kaydı yine de duruyor — sürücünün
  * girdiği veriyi reddetmiyoruz, sadece tahmine katmıyoruz. Yakıt tipi
  * araçtan çıkarılmışsa (yumuşak silinmiş) satırı da yok sayılır.
+ *
+ * FİYATSIZ DOLUM FİYATI EZMEZ. Fiyat yakıt ekranında isteğe bağlı ve
+ * girilmediğinde dolum satırında 0 duruyor; eskiden o 0 araca yazılıyor,
+ * bir önceki doğru fiyat kalıcı olarak kayboluyordu (negatif fiyat da
+ * ön dolguya "-40" olarak dönüyordu).
  */
 function rememberUnitPrice(
   userId: string, vehicleId: string, fuelType: FuelType, unitPriceKurus: Kurus, now: UnixMs,
 ): void {
-  const row = getDb().select({ id: vehicleFuelTypes.id })
-    .from(vehicleFuelTypes)
-    .where(and(
-      alive(vehicleFuelTypes, userId),
-      eq(vehicleFuelTypes.vehicleId, vehicleId),
-      eq(vehicleFuelTypes.fuelType, fuelType),
-    ))
-    .get();
+  if (!isKnownUnitPrice(unitPriceKurus)) return;
+
+  const row = listVehicleFuelTypes(userId, vehicleId).find((r) => r.fuelType === fuelType);
   if (!row) return;
 
   updateOwned(vehicleFuelTypes, 'vehicle_fuel_types', userId, row.id, {
@@ -201,20 +203,16 @@ export function rememberStatedFuelFigures(
 ): void {
   const hasConsumption = consumptionPer100Km != null
     && Number.isFinite(consumptionPer100Km) && consumptionPer100Km > 0;
-  const hasPrice = unitPriceKurus != null
-    && Number.isFinite(unitPriceKurus) && unitPriceKurus > 0;
+  const hasPrice = isKnownUnitPrice(unitPriceKurus);
   if (!hasConsumption && !hasPrice) return;
 
   /**
    * Birincil yakıt tipine yazılıyor. Çift yakıtlı araçta sürücü hangi
    * yakıtla gittiğini söylemiyor; birincil olan en sık kullandığıdır ve
    * ön dolgu için yeterli. Hesap zaten vardiyadaki kopyadan yapılıyor.
+   * Hangi satırın birincil sayıldığı `pickPrimaryFuelType`'ta, tek yerde.
    */
-  const row = getDb().select({ id: vehicleFuelTypes.id })
-    .from(vehicleFuelTypes)
-    .where(and(alive(vehicleFuelTypes, userId), eq(vehicleFuelTypes.vehicleId, vehicleId)))
-    .orderBy(desc(vehicleFuelTypes.isPrimary))
-    .get();
+  const row = pickPrimaryFuelType(listVehicleFuelTypes(userId, vehicleId));
   if (!row) return;
 
   updateOwned(vehicleFuelTypes, 'vehicle_fuel_types', userId, row.id, {
@@ -233,16 +231,15 @@ export function rememberStatedFuelFigures(
  *
  * Araçtan çıkarılmış (yumuşak silinmiş) yakıt tipi okunmaz — eskiden
  * birincil sıralamada öne geçip kaldırılmış yakıtın fiyatını getirebiliyordu.
+ * Hatırlatma ile AYNI satır okunuyor (`pickPrimaryFuelType`): yazılan
+ * değer başka bir satıra gidip ön dolgu boş gelmesin.
  */
 export function getKnownFuelFigures(userId: string, vehicleId: string): {
   consumptionPer100Km: number | null;
   unitPriceKurus: Kurus | null;
   isMeasured: boolean;
 } {
-  const row = getDb().select().from(vehicleFuelTypes)
-    .where(and(alive(vehicleFuelTypes, userId), eq(vehicleFuelTypes.vehicleId, vehicleId)))
-    .orderBy(desc(vehicleFuelTypes.isPrimary))
-    .get();
+  const row = pickPrimaryFuelType(listVehicleFuelTypes(userId, vehicleId));
 
   return {
     consumptionPer100Km: row?.avgConsumptionPer100Km ?? null,

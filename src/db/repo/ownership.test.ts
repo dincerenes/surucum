@@ -391,7 +391,8 @@ describe('kendi kaydı — eski davranış sürer', () => {
     assert.equal(setVehicleFuelTypes(A, a.vehicle.id, ['lpg', 'gasoline'], T0 + 10), true);
     assert.deepEqual(
       listVehicleFuelTypes(A, a.vehicle.id).map((f) => [f.fuelType, f.isPrimary]),
-      [['gasoline', false], ['lpg', true]],
+      // Birincil başta: yakıt ekranının varsayılan çipi listenin ilki.
+      [['lpg', true], ['gasoline', false]],
     );
 
     // Kapanıştaki beyan aracın kendi yakıt satırına hatırlatılır.
