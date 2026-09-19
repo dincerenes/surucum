@@ -5,12 +5,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, PageHeader } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import {
-  getSettings, listActiveVehicles, listVehicleFuelTypes, resolveActiveVehicle,
+  getOpenShift, getSettings, getVehicle, listActiveVehicles, listVehicleFuelTypes,
   updateSettings,
 } from '@/db/repo';
 import { FUEL_TYPE_LABELS, OWNERSHIP_LABELS } from '@/db/schema/_shared';
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatKurus } from '@/lib/money';
+import { resolveWorkingVehicle } from '@/lib/vehicle-resolve';
 import { requestSync } from '@/sync/scheduler';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
@@ -24,6 +25,11 @@ import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
  *
  * Araç SİLİNMEZ, pasifleşir — silinseydi ona bağlı geçmiş vardiya ve
  * yakıt kayıtları sahipsiz kalır ve geçmiş raporlar bozulurdu.
+ *
+ * VARDİYA AÇIKKEN SEÇİM SONRAKİ VARDİYADA GEÇERLİ. Açık vardiya kendi
+ * aracında kalır — seferi, yakıtı ve vardiya sonu ön dolgusu o araca
+ * ait. Seçimi engellemiyoruz (akış bloklanmaz); iki etiketle hangisinin
+ * şu an, hangisinin sonra geçerli olduğunu gösteriyoruz.
  */
 export default function VehiclesScreen() {
   const { colors } = useTheme();
@@ -34,11 +40,16 @@ export default function VehiclesScreen() {
   const data = useDbValue(() => {
     if (!userId) return null;
     const vehicles = listActiveVehicles(userId);
+    const openShift = getOpenShift(userId) ?? null;
+    const shiftVehicle = openShift ? getVehicle(userId, openShift.vehicleId) ?? null : null;
+    /** Çözümleme `useDriver` ile AYNI fonksiyondan — ikisi ayrışamaz. */
+    const { next, diverged } = resolveWorkingVehicle(
+      vehicles, getSettings(userId)?.defaultVehicleId, shiftVehicle,
+    );
     return {
-      /** Çözümleme `useDriver` ile AYNI fonksiyondan — ikisi ayrışamaz. */
-      activeId: resolveActiveVehicle(
-        vehicles, getSettings(userId)?.defaultVehicleId,
-      )?.id ?? null,
+      activeId: next?.id ?? null,
+      shiftVehicle,
+      diverged,
       vehicles: vehicles.map((v) => ({
         vehicle: v,
         fuels: listVehicleFuelTypes(userId, v.id)
@@ -62,8 +73,39 @@ export default function VehiclesScreen() {
 
       <Text style={[typeScale.display, { color: colors.text }]}>Araçlarım</Text>
 
+      {data?.shiftVehicle ? (
+        <View style={[styles.note, { backgroundColor: colors.accentSoft }]}>
+          <Text style={[typeScale.body, { color: colors.text }]}>
+            {data.diverged
+              ? `Açık vardiyan ${data.shiftVehicle.label} ile sürüyor. `
+                + 'Seçimin bir sonraki vardiyada geçerli olur.'
+              : 'Açık vardiyan bu araçla sürüyor. Başka bir araç seçersen '
+                + 'bir sonraki vardiyada geçerli olur.'}
+          </Text>
+          <Pressable
+            onPress={() => router.push('/vardiya-bitir')}
+            accessibilityRole="button"
+            hitSlop={space.sm}
+          >
+            <Text style={[typeScale.bodyStrong, { color: colors.accent }]}>
+              Vardiyayı bitir
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       {data?.vehicles.map(({ vehicle, fuels }) => {
         const active = data.activeId === vehicle.id;
+        const onShift = data.shiftVehicle?.id === vehicle.id;
+        /**
+         * Vardiya yokken tek rozet: AKTİF. Vardiya açıkken iki soru var —
+         * hangi araçla şu an çalışılıyor, hangisi sonra — ve iki rozet.
+         */
+        const badge = data.shiftVehicle == null
+          ? (active ? 'AKTİF' : null)
+          : onShift ? 'VARDİYADA'
+          : active ? 'SONRAKİ VARDİYA'
+          : null;
 
         return (
           <Pressable
@@ -85,8 +127,8 @@ export default function VehiclesScreen() {
               <Text style={[typeScale.title, { color: colors.text }]}>
                 {vehicle.label}
               </Text>
-              {active ? (
-                <Text style={[styles.badge, { color: colors.accent }]}>AKTİF</Text>
+              {badge ? (
+                <Text style={[styles.badge, { color: colors.accent }]}>{badge}</Text>
               ) : null}
             </View>
 
@@ -125,8 +167,8 @@ export default function VehiclesScreen() {
       />
 
       <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-        Araca dokunmak onu aktif yapar. Yeni vardiyalar aktif araca
-        yazılır; geçmiş kayıtlar kendi aracında kalır.
+        Araca dokunmak onu seçer. Yeni vardiyalar seçili araca yazılır;
+        açık vardiya ve geçmiş kayıtlar kendi aracında kalır.
       </Text>
     </ScrollView>
   );
@@ -142,5 +184,6 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   badge: { ...typeScale.label, letterSpacing: 1 },
+  note: { borderRadius: radius.md, padding: space.md, gap: space.sm },
   edit: { alignSelf: 'flex-start', paddingTop: space.sm, minHeight: 40 },
 });

@@ -21,6 +21,13 @@ import {
 } from './_base';
 import { newId } from '@/lib/id';
 import { toWholePositive } from '@/lib/whole-number';
+import { resolveActiveVehicle } from '@/lib/vehicle-resolve';
+
+/**
+ * Seçili aracın çözümlemesi `lib/vehicle-resolve.ts`'te — saf ve test
+ * ediliyor. Ekranlar onu buradan da bulabilsin diye yeniden dışa açılıyor.
+ */
+export { resolveActiveVehicle };
 
 export interface NewVehicleInput {
   label: string;
@@ -276,11 +283,25 @@ export function setVehicleFuelTypes(
  * Araç silinirse ona bağlı geçmiş vardiya ve yakıt kayıtları sahipsiz
  * kalır ve raporlar bozulur. Sürücü araç değiştirdiğinde eskisi
  * listeden çıkar, geçmişi durur.
+ *
+ * AÇIK VARDİYANIN ARACI PASİFLEŞTİRİLMEZ — `false` döner, hiçbir şey
+ * yazılmaz. Vardiya o araçla sürüyor; araç listeden çıkınca ekranlar
+ * başka bir araca düşüyor ve vardiyanın kalan kayıtları o araca
+ * yazılıyordu. Önce vardiya bitirilmeli. Ekran bunu önceden sorup
+ * açıklıyor (`isVehicleOnOpenShift`); bu denetim son savunma hattı.
  */
 export function deactivateVehicle(
   userId: string, id: string, now: UnixMs = Date.now(),
 ): boolean {
+  if (isVehicleOnOpenShift(userId, id)) return false;
   return updateOwned(vehicles, 'vehicles', userId, id, { isActive: false }, now);
+}
+
+/** Bu araçla açılmış, henüz bitmemiş bir vardiya var mı? */
+export function isVehicleOnOpenShift(userId: string, vehicleId: string): boolean {
+  return getDb().select({ id: shifts.id }).from(shifts).where(and(
+    alive(shifts, userId), eq(shifts.vehicleId, vehicleId), isNull(shifts.endedAt),
+  )).get() != null;
 }
 
 export function activateVehicle(
@@ -304,20 +325,6 @@ export function listActiveVehicles(userId: string): Vehicle[] {
   return listVehicles(userId).filter((v) => v.isActive);
 }
 
-/**
- * Kullanımdaki araç — TEK ÇÖZÜMLEME YOLU.
- *
- * Ayardaki varsayılan pasifleştirilmiş olabilir; o zaman listenin ilkine
- * düşülüyor. Bu kural iki yerde ayrı ayrı yazılmıştı ve ayrışmışlardı:
- * `useDriver` ilk aracı kullanıp vardiyayı ona bağlarken Araçlarım ekranı
- * ham kimliğe baktığı için hiçbir karta AKTİF rozeti basmıyordu — sürücü
- * hangi aracın kullanıldığını göremiyordu.
- */
-export function resolveActiveVehicle(
-  vehicles: readonly Vehicle[], defaultVehicleId: string | null | undefined,
-): Vehicle | null {
-  return vehicles.find((v) => v.id === defaultVehicleId) ?? vehicles[0] ?? null;
-}
 
 export function getVehicle(userId: string, id: string): Vehicle | undefined {
   return getDb().select().from(vehicles).where(ownedById(vehicles, userId, id)).get();

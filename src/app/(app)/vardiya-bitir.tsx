@@ -39,9 +39,14 @@ export default function EndShiftScreen() {
   const insets = useSafeAreaInsets();
   const { userId, openShift, vehicle, today } = useDriver();
 
+  /**
+   * Ön dolgu VARDİYANIN ARACINDAN: vardiya ortasında Araçlarım'da başka
+   * araç seçilmiş olabilir; tüketim ve fiyat bu vardiyanın aracına ait.
+   */
+  const fuelVehicleId = openShift?.vehicleId ?? vehicle?.id ?? null;
   const known = useDbValue(
-    () => (userId && vehicle ? getKnownFuelFigures(userId, vehicle.id) : null),
-    [userId, vehicle?.id],
+    () => (userId && fuelVehicleId ? getKnownFuelFigures(userId, fuelVehicleId) : null),
+    [userId, fuelVehicleId],
   );
 
   /**
@@ -101,7 +106,8 @@ export default function EndShiftScreen() {
       categoryId: selectedCategory,
       amountKurus: expenseAmount as Kurus,
       vehicleId: vehicle?.id ?? null,
-      businessDate: openShift?.businessDate,
+      // Gün ve araç vardiyadan gelir.
+      shiftId: openShift?.id ?? null,
     });
     const name = categories.find((c) => c.id === selectedCategory)?.name ?? 'Gider';
     setAdded((cur) => [...cur, { name, amount: expenseAmount as Kurus }]);

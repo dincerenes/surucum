@@ -17,14 +17,23 @@ import {
   type UnixMs, alive, assertOwned, ownedById, softDeleteRow, stampNew, updateOwned, withOutbox,
 } from './_base';
 import { getCutoffHour } from './settings';
+import { resolveShiftContext } from './shift-context';
 import type { Kurus } from '@/lib/money';
 import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
 import { toWholePositive } from '@/lib/whole-number';
 import { isKnownUnitPrice, pickPrimaryFuelType } from '@/lib/fuel-type-pick';
 
 export interface NewFuelLogInput {
+  /** Vardiya verildiyse YOK SAYILIR — araç vardiyadan gelir. */
   vehicleId: string;
   fuelType: FuelType;
+
+  /**
+   * Açık vardiya varsa kimliği. Dolum vardiyanın GÜNÜNÜ ve ARACINI alır:
+   * vardiya ortasında Araçlarım'dan başka araç seçilse bile yakıt,
+   * vardiyanın açıldığı araca yazılır.
+   */
+  shiftId?: string | null;
 
   /** Sıvı/gaz yakıtta MİLİLİTRE, elektrikte WATT-SAAT. Tam sayı. */
   volumePer1000: number;
@@ -66,17 +75,20 @@ export function addFuelLog(
   const occurredAt = input.occurredAt ?? now;
   const cutoff = cutoffHour ?? getCutoffHour(userId);
 
-  // Araç BU HESABIN olmalı — yabancı aracın fiyatı da güncellenirdi.
-  assertOwned(vehicles, 'vehicles', userId, input.vehicleId);
+  // Vardiya ve araç BU HESABIN olmalı — yabancı aracın fiyatı da güncellenirdi.
+  const shift = input.shiftId ? resolveShiftContext(userId, input.shiftId) : null;
+  const vehicleId = shift ? shift.vehicleId : input.vehicleId;
+  if (!shift) assertOwned(vehicles, 'vehicles', userId, vehicleId);
 
   const stamp = stampNew(userId, now);
   const row = withOutbox('fuel_logs', stamp.id, 'upsert', (tx) => (
     tx.insert(fuelLogs).values({
       ...stamp,
-      vehicleId: input.vehicleId,
+      vehicleId,
       fuelType: input.fuelType,
       occurredAt,
-      businessDate: input.businessDate ?? toBusinessDate(occurredAt, cutoff),
+      businessDate: shift?.businessDate
+        ?? input.businessDate ?? toBusinessDate(occurredAt, cutoff),
       volumePer1000: Math.round(input.volumePer1000),
       unitPriceKurus: input.unitPriceKurus,
       totalAmountKurus: input.totalAmountKurus,
@@ -89,7 +101,7 @@ export function addFuelLog(
     }).returning().get()
   ), now);
 
-  rememberUnitPrice(userId, input.vehicleId, input.fuelType, input.unitPriceKurus, now);
+  rememberUnitPrice(userId, vehicleId, input.fuelType, input.unitPriceKurus, now);
   return row;
 }
 
@@ -99,7 +111,7 @@ export function addFuelLog(
  */
 export function updateFuelLog(
   userId: string, id: string,
-  patch: Omit<Partial<NewFuelLogInput>, 'vehicleId' | 'fuelType'>,
+  patch: Omit<Partial<NewFuelLogInput>, 'vehicleId' | 'fuelType' | 'shiftId'>,
   now: UnixMs = Date.now(),
 ): boolean {
   return updateOwned(fuelLogs, 'fuel_logs', userId, id, {

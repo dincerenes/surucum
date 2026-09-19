@@ -20,6 +20,7 @@ import {
   updateOwned, withOutbox,
 } from './_base';
 import { getCutoffHour } from './settings';
+import { resolveShiftContext } from './shift-context';
 import type { Kurus } from '@/lib/money';
 import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
 
@@ -136,6 +137,14 @@ export interface NewExpenseInput {
   occurredAt?: UnixMs;
 
   /**
+   * Açık vardiya varsa kimliği. SAKLANMAZ (yukarıdaki not); yalnızca
+   * giderin GÜNÜNÜ ve ARACINI vardiyadan almak için. Vardiya verildiyse
+   * `vehicleId` ve `businessDate` yok sayılır: vardiya ortasında başka
+   * araç seçilse bile gider vardiyanın aracına yazılır.
+   */
+  shiftId?: string | null;
+
+  /**
    * İş günü. Açık vardiya varsa ÇAĞIRAN vardiyanın gününü verir; yoksa
    * kaydın saatinden türetilir. Gece vardiyası gün ortasında dönmesin.
    */
@@ -153,19 +162,22 @@ export function addExpense(
   const occurredAt = input.occurredAt ?? now;
   const cutoff = cutoffHour ?? getCutoffHour(userId);
 
-  // Kategori ve araç BU HESABIN olmalı — yabancı kimlik reddedilir.
+  // Kategori, vardiya ve araç BU HESABIN olmalı — yabancı kimlik reddedilir.
   assertOwned(expenseCategories, 'expense_categories', userId, input.categoryId);
-  assertOwnedIfSet(vehicles, 'vehicles', userId, input.vehicleId);
+  const shift = input.shiftId ? resolveShiftContext(userId, input.shiftId) : null;
+  const vehicleId = shift ? shift.vehicleId : (input.vehicleId ?? null);
+  if (!shift) assertOwnedIfSet(vehicles, 'vehicles', userId, vehicleId);
 
   const stamp = stampNew(userId, now);
   return withOutbox('expenses', stamp.id, 'upsert', (tx) => (
     tx.insert(expenses).values({
       ...stamp,
       categoryId: input.categoryId,
-      vehicleId: input.vehicleId ?? null,
+      vehicleId,
       amountKurus: input.amountKurus,
       occurredAt,
-      businessDate: input.businessDate ?? toBusinessDate(occurredAt, cutoff),
+      businessDate: shift?.businessDate
+        ?? input.businessDate ?? toBusinessDate(occurredAt, cutoff),
       receiptPath: input.receiptPath ?? null,
       notes: input.notes?.trim() || null,
     }).returning().get()
@@ -181,7 +193,8 @@ export function addExpense(
  * reddedilmemeli.
  */
 export function updateExpense(
-  userId: string, id: string, patch: Partial<NewExpenseInput>, now: UnixMs = Date.now(),
+  userId: string, id: string, patch: Omit<Partial<NewExpenseInput>, 'shiftId'>,
+  now: UnixMs = Date.now(),
 ): boolean {
   const current = getExpense(userId, id);
   if (!current) return false;

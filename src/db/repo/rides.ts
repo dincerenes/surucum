@@ -8,14 +8,15 @@
 
 import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import { getDb } from '../client';
-import { earningSources, rides, shifts, vehicles } from '../schema';
+import { earningSources, rides, vehicles } from '../schema';
 import type { Ride } from '../schema/earnings';
 import type { PaymentMethod } from '../schema/_shared';
 import {
-  type UnixMs, ForeignRecordError, alive, assertOwned, assertOwnedIfSet, ownedById,
+  type UnixMs, alive, assertOwned, assertOwnedIfSet, ownedById,
   softDeleteRow, stampNew, updateOwned, withOutbox,
 } from './_base';
 import { ensureDefaultEarningSource } from './earning-sources';
+import { resolveShiftContext } from './shift-context';
 import { getCutoffHour } from './settings';
 import { type BasisPoints, type Kurus } from '@/lib/money';
 import { calculateRideAmounts } from '@/lib/ride';
@@ -33,6 +34,7 @@ export interface NewRideInput {
 
   /** Açık vardiya varsa kimliği. Vardiya dışında da sefer olabilir. */
   shiftId?: string | null;
+  /** Yalnızca VARDİYASIZ seferde okunur; vardiya varsa araç ondan gelir. */
   vehicleId?: string | null;
 
   /** Sürücü kesintiyi rakam olarak biliyorsa — oranı ezer. */
@@ -88,15 +90,21 @@ export function addRide(
    * Sürücü tek bir iş yaptı, tek bir günde görmeli.
    *
    * Vardiya dışında girilen sefer kendi saatinden gün alır.
+   *
+   * ARAÇ DA VARDİYADAN gelir: vardiya ortasında Araçlarım'dan başka araç
+   * seçilse bile sefer, vardiyanın açıldığı araca yazılır. Seçim bir
+   * sonraki vardiyada geçerli. Vardiya bu hesabın değilse reddedilir.
    */
-  const businessDate = resolveBusinessDate(userId, input.shiftId, occurredAt, cutoff);
+  const shift = input.shiftId ? resolveShiftContext(userId, input.shiftId) : null;
+  const businessDate = shift?.businessDate ?? toBusinessDate(occurredAt, cutoff);
+  const vehicleId = shift ? shift.vehicleId : (input.vehicleId ?? null);
 
   /**
    * Bağlanan kaynak ve araç da BU HESABIN olmalı. Denetim her yazmadan
    * önce: reddedilen bir kayıt yarım iz bırakmasın.
    */
   assertOwnedIfSet(earningSources, 'earning_sources', userId, input.earningSourceId);
-  assertOwnedIfSet(vehicles, 'vehicles', userId, input.vehicleId);
+  if (!shift) assertOwnedIfSet(vehicles, 'vehicles', userId, vehicleId);
   const earningSourceId = input.earningSourceId
     ?? ensureDefaultEarningSource(userId, now).id;
 
@@ -113,7 +121,7 @@ export function addRide(
       ...stamp,
       shiftId: input.shiftId ?? null,
       earningSourceId,
-      vehicleId: input.vehicleId ?? null,
+      vehicleId,
       occurredAt,
       businessDate,
       grossAmountKurus: amounts.grossAmountKurus,
@@ -221,24 +229,4 @@ export function listRidesInRange(
     ))
     .orderBy(desc(rides.occurredAt))
     .all();
-}
-
-/**
- * Vardiyaya bağlı kayıtlar vardiyanın gününü alır.
- *
- * Vardiya bu hesabın değilse ya da silinmişse REDDEDİLİR. Sessizce kendi
- * saatinden gün almak, sürücünün vardiyaya bağlı sandığı seferi başka
- * bir güne yazabilirdi (kural 3); yabancı vardiyanın gününü almak ise
- * başka bir hesabın defterine bakmaktır.
- */
-function resolveBusinessDate(
-  userId: string, shiftId: string | null | undefined, occurredAt: UnixMs, cutoffHour: number,
-): BusinessDate {
-  if (shiftId) {
-    const shift = getDb().select({ businessDate: shifts.businessDate })
-      .from(shifts).where(ownedById(shifts, userId, shiftId)).get();
-    if (!shift) throw new ForeignRecordError('shifts', shiftId);
-    return shift.businessDate;
-  }
-  return toBusinessDate(occurredAt, cutoffHour);
 }

@@ -61,14 +61,15 @@ export default function AddFuelScreen() {
       ? Math.round((totalKurus / priceKurus) * 1000)
       : 0;
 
+    // Açık vardiya varsa gün ve araç ondan gelir (repo bunu kendisi çözer).
     addFuelLog(userId, {
       vehicleId: vehicle.id,
+      shiftId: openShift?.id ?? null,
       fuelType: selected,
       totalAmountKurus: totalKurus as Kurus,
       unitPriceKurus: (isKnownUnitPrice(priceKurus) ? priceKurus : 0) as Kurus,
       volumePer1000: volume,
       isFullTank: false,
-      businessDate: openShift?.businessDate,
     });
     requestSync();
     router.back();

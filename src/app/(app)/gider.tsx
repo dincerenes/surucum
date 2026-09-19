@@ -35,11 +35,12 @@ export default function AddExpenseScreen() {
 
   function kaydet() {
     if (!userId || !valid) return;
+    // Açık vardiya varsa gün ve araç ondan gelir (repo bunu kendisi çözer).
     addExpense(userId, {
       categoryId: selected,
       amountKurus: amount as Kurus,
       vehicleId: vehicle?.id ?? null,
-      businessDate: openShift?.businessDate,
+      shiftId: openShift?.id ?? null,
     });
     requestSync();
     router.back();

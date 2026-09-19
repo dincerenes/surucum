@@ -9,7 +9,8 @@ import {
 import { useDbValue } from '@/db/use-db';
 import {
   countShiftsAffectedByOwnership, createVehicle, deactivateVehicle, getVehicle,
-  listActiveVehicles, listVehicleFuelTypes, setVehicleFuelTypes, updateSettings, updateVehicle,
+  isVehicleOnOpenShift, listActiveVehicles, listVehicleFuelTypes, setVehicleFuelTypes,
+  updateSettings, updateVehicle,
 } from '@/db/repo';
 import {
   FUEL_TYPE_LABELS, type FuelType, OWNERSHIP_LABELS, OWNERSHIP_TYPES,
@@ -174,7 +175,18 @@ export default function VehicleEditScreen() {
    * göremeyeceği bir eylemi sunmuyoruz.
    */
   function pasiflestir() {
-    if (!v) return;
+    if (!v || !userId) return;
+    /**
+     * Açık vardiyanın aracı kaldırılamaz: vardiya bu araçla sürüyor ve
+     * kalan seferleri, yakıtı ve vardiya sonu hesabı ona ait.
+     */
+    if (isVehicleOnOpenShift(userId, v.id)) {
+      Alert.alert(
+        'Vardiya bu araçla açık',
+        'Bu araçla açık vardiyan var; önce vardiyayı bitir, sonra aracı kaldır.',
+      );
+      return;
+    }
     if (otherVehicleCount === 0) {
       Alert.alert(
         'Tek aracın',
@@ -199,7 +211,10 @@ export default function VehicleEditScreen() {
           style: 'destructive',
           onPress: () => {
             if (!userId) return;
-            deactivateVehicle(userId, v.id);
+            if (!deactivateVehicle(userId, v.id)) {
+              Alert.alert('Araç kaldırılmadı', 'Araç bulunamadı ya da açık bir vardiyada kullanılıyor.');
+              return;
+            }
             requestSync();
             router.back();
           },

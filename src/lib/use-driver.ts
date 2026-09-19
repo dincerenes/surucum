@@ -9,8 +9,8 @@
 import { useMemo } from 'react';
 import { useDbValue } from '@/db/use-db';
 import {
-  ensureSettings, getDailyGoalKurus, getDaySummary, getOpenShift,
-  listActiveVehicles, listRidesInShift, listRidesOnDate, resolveActiveVehicle,
+  ensureSettings, getDailyGoalKurus, getDaySummary, getOpenShift, getVehicle,
+  listActiveVehicles, listRidesInShift, listRidesOnDate,
 } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
 import { type BusinessDate, todayBusinessDate } from '@/lib/business-date';
@@ -20,10 +20,20 @@ import { type Kurus, ZERO, add } from '@/lib/money';
 import { isShiftStale, resolveShiftDuration } from '@/lib/shift';
 import type { Ride, Shift } from '@/db/schema/earnings';
 import type { Vehicle } from '@/db/schema/vehicles';
+import { resolveWorkingVehicle } from '@/lib/vehicle-resolve';
 
 export interface DriverState {
   userId: string | null;
+  /**
+   * Kayıtların yazılacağı araç: AÇIK VARDİYANIN aracı, vardiya yoksa
+   * Araçlarım'da seçili araç. Sefer, gider, yakıt ve vardiya sonu ön
+   * dolgusu hep bunu kullanıyor.
+   */
   vehicle: Vehicle | null;
+  /** Bir sonraki vardiyanın aracı — Araçlarım'daki seçim. */
+  nextVehicle: Vehicle | null;
+  /** Açık vardiya seçili araçtan başka bir araçla mı sürüyor? */
+  vehicleDiverged: boolean;
   /** Kurulum tamamlandı mı? Araç yoksa uygulama kullanılamaz. */
   needsSetup: boolean;
   openShift: Shift | null;
@@ -64,7 +74,8 @@ export interface DriverState {
 }
 
 const EMPTY: DriverState = {
-  userId: null, vehicle: null, needsSetup: true, openShift: null,
+  userId: null, vehicle: null, nextVehicle: null, vehicleDiverged: false,
+  needsSetup: true, openShift: null,
   shiftIsStale: false, openShiftMinutes: 0,
   today: todayBusinessDate(), summary: null, rides: [],
   shiftRides: [], shiftGross: ZERO, goal: null,
@@ -83,14 +94,22 @@ export function useDriver(): DriverState {
     const today = todayBusinessDate(cutoff, new Date(now));
 
     /**
-     * Aktif araç AYARDAN geliyor, listenin ilkinden değil: sürücü
-     * Araçlarım'dan başka bir aracı seçtiğinde vardiya ona bağlanmalı ve
-     * yıpranma payı onun oranından gelmeli. Çözümleme `resolveActiveVehicle`
-     * içinde, tek yerde — Araçlarım ekranı da aynısını çağırıyor.
+     * Seçili araç AYARDAN geliyor, listenin ilkinden değil: sürücü
+     * Araçlarım'dan başka bir aracı seçtiğinde YENİ vardiya ona bağlanmalı.
+     *
+     * Ama açık vardiya KENDİ ARACINDA kalır. İkisi eskiden bağımsız
+     * çözülüyordu: vardiya ortasında B'yi seçen sürücünün seferleri A
+     * vardiyasına ama B aracına yazılıyor, vardiya sonu B'nin tüketimiyle
+     * açılıyordu. Çözümleme `resolveWorkingVehicle` içinde, tek yerde —
+     * Araçlarım ekranı da aynısını çağırıyor. Vardiyanın aracı pasif olsa
+     * bile (`getVehicle` pasifleri de buluyor) kayıtlar ona yazılır.
      */
     const vehicles = listActiveVehicles(userId);
-    const vehicle = resolveActiveVehicle(vehicles, settings.defaultVehicleId);
     const openShift = getOpenShift(userId) ?? null;
+    const shiftVehicle = openShift ? getVehicle(userId, openShift.vehicleId) ?? null : null;
+    const { working, next, diverged } = resolveWorkingVehicle(
+      vehicles, settings.defaultVehicleId, shiftVehicle,
+    );
 
     // Vardiya açıkken defter onun gününde kalır, takvim dönse bile.
     const activeDate = openShift?.businessDate ?? today;
@@ -100,8 +119,10 @@ export function useDriver(): DriverState {
 
     return {
       userId,
-      vehicle,
-      needsSetup: vehicle == null,
+      vehicle: working,
+      nextVehicle: next,
+      vehicleDiverged: diverged,
+      needsSetup: next == null,
       openShift,
       shiftIsStale: openShift ? isShiftStale(openShift, now) : false,
       openShiftMinutes: openShift
