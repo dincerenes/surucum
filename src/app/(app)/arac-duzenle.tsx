@@ -152,9 +152,15 @@ export default function VehicleEditScreen() {
       return;
     }
 
+    /**
+     * Metin GERİ ALMA VAAT ETMİYOR. Eskiden "sonra geri alabilirsin"
+     * diyordu ama kaldırılan aracı gösteren ya da geri getiren hiçbir
+     * ekran yok; sürücü güvendiği bir yolu bulamazdı.
+     */
     Alert.alert(
       'Aracı kaldır',
-      'Araç listeden çıkar ama geçmiş kayıtları durur. İstersen sonra geri alabilirsin.',
+      'Araç listeden çıkar, geçmiş vardiya ve yakıt kayıtları durur. '
+        + 'Kaldırılan araç listeye geri getirilemez; gerekirse yeniden eklersin.',
       [
         { text: 'Vazgeç', style: 'cancel' },
         {
