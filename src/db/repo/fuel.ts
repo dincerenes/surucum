@@ -162,6 +162,17 @@ export function listFuelLogsInRange(
     .all();
 }
 
+/**
+ * Bir vardiyaya bağlı dolumlar. Tüketimi hesaplanamayan vardiyanın
+ * yakıtı bunlardır (bkz. `day-summary.ts`).
+ */
+export function listFuelLogsInShift(userId: string, shiftId: string): FuelLog[] {
+  return getDb().select().from(fuelLogs)
+    .where(and(alive(fuelLogs, userId), eq(fuelLogs.shiftId, shiftId)))
+    .orderBy(desc(fuelLogs.occurredAt))
+    .all();
+}
+
 /** Aracın dolumları, yeniden eskiye. Tüketim hesabının girdisi. */
 export function listFuelLogsForVehicle(userId: string, vehicleId: string): FuelLog[] {
   return getDb().select().from(fuelLogs)

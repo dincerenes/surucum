@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 import {
   addFuelLog, addRide, createVehicle, endShift, getDaySummary, getFuelLog,
-  listDaySummaries, listShiftsInRange, startShift,
+  listDaySummaries, listFuelLogsInShift, listShiftsInRange, startShift,
 } from '@/db/repo';
 import type { Kurus } from '@/lib/money';
 import type { BusinessDate } from '@/lib/business-date';
@@ -44,6 +44,9 @@ describe('yakıt modeli — repo', () => {
       totalAmountKurus: k(10_000), unitPriceKurus: k(5_000), volumePer1000: 2_000,
     }, 4, T0 + H);
     assert.equal(getFuelLog(U, vardiyasiz.id)?.shiftId, null);
+
+    // Vardiya detayı bağlı dolumları okuyor — vardiyasız olan gelmez.
+    assert.deepEqual(listFuelLogsInShift(U, s.id).map((x) => x.id), [f.id]);
   });
 
   it('iki vardiya: biri tüketimli, öteki bağlı dolumlu — ikisi de sayılır', () => {

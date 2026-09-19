@@ -7,7 +7,7 @@ import { AboveKeyboard, AmountInput, Button, RideList } from '@/components/ui';
 import { SheetHeader } from '@/components/ui/sheet';
 import { useDbValue } from '@/db/use-db';
 import {
-  deleteShift, getShift, getVehicle, listRidesInShift, updateShiftTotals,
+  deleteShift, getShift, getVehicle, listFuelLogsInShift, listRidesInShift, updateShiftTotals,
 } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatBusinessDate, formatClock } from '@/lib/business-date';
@@ -55,11 +55,14 @@ export default function ShiftDetailScreen() {
     const rides = listRidesInShift(userId, shift.id);
     const gross = rides.reduce((acc, r) => add(acc, r.grossAmountKurus), ZERO);
     const vehicle = getVehicle(userId, shift.vehicleId);
+    const fills = listFuelLogsInShift(userId, shift.id);
 
     return {
       shift,
       rides,
       gross,
+      /** Bu vardiyaya bağlı dolumların toplamı — tüketim yoksa yakıt bu. */
+      filled: fills.reduce((acc, f) => add(acc, f.totalAmountKurus), ZERO),
       wearPerKmKurus: shift.wearPerKmKurus ?? vehicle?.wearPerKmKurus ?? null,
       stats: calculateShiftStats(shift, gross, rides.length, Date.now()),
     };
@@ -82,7 +85,7 @@ export default function ShiftDetailScreen() {
     );
   }
 
-  const { shift, rides, gross, stats, wearPerKmKurus } = data;
+  const { shift, rides, gross, stats, wearPerKmKurus, filled } = data;
 
   /** Alanlar kaydın MEVCUT değeriyle açılıyor; boş açmak veriyi siler. */
   const kmText = km ?? numberInput(shift.distanceKm);
@@ -104,7 +107,16 @@ export default function ShiftDetailScreen() {
     ? Math.round(consumptionValue * 1000) : null;
 
   const wear = calculateWearShare(kmValue, wearPerKmKurus as Kurus | null);
-  const fuel = calculateFuelCost(kmValue, consumptionPer100Km, parseAmount(priceText));
+  /**
+   * Vardiyanın yakıtı gün özetiyle AYNI kuraldan: tüketim hesaplanıyorsa
+   * o, hesaplanmıyorsa bu vardiyaya bağlı dolumlar. Satır kaynağını
+   * söylüyor; vardiyasız dolumların hangi vardiyayı kapsadığı gün
+   * kartında.
+   */
+  const burned = calculateFuelCost(kmValue, consumptionPer100Km, parseAmount(priceText));
+  const fuel = burned > 0 ? burned : filled;
+  const fuelLabel = burned > 0 ? 'Yakıt · tüketimden'
+    : filled > 0 ? 'Yakıt · dolumdan' : 'Yakıt';
 
   function kaydet() {
     if (!userId) return;
@@ -197,8 +209,8 @@ export default function ShiftDetailScreen() {
             muted={wear === 0}
           />
           <Row
-            label="Yakıt maliyeti"
-            value={fuel > 0 ? `−${formatKurus(fuel)}` : 'hesaplanmadı'}
+            label={fuelLabel}
+            value={fuel > 0 ? `−${formatKurus(fuel)}` : 'bilinmiyor'}
             muted={fuel === 0}
           />
           <Text style={[typeScale.caption, { color: colors.textFaint }]}>
