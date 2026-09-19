@@ -4,7 +4,9 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { AboveKeyboard, AmountInput, Button, Chip, ChipGrid } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
-import { addExpense, listActiveExpenseCategories, seedSystemCategories } from '@/db/repo';
+import {
+  WEAR_COVERED_CATEGORY_ICONS, addExpense, listActiveExpenseCategories, seedSystemCategories,
+} from '@/db/repo';
 import { type Kurus, parseAmount } from '@/lib/money';
 import { useDriver } from '@/lib/use-driver';
 import { requestSync } from '@/sync/scheduler';
@@ -32,6 +34,16 @@ export default function AddExpenseScreen() {
   const amount = parseAmount(raw);
   const selected = categoryId ?? categories[0]?.id ?? null;
   const valid = amount != null && amount > 0 && selected != null;
+
+  /**
+   * Bakım, sigorta ve vergi kendi aracında yıpranma payının içinde
+   * kabaca sayılıyor. Gideri reddetmiyoruz — sürücünün ödediği gerçek
+   * para — ama aynı kalemi her ay "yıpranma" diye de düşmüş olmamak için
+   * yalnızca o gün ödeneni yazmasını hatırlatıyoruz.
+   */
+  const category = categories.find((c) => c.id === selected);
+  const overlapsWear = vehicle != null && vehicle.wearPerKmKurus > 0
+    && category?.isSystem === true && WEAR_COVERED_CATEGORY_ICONS.has(category.icon ?? '');
 
   function kaydet() {
     if (!userId || !valid) return;
@@ -65,7 +77,13 @@ export default function AddExpenseScreen() {
           </ChipGrid>
         </View>
 
-        <AmountInput label="Tutar" value={raw} onChangeText={setRaw} autoFocus />
+        <AmountInput
+          label="Tutar" value={raw} onChangeText={setRaw} autoFocus
+          hint={overlapsWear
+            ? 'Bakım, sigorta ve vergi yıpranma payının içinde kabaca sayılıyor; '
+              + 'buraya yalnızca bugün ödediğini yaz.'
+            : undefined}
+        />
 
         <View style={styles.spacer} />
         <Button label="Kaydet" onPress={kaydet} disabled={!valid} />

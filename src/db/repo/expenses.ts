@@ -38,7 +38,9 @@ import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
  * "YAKIT" KASTEN YOK. Yakıtın kendi tablosu var (`fuel_logs`) ve gün
  * özeti oradan okuyor. Bir de gider kategorisi olsaydı sürücü aynı
  * dolumu iki yere girebilir, iki kez düşülür ve fark edilmezdi.
- * Vardiya sonundaki "Yakıt" çipi `addFuelLog`'a gider, `addExpense`'e değil.
+ * Vardiya sonu sihirbazında yakıt çipi yok (tüketim ve fiyat orada zaten
+ * soruluyor); dolum Anasayfa'dan (açık vardiya) ya da Kayıtlar'dan
+ * `addFuelLog` ile girilir, `addExpense` ile değil.
  *
  * `kind` alanının ŞU AN HİÇBİR HESAP DAVRANIŞI YOKTUR, yalnızca etikettir.
  * Sabit gider tahakkuku yayın sonrasına ertelendi (27 Ağustos 2026); plaka
@@ -58,6 +60,18 @@ const SYSTEM_CATEGORIES: ReadonlyArray<{
   { name: 'Vergi', kind: 'fixed', icon: 'receipt' },
   { name: 'Diğer', kind: 'variable', icon: 'dots' },
 ];
+
+/**
+ * Kendi aracında yıpranma katsayısının İÇİNDE kabaca sayılan kalemler —
+ * bakım, sigorta, vergi (bkz. `_shared.ts`, tek katsayı). Sürücü bunları
+ * yine gider olarak girebilir; reddetmiyoruz, çünkü ödediği gerçek para.
+ * Gider ekranı yalnızca kısa bir ipucu gösteriyor. Hesap değişmiyor.
+ * Sistem kategorisinin simgesiyle tanınıyor: ad kullanıcıya göre
+ * değişebilir, simge değişmiyor.
+ */
+export const WEAR_COVERED_CATEGORY_ICONS: ReadonlySet<string> = new Set([
+  'wrench', 'shield', 'receipt',
+]);
 
 /**
  * Sistem kategorilerini bir kez oluşturur.
