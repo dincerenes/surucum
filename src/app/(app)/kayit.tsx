@@ -11,6 +11,7 @@ import {
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatClock } from '@/lib/business-date';
 import { type Kurus, formatAmountForInput, parseAmount } from '@/lib/money';
+import { isKnownUnitPrice } from '@/lib/fuel-type-pick';
 import { requestSync } from '@/sync/scheduler';
 import { space, type as typeScale, useTheme } from '@/theme/use-theme';
 import { SheetHeader, sheetStyles } from '@/components/ui/sheet';
@@ -92,15 +93,21 @@ export default function EditRecordScreen() {
   const amountText = amount ?? formatAmountForInput(currentAmount);
   const parsedAmount = parseAmount(amountText);
 
-  const currentPrice = kind === 'yakit'
+  /**
+   * Fiyatsız dolumda sütun 0 tutuyor ("bilinmiyor"); alan "0" diye değil
+   * boş açılır. Yazılan fiyat da sıfır ya da eksi olamaz.
+   */
+  const storedPrice = kind === 'yakit'
     ? (record as { unitPriceKurus: Kurus }).unitPriceKurus : null;
+  const currentPrice = isKnownUnitPrice(storedPrice) ? storedPrice : null;
   const priceText = price ?? formatAmountForInput(currentPrice);
   const parsedPrice = parseAmount(priceText);
+  const priceValid = priceText.trim().length === 0 || isKnownUnitPrice(parsedPrice);
 
   const selectedCategory = categoryId
     ?? (kind === 'gider' ? (record as { categoryId: string }).categoryId : null);
 
-  const valid = parsedAmount != null && parsedAmount > 0;
+  const valid = parsedAmount != null && parsedAmount > 0 && priceValid;
 
   function kaydet() {
     if (!valid || !userId) return;
@@ -119,12 +126,13 @@ export default function EditRecordScreen() {
        * hacim eski kalırsa litre fiyatı kendiliğinden değişmiş olur ve
        * kayıt kendi içinde çelişir.
        */
-      const volume = parsedPrice && parsedPrice > 0
+      const known = isKnownUnitPrice(parsedPrice);
+      const volume = known
         ? Math.round((parsedAmount / parsedPrice) * 1000)
         : 0;
       saved = updateFuelLog(userId, id, {
         totalAmountKurus: parsedAmount as Kurus,
-        unitPriceKurus: (parsedPrice ?? 0) as Kurus,
+        unitPriceKurus: (known ? parsedPrice : 0) as Kurus,
         volumePer1000: volume,
       });
     }
@@ -207,7 +215,9 @@ export default function EditRecordScreen() {
             value={priceText}
             onChangeText={setPrice}
             unit="₺/lt"
-            hint="Zorunlu değil — girersen gün hesabı bu fiyatı kullanır."
+            hint={priceValid
+              ? 'Zorunlu değil — girersen kaç litre aldığın hesaplanır.'
+              : 'Litre fiyatı sıfırdan büyük olmalı. Bilmiyorsan boş bırak.'}
           />
         ) : null}
 
