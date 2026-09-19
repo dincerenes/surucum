@@ -1,8 +1,12 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { AmountText } from './amount-text';
-import type { DaySummary } from '@/lib/day-summary';
+import type { DaySummary, FuelSource } from '@/lib/day-summary';
 import type { Kurus } from '@/lib/money';
-import { add, formatDecimal, formatInteger } from '@/lib/money';
+import { add, formatInteger } from '@/lib/money';
+import {
+  CASH_PROFIT_CAPTION, type SummaryNote, TRUE_PROFIT_CAPTION, buildDayNotes, fuelRowLabel,
+  isFuelUnknown,
+} from '@/lib/summary-notes';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 /**
@@ -21,12 +25,20 @@ export interface ProfitRowsData {
   wearShare: Kurus;
   trueProfit: Kurus;
 
-  /** Yakıt satırına yazılacak hacim, mililitre. Bilinmiyorsa `null`. */
+  /** Tüketimden hesaplanan hacim, mililitre. Hesaplanmadıysa `null`. */
   fuelVolume: number | null;
+  /** Yakıt tutarının nereden geldiği — satır etiketi bunu söylüyor. */
+  fuelSource: FuelSource;
+  /**
+   * Yakıt BİLİNMİYOR mu? Tutar sıfırken yakıtı bilinmeyen vardiya varsa
+   * satır gizlenmez, "bilinmiyor" diye soluk çizilir. Rakam yok, yani
+   * satırlar toplanınca yine gerçek kâra ulaşılır.
+   */
+  fuelUnknown: boolean;
   /** Yıpranma satırına yazılacak kilometre. Bilinmiyorsa `null`. */
   distanceKm: number | null;
-  /** Eksik girdi uyarıları — boş dizi hiçbir şey çizmez. */
-  notes: readonly string[];
+  /** Eksik girdi uyarıları ve bilgi notları — boş dizi hiçbir şey çizmez. */
+  notes: readonly SummaryNote[];
 }
 
 interface Props {
@@ -55,8 +67,10 @@ export function SummaryRows({ summary, detailed = true }: Props) {
  * arasındaki fark bu ürünün neden var olduğudur: sürücü akşam cebindeki
  * parayla eve gider ve kazandığını sanır; aracının eridiğini görmez.
  *
- * İKİ SATIR ARASINDAKİ TEK FARK YIPRANMA PAYIDIR. (2) sürücünün akşam
- * cebinde bulduğu para; (3) aracının eridiği de düşülmüş hâli.
+ * İKİ SATIR ARASINDAKİ TEK FARK YIPRANMA PAYIDIR. (2) yıpranma hariç
+ * kalan; (3) aracının eridiği de düşülmüş hâli. (2)'ye "gerçekleşmiş
+ * nakit" DENMİYOR: yakıt tüketimden hesaplanabiliyor ve o gün pompaya
+ * ödenenden farklı olabiliyor — satır etiketi kaynağını söylüyor.
  *
  * Ekrandaki satırlar toplanınca gerçek kâra ULAŞMALI: sürücü gördüğü
  * sayıları topluyor ve tutmadığında sayıya güvenmiyor.
@@ -81,14 +95,17 @@ export function ProfitRows({
       {detailed ? (
         <>
           <Deduction label="Komisyon" value={data.commission} />
-          <Deduction
-            label={
-              data.fuelVolume == null
-                ? 'Yakıt'
-                : `Yakıt · ${formatDecimal(data.fuelVolume / 1000)} lt`
-            }
-            value={data.fuelPaid}
-          />
+          {data.fuelUnknown ? (
+            <View style={styles.line}>
+              <Text style={[typeScale.body, { color: colors.textFaint }]}>Yakıt · bilinmiyor</Text>
+              <Text style={[typeScale.body, { color: colors.textFaint }]}>—</Text>
+            </View>
+          ) : (
+            <Deduction
+              label={fuelRowLabel(data.fuelSource, data.fuelVolume)}
+              value={data.fuelPaid}
+            />
+          )}
           <Deduction label="Gider" value={data.expensesPaid} />
         </>
       ) : (
@@ -102,7 +119,7 @@ export function ProfitRows({
           <View style={styles.heroText}>
             <Text style={[styles.heroLabel, { color: colors.accent }]}>CEBE KALAN</Text>
             <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-              gerçekleşmiş nakit
+              {CASH_PROFIT_CAPTION}
             </Text>
           </View>
           <AmountText value={data.cashProfit} size="title" tone="signed" />
@@ -123,7 +140,7 @@ export function ProfitRows({
           <View style={styles.heroText}>
             <Text style={[styles.heroLabel, { color: colors.text }]}>GERÇEK KÂR</Text>
             <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-              yıpranma dahil
+              {TRUE_PROFIT_CAPTION}
             </Text>
           </View>
           <AmountText value={data.trueProfit} size="title" tone="signed" />
@@ -143,23 +160,14 @@ export function ProfitRows({
 /**
  * Gün özetini bloğun beklediği şekle çevirir ve EKSİK GİRDİYİ SÖYLER.
  *
- * Kilometre ya da tüketim girilmemişse gerçek kâr olduğundan iyi görünür.
- * Bunu sessizce yapmak, sürücüye yanlış bir sayıyı doğruymuş gibi
- * göstermektir; sayıya olan güven bir kez kaybedilince geri gelmiyor.
+ * Kilometre, tüketim ya da komisyon girilmemişse sayılar olduğundan iyi
+ * görünür. Bunu sessizce yapmak, sürücüye yanlış bir sayıyı doğruymuş
+ * gibi göstermektir; sayıya olan güven bir kez kaybedilince geri
+ * gelmiyor. Metinler `summary-notes.ts`'te ve tutardan değil özetin
+ * eksiklik alanlarından üretiliyor: "yakıt 0" ile "yakıt bilinmiyor"
+ * aynı şey değil.
  */
 export function toRowsData(summary: DaySummary): ProfitRowsData {
-  const notes: string[] = [];
-
-  if (summary.distanceKm == null) {
-    notes.push('Kilometre girilmediği için yıpranma payı hesaplanmadı.');
-  } else if (summary.shiftsMissingDistance > 0) {
-    notes.push(`${summary.shiftsMissingDistance} vardiyanın kilometresi girilmemiş; pay eksik.`);
-  }
-
-  if (summary.fuelVolume == null && summary.profit.fuelPaid > 0) {
-    notes.push('Ortalama tüketim girilmediği için yakıt, kaydedilen dolum tutarından sayıldı.');
-  }
-
   return {
     revenue: summary.profit.revenue,
     commission: summary.profit.commission,
@@ -169,8 +177,12 @@ export function toRowsData(summary: DaySummary): ProfitRowsData {
     wearShare: summary.profit.wearShare,
     trueProfit: summary.profit.trueProfit,
     fuelVolume: summary.fuelVolume,
+    fuelSource: summary.completeness.fuelSource,
+    fuelUnknown: isFuelUnknown(
+      summary.profit.fuelPaid, summary.completeness.shiftsMissingFuel,
+    ),
     distanceKm: summary.distanceKm,
-    notes,
+    notes: buildDayNotes(summary),
   };
 }
 
@@ -186,16 +198,37 @@ function Deduction({ label, value }: { label: string; value: number }) {
   );
 }
 
-function MissingData({ notes }: { notes: readonly string[] }) {
+/**
+ * Uyarılar ve bilgi notları AYRI kutularda: uyarı "bu sayı olduğundan
+ * iyi" der, bilgi "şu kayıt neden düşülmedi" der. Aynı sarı kutuda
+ * dururlarsa doğru bir hesap da hatalıymış gibi okunur.
+ */
+function MissingData({ notes }: { notes: readonly SummaryNote[] }) {
   const { colors } = useTheme();
-  if (notes.length === 0) return null;
+  const warnings = notes.filter((n) => n.tone === 'warning');
+  const infos = notes.filter((n) => n.tone === 'info');
 
   return (
-    <View style={[styles.note, { backgroundColor: colors.warningSoft }]}>
-      {notes.map((n) => (
-        <Text key={n} style={[typeScale.caption, { color: colors.warning }]}>{n}</Text>
-      ))}
-    </View>
+    <>
+      {warnings.length > 0 ? (
+        <View style={[styles.note, { backgroundColor: colors.warningSoft }]}>
+          {warnings.map((n) => (
+            <Text key={n.text} style={[typeScale.caption, { color: colors.warning }]}>
+              {n.text}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+      {infos.length > 0 ? (
+        <View style={[styles.note, { backgroundColor: colors.surfaceSunken }]}>
+          {infos.map((n) => (
+            <Text key={n.text} style={[typeScale.caption, { color: colors.textSoft }]}>
+              {n.text}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+    </>
   );
 }
 

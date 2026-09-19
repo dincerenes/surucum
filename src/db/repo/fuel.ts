@@ -85,6 +85,7 @@ export function addFuelLog(
     tx.insert(fuelLogs).values({
       ...stamp,
       vehicleId,
+      shiftId: shift ? input.shiftId : null,
       fuelType: input.fuelType,
       occurredAt,
       businessDate: shift?.businessDate

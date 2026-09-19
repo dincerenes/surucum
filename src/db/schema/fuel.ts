@@ -19,6 +19,20 @@ export const fuelLogs = sqliteTable(
     vehicleId: text().notNull(),
     fuelType: text({ enum: FUEL_TYPES }).notNull(),
 
+    /**
+     * Dolum açık bir vardiya sırasında girildiyse o vardiya.
+     *
+     * YAKIT VARDİYA BAŞINA TEK SAYI: tüketim × km × fiyat hesaplanabiliyorsa
+     * o sayılır, hesaplanamıyorsa o vardiyaya bağlı dolumlar. Bağ olmadan
+     * günün TEK bir tüketimli vardiyası o günün bütün dolumlarını hesaptan
+     * çıkarıyordu — tüketimi girilmemiş diğer vardiyanın yakıtı sıfır
+     * görünüyordu. Vardiyasız dolumun kuralı `day-summary.ts`'te.
+     *
+     * Eski dolumlar için DOLDURULMADI: hangi vardiyaya ait olduğu
+     * bilinmiyor; vardiyasız dolum kuralı onları taşıyor.
+     */
+    shiftId: text(),
+
     occurredAt: integer().notNull(),
     businessDate: businessDate().notNull(),
 
@@ -43,6 +57,7 @@ export const fuelLogs = sqliteTable(
   (t) => [
     index('fuel_logs_user_date_idx').on(t.userId, t.businessDate),
     index('fuel_logs_vehicle_idx').on(t.vehicleId, t.occurredAt),
+    index('fuel_logs_shift_idx').on(t.shiftId),
   ],
 );
 

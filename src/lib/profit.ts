@@ -4,8 +4,8 @@
  * Bir sürücünün gününü ÜÇ ayrı sayı anlatır ve üçü de gösterilir:
  *
  *   1. CİRO          — müşteriden tahsil edilen brüt tutar.
- *   2. CEBE KALAN    — ciro eksi komisyon, eksi o gün fiilen ödenen
- *                      gider ve yakıt. Sürücünün akşam cebinde bulduğu para.
+ *   2. CEBE KALAN    — ciro eksi komisyon, eksi yakıt, eksi o gün ödenen
+ *                      gider. Yıpranma hariç.
  *   3. GERÇEK KÂR    — cebe kalan, eksi kilometre yıpranma payı.
  *
  * Neden üçü birden? Çünkü 2 ile 3 arasındaki fark ürünün varlık sebebi.
@@ -15,8 +15,16 @@
  * inandırmaz — "ben 3.000 lira aldım, bu uygulama ne diyor" der ve siler.
  * Yalnızca (2)'yi göstermek ise bildiğini tekrar etmektir.
  *
- * (2) NAKİT GERÇEKTİR: yalnızca gerçekten el değiştirmiş parayı içerir.
- * (3) MODELDİR: tahakkuk ve tahmin içerir. Bu ayrım arayüzde de korunmalı.
+ * İKİ SATIR ARASINDAKİ TEK FARK YIPRANMA. Komisyon, yakıt ve gider
+ * ikisinde de aynı sayı; ekrandaki satırlar toplanınca gerçek kâra
+ * ulaşmalı.
+ *
+ * (2) "GERÇEKLEŞMİŞ NAKİT" DEĞİLDİR ve öyle anlatılmamalı: yakıt,
+ * "Yakıt tek sayıdır" kuralıyla vardiya başına bulunuyor — tüketim
+ * girildiyse km × tüketim × fiyat (bir model), girilmediyse o vardiyanın
+ * dolumu. O gün pompaya ödenenle aynı olmayabilir; arayüz yakıt satırının
+ * kaynağını ve sayılmayan dolumu ayrıca söylüyor (`summary-notes.ts`).
+ * (3) yıpranma payını da düşer — bilerek düşük tutulmuş bir katsayı.
  */
 
 import { type Kurus, ZERO, add, multiply, subtract, sum } from './money.ts';
@@ -29,7 +37,10 @@ export interface ProfitBreakdown {
   /** Kazanç kaynaklarının kestiği toplam komisyon. */
   commission: Kurus;
 
-  /** O günün yakıt maliyeti. */
+  /**
+   * O günün yakıt maliyeti — vardiya başına tüketimden ya da dolumdan
+   * (`day-summary.ts`). Adı eski; pompaya ödenen tutar olmayabilir.
+   */
   fuelPaid: Kurus;
 
   /** O gün fiilen ödenen diğer giderler — yemek, otopark, yıkama. */
@@ -44,7 +55,7 @@ export interface ProfitBreakdown {
   /** (1) Ciro. `grossRevenue` ile aynı; okunurluk için ayrı ad. */
   revenue: Kurus;
 
-  /** (2) Cebe kalan — yalnızca gerçekleşmiş nakit. */
+  /** (2) Cebe kalan — ciro − komisyon − yakıt − gider. Yıpranma hariç. */
   cashProfit: Kurus;
 
   /** (3) Gerçek kâr — tahakkuk ve yıpranma düşülmüş. */
@@ -107,7 +118,7 @@ export function calculateProfit(input: ProfitInput): ProfitBreakdown {
   const wearShare = input.wearShare
     ?? calculateWearShare(input.distanceKm, input.wearPerKmKurus);
 
-  // (2) Yalnızca gerçekleşmiş nakit.
+  // (2) Yıpranma hariç: komisyon, yakıt ve gider düşülmüş.
   const cashProfit = subtract(grossRevenue, add(commission, fuelPaid, expensesPaid));
 
   // (3) Aynı hesap, üstüne yıpranma payı. Tek fark bu.

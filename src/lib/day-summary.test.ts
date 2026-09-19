@@ -399,3 +399,206 @@ describe('gece vardiyası gün ortasında bölünmez', () => {
     assert.equal(s.durationMinutes, 480);
   });
 });
+
+describe('yakıt vardiya başına tek sayı', () => {
+  /** 100 km × 10 lt × 50 ₺ = 500 ₺ yakan kapanmış vardiya. */
+  const burning = (id: string, vehicleId = 'V1') => ({
+    ...shift({ endedAt: T0 + 4 * H, distanceKm: 100 }),
+    id, vehicleId, commissionKurus: k(0),
+    fuelConsumptionPer100Km: 10_000, fuelPriceKurus: k(50),
+  });
+  /** Tüketimi girilmemiş kapanmış vardiya. */
+  const plain = (id: string, vehicleId = 'V1', o: { distanceKm?: number | null } = {}) => ({
+    ...shift({ startedAt: T0 + 5 * H, endedAt: T0 + 9 * H, distanceKm: o.distanceKm ?? null }),
+    id, vehicleId, commissionKurus: k(0),
+  });
+  const fill = (id: string, amount: number, o: { shiftId?: string; vehicleId?: string } = {}) => ({
+    id, totalAmountKurus: k(amount), shiftId: o.shiftId ?? null, vehicleId: o.vehicleId ?? 'V1',
+  });
+  const day = (shifts: object[], fuelLogs: object[]) => calculateDaySummary({
+    rides: [ride(2000, 0)], expenses: [],
+    fuelLogs: fuelLogs as never, shifts: shifts as never, now: T0 + 10 * H,
+  });
+
+  it('aynı araçta A tüketimli, B bilinmiyor, vardiyasız dolum → yalnızca A; B eksik; dolum sayılmadı', () => {
+    const s = day([burning('A'), plain('B')], [fill('f', 300)]);
+    assert.equal(s.profit.fuelPaid, k(500));
+    assert.equal(s.completeness.shiftsMissingFuel, 1);
+    assert.deepEqual(s.completeness.fuelUnknownShiftIds, ['B']);
+    assert.equal(s.completeness.fillsNotCountedKurus, k(300));
+    assert.equal(s.fuelLogStatus.f, 'covered');
+    assert.equal(s.completeness.fuel, 'partial');
+    assert.equal(s.completeness.fuelSource, 'burned');
+  });
+
+  it('dolum B vardiyasına bağlıysa B\'nin yakıtı odur: 500 + 300', () => {
+    const s = day([burning('A'), plain('B')], [fill('f', 300, { shiftId: 'B' })]);
+    assert.equal(s.profit.fuelPaid, k(800));
+    assert.equal(s.completeness.shiftsMissingFuel, 0);
+    assert.equal(s.completeness.fuel, 'complete');
+    assert.equal(s.completeness.fuelSource, 'mixed');
+    assert.equal(s.fuelLogStatus.f, 'counted');
+  });
+
+  it('tüketimli vardiyaya bağlı dolum AYRICA düşülmez: 500, 1200 değil', () => {
+    const s = day([burning('A')], [fill('f', 700, { shiftId: 'A' })]);
+    assert.equal(s.profit.fuelPaid, k(500));
+    assert.equal(s.completeness.fillsNotCountedKurus, k(700));
+    assert.equal(s.fuelLogStatus.f, 'covered');
+  });
+
+  it('iki araç: V1 tüketimli, V2 tüketimsiz + V2 dolumu → 800', () => {
+    const s = day([burning('A', 'V1'), plain('B', 'V2')], [fill('f', 300, { vehicleId: 'V2' })]);
+    assert.equal(s.profit.fuelPaid, k(800));
+    assert.equal(s.completeness.shiftsMissingFuel, 0, 'V2 vardiyası dolumla kapsandı');
+  });
+
+  it('iki araç: V2\'nin dolumu yoksa V2 vardiyası bilinmiyor', () => {
+    const s = day([burning('A', 'V1'), plain('B', 'V2')], []);
+    assert.equal(s.profit.fuelPaid, k(500));
+    assert.equal(s.completeness.shiftsMissingFuel, 1);
+  });
+
+  it('silinmiş (listede olmayan) vardiyaya bağlı dolum vardiyasız sayılır', () => {
+    const s = day([plain('B')], [fill('f', 300, { shiftId: 'silinmis' })]);
+    assert.equal(s.profit.fuelPaid, k(300));
+    assert.equal(s.fuelLogStatus.f, 'counted');
+  });
+
+  it('o gün o araçla hiç vardiya yoksa depo alımı maliyete GİRMEZ', () => {
+    const s = calculateDaySummary({
+      rides: [], expenses: [], fuelLogs: [fill('f', 1000)], shifts: [], now: T0,
+    });
+    assert.equal(s.profit.fuelPaid, 0);
+    assert.equal(s.profit.cashProfit, 0);
+    assert.equal(s.completeness.offDayFillsKurus, k(1000));
+    assert.equal(s.fuelLogStatus.f, 'off_day');
+    // Kayıt var, ama çalışılmış gün değil ve km eksik sayılmaz.
+    assert.equal(s.hasActivity, true);
+    assert.equal(s.isWorkedDay, false);
+    assert.equal(s.completeness.distance, 'none');
+  });
+
+  it('başka araçla vardiya varsa da bu aracın dolumu gün dışıdır', () => {
+    const s = day([plain('B', 'V1')], [fill('f', 400, { vehicleId: 'V2' })]);
+    assert.equal(s.profit.fuelPaid, 0);
+    assert.equal(s.fuelLogStatus.f, 'off_day');
+    assert.equal(s.completeness.shiftsMissingFuel, 1);
+  });
+
+  it('yakıt tamamen bilinmiyor: km var, tüketim yok, dolum yok', () => {
+    const s = day([plain('B', 'V1', { distanceKm: 100 })], []);
+    assert.equal(s.profit.fuelPaid, 0);
+    assert.equal(s.completeness.fuel, 'unknown');
+    assert.equal(s.completeness.fuelSource, 'none');
+    assert.equal(s.completeness.shiftsMissingFuel, 1);
+  });
+
+  it('açık vardiya eksik sayılmaz; ona bağlı dolum o anki yakıttır', () => {
+    const open = { ...shift(), id: 'O', vehicleId: 'V1' };
+    const s = day([open], [fill('f', 700, { shiftId: 'O' })]);
+    assert.equal(s.profit.fuelPaid, k(700));
+    assert.equal(s.completeness.closedShiftCount, 0);
+    assert.equal(s.completeness.openShiftCount, 1);
+    assert.equal(s.completeness.fuel, 'none');
+    assert.equal(s.completeness.distance, 'none');
+    assert.equal(s.shiftsMissingDistance, 0);
+  });
+
+  it('tüketim varken dolum: cebe kalan tüketimle, satırlar yine gerçek kâra ulaşır', () => {
+    // Ciro 1000, dolum 700, tüketim 500 → cebe kalan 500; dolum not olarak söylenir.
+    const s = calculateDaySummary({
+      rides: [ride(1000, 0)], expenses: [],
+      fuelLogs: [fill('f', 700, { shiftId: 'A' })],
+      shifts: [{ ...burning('A'), wearPerKmKurus: k(2.5) }],
+      now: T0 + 10 * H,
+    });
+    assert.equal(s.completeness.fillsNotCountedKurus, 70000);
+    assert.equal(s.profit.cashProfit, 50000);
+    assert.equal(s.profit.trueProfit, s.profit.cashProfit - s.profit.wearShare);
+    assert.equal(
+      s.profit.revenue - s.profit.commission - s.profit.fuelPaid - s.profit.expensesPaid
+        - s.profit.wearShare,
+      s.profit.trueProfit,
+    );
+  });
+
+  it('eski satırlar (araç ve bağ bilgisi yok) eski davranışla hesaplanır', () => {
+    const s = calculateDaySummary({
+      rides: [ride(1000, 0)], expenses: [],
+      fuelLogs: [{ totalAmountKurus: k(300) }],
+      shifts: [shift({ endedAt: T0 + 5 * H })],
+      now: T0 + 6 * H,
+    });
+    assert.equal(s.profit.fuelPaid, k(300));
+  });
+
+  it('bütün yakıt tutarları tam sayı kuruş', () => {
+    const s = day([burning('A'), plain('B')], [fill('f', 333.33), fill('g', 1.01, { shiftId: 'B' })]);
+    for (const v of [s.profit.fuelPaid, s.completeness.fillsNotCountedKurus,
+      s.completeness.offDayFillsKurus]) {
+      assert.ok(Number.isInteger(v), String(v));
+    }
+  });
+});
+
+describe('eksiklik tutardan bağımsız', () => {
+  it('gerçek sıfır komisyon eksik DEĞİL; boş bırakılan eksik', () => {
+    const s = calculateDaySummary({
+      rides: [ride(1000, 0)], expenses: [], fuelLogs: [],
+      shifts: [
+        { ...shift({ endedAt: T0 + H }), commissionKurus: k(0) },
+        { ...shift({ startedAt: T0 + 2 * H, endedAt: T0 + 3 * H }), commissionKurus: null },
+      ],
+      now: T0 + 4 * H,
+    });
+    assert.equal(s.completeness.shiftsMissingCommission, 1);
+    assert.equal(s.completeness.commission, 'partial');
+    assert.equal(s.profit.commission, 0);
+  });
+
+  it('yalnızca gider içeren gün km eksik sayılmaz', () => {
+    const s = calculateDaySummary({
+      rides: [], expenses: [{ amountKurus: k(500) }], fuelLogs: [], shifts: [], now: T0,
+    });
+    assert.equal(s.completeness.distance, 'none');
+    assert.equal(s.shiftsMissingDistance, 0);
+    assert.equal(s.completeness.fuel, 'none');
+  });
+});
+
+describe('günde gösterilecek bir şey var mı', () => {
+  const base = { rides: [], expenses: [], fuelLogs: [], shifts: [], now: T0 + 10 * H };
+
+  it('yalnızca gider', () => {
+    const s = calculateDaySummary({ ...base, expenses: [{ amountKurus: k(500) }] });
+    assert.equal(s.hasActivity, true);
+    assert.equal(s.profit.cashProfit, k(-500));
+    assert.equal(s.isWorkedDay, false);
+  });
+
+  it('yalnızca dolum', () => {
+    assert.equal(calculateDaySummary({ ...base, fuelLogs: [{ totalAmountKurus: k(700) }] }).hasActivity, true);
+  });
+
+  it('yalnızca komisyonlu kapanmış vardiya', () => {
+    const s = calculateDaySummary({
+      ...base, shifts: [{ ...shift({ endedAt: T0 + H }), commissionKurus: k(100) }],
+    });
+    assert.equal(s.hasActivity, true);
+    assert.equal(s.isWorkedDay, true);
+  });
+
+  it('tam sıfır dengelenmiş gün de gösterilir', () => {
+    const s = calculateDaySummary({
+      ...base, rides: [ride(500, 0)], expenses: [{ amountKurus: k(500) }],
+    });
+    assert.equal(s.profit.cashProfit, 0);
+    assert.equal(s.hasActivity, true);
+  });
+
+  it('yalnızca açık vardiya ya da boş gün — gösterilecek bir şey yok', () => {
+    assert.equal(calculateDaySummary({ ...base, shifts: [shift()] }).hasActivity, false);
+    assert.equal(calculateDaySummary(base).hasActivity, false);
+  });
+});

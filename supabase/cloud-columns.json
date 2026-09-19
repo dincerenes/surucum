@@ -123,6 +123,7 @@
       "target_net_kurus": "bigint"
     }
   },
+  "_bekleyen": "shifts.wear_per_km_kurus ve fuel_logs.shift_id supabase/migrations/PENDING_shift_wear_snapshot.sql ve PENDING_fuel_log_shift.sql ile geliyor. O dosyalar uygulanana kadar bu iki sütun bulutta YOK; uygulama bu sürümden önce güncellenmemeli.",
   "tables": {
     "app_settings": [
       "id",
@@ -192,7 +193,8 @@
       "is_full_tank",
       "station_name",
       "receipt_path",
-      "notes"
+      "notes",
+      "shift_id"
     ],
     "goals": [
       "id",

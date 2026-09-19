@@ -15,6 +15,7 @@ import {
   type DayEntry, type PeriodTotals, calculatePeriodTotals, percentChange,
   summarizeByWeekday,
 } from '@/lib/stats';
+import { buildPeriodNotes, isFuelUnknown } from '@/lib/summary-notes';
 import {
   accentStep, radius, space, type as typeScale, useTheme,
 } from '@/theme/use-theme';
@@ -102,9 +103,14 @@ export default function StatsScreen() {
         <EmptyPeriod period={period} />
       ) : (
         <>
+          {/*
+            * Çalışılan gün: sefer ya da kapanmış vardiya olan gün. Yalnız
+            * gider ya da depo alımı olan gün sayılmıyor; maliyeti yine
+            * aşağıdaki toplamda.
+            */}
           <Card
             title={PERIOD_LABELS[period]}
-            meta={`${totals.dayCount} gün çalışıldı`}
+            meta={`${totals.workedDayCount} gün çalışıldı`}
           >
             <ProfitRows
               data={{
@@ -116,13 +122,16 @@ export default function StatsScreen() {
                 wearShare: totals.wearShare,
                 trueProfit: totals.trueProfit,
                 /**
-                 * Hacim dönem geneline yazılmıyor: günlerin bir kısmında
-                 * tüketim girilmiş, bir kısmında girilmemiş olabilir ve
-                 * yarısı ölçülmüş bir litre toplamı yanlış bilgidir.
+                 * Hacim ve kaynak dönem geneline yazılmıyor: günlerin bir
+                 * kısmında tüketim girilmiş, bir kısmında girilmemiş
+                 * olabilir ve yarısı ölçülmüş bir litre toplamı yanlış
+                 * bilgidir. Kaynak farkları notlarda söyleniyor.
                  */
                 fuelVolume: null,
+                fuelSource: 'none',
+                fuelUnknown: isFuelUnknown(totals.fuelPaid, totals.shiftsMissingFuel),
                 distanceKm: totals.distanceKm,
-                notes: periodNotes(totals),
+                notes: buildPeriodNotes(totals),
               }}
             />
           </Card>
@@ -162,11 +171,11 @@ export default function StatsScreen() {
             </Text>
           </Card>
 
-          {data?.previous && data.previous.dayCount > 0 ? (
+          {data?.previous && data.previous.workedDayCount > 0 ? (
             <Comparison current={totals} previous={data.previous} period={period} />
           ) : null}
 
-          <WeekdayStrip stats={data?.weekdays ?? []} dayCount={totals.dayCount} />
+          <WeekdayStrip stats={data?.weekdays ?? []} dayCount={totals.workedDayCount} />
         </>
       )}
     </ScrollView>
@@ -250,7 +259,7 @@ function Comparison({
   const label = period === 'week' ? 'Geçen hafta' : 'Geçen ay';
 
   return (
-    <Card title={label} meta={`${previous.dayCount} gün`}>
+    <Card title={label} meta={`${previous.workedDayCount} gün`}>
       <View style={styles.line}>
         <Text style={[typeScale.body, { color: colors.textSoft }]}>Cebe kalan</Text>
         <Text style={[typeScale.bodyStrong, {
@@ -313,18 +322,6 @@ function Metric({ value, label }: { value: string; label: string }) {
   );
 }
 
-/** Dönemin eksik girdileri — gün özetindekiyle aynı dürüstlük kuralı. */
-function periodNotes(totals: PeriodTotals): string[] {
-  const notes: string[] = [];
-  if (totals.daysMissingDistance > 0) {
-    notes.push(
-      `${totals.daysMissingDistance} günün kilometresi girilmemiş; `
-      + 'yıpranma payı o günler için hesaplanmadı ve gerçek kâr '
-      + 'olduğundan iyi görünüyor.',
-    );
-  }
-  return notes;
-}
 
 /**
  * Dönemin sınırları ve karşılaştırılacak önceki dönem.

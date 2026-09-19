@@ -23,8 +23,17 @@ export interface DayEntry {
 }
 
 export interface PeriodTotals {
-  /** Kaydı olan gün sayısı. Çalışılmayan günler SAYILMAZ. */
+  /** Kaydı olan gün sayısı — dönem boş mu, onu söyler. */
   dayCount: number;
+
+  /**
+   * ÇALIŞILAN gün sayısı — sefer ya da kapanmış vardiya olan gün. Gün
+   * başına ortalamanın paydası bu. Yalnızca gider ya da depo alımı olan
+   * gün çalışılmış sayılmaz: sürücünün Pazar günü yaptığı dolum o günü
+   * "−1.000 ₺ kazandığı gün" yapıp ortalamayı yarıya indiriyordu.
+   * Maliyeti yine dönem toplamında kalıyor.
+   */
+  workedDayCount: number;
 
   revenue: Kurus;
   cashProfit: Kurus;
@@ -47,8 +56,21 @@ export interface PeriodTotals {
   /** Çalışılan gün başına cebe kalan. */
   perDay: Kurus | null;
 
-  /** Kilometresi eksik olduğu için yıpranma payı hesaplanamayan gün sayısı. */
-  daysMissingDistance: number;
+  /**
+   * Eksiklikler — günlerinkinin toplamı, tutardan bağımsız. Yalnızca
+   * KAPANMIŞ vardiyalar sayılıyor: açık vardiyanın kilometresi henüz
+   * sorulmadı, yalnız gider içeren günde de sorulacak bir şey yok.
+   * Eskiden yalnızca "km'si hiç bilinmeyen gün" sayılıyordu: iki
+   * vardiyanın birinde km eksik olan gün dönemde kayboluyor, yalnız
+   * gider içeren gün ise km eksik sayılıyordu.
+   */
+  shiftsMissingDistance: number;
+  shiftsMissingFuel: number;
+  shiftsMissingCommission: number;
+  /** Tüketimden hesaplandığı için ayrıca düşülmeyen dolumlar. */
+  fillsNotCountedKurus: Kurus;
+  /** O gün o araçla vardiya olmadığı için hesaba girmeyen depo alımları. */
+  offDayFillsKurus: Kurus;
 }
 
 /**
@@ -80,9 +102,12 @@ export function calculatePeriodTotals(days: readonly DayEntry[]): PeriodTotals {
     : null;
 
   const dayCount = days.length;
+  const workedDayCount = days.filter((d) => d.summary.isWorkedDay).length;
+  const count = (pick: (d: DayEntry) => number) => days.reduce((acc, d) => acc + pick(d), 0);
 
   return {
     dayCount,
+    workedDayCount,
     revenue,
     cashProfit,
     trueProfit,
@@ -96,8 +121,12 @@ export function calculatePeriodTotals(days: readonly DayEntry[]): PeriodTotals {
     perHour: earningsPerHour(cashProfit, durationMinutes),
     perKm: earningsPerKm(cashProfit, distanceKm),
     perRide: earningsPerRide(cashProfit, rideCount),
-    perDay: earningsPerDay(cashProfit, dayCount),
-    daysMissingDistance: days.filter((d) => d.summary.distanceKm == null).length,
+    perDay: earningsPerDay(cashProfit, workedDayCount),
+    shiftsMissingDistance: count((d) => d.summary.completeness.shiftsMissingDistance),
+    shiftsMissingFuel: count((d) => d.summary.completeness.shiftsMissingFuel),
+    shiftsMissingCommission: count((d) => d.summary.completeness.shiftsMissingCommission),
+    fillsNotCountedKurus: sum(days.map((d) => d.summary.completeness.fillsNotCountedKurus)),
+    offDayFillsKurus: sum(days.map((d) => d.summary.completeness.offDayFillsKurus)),
   };
 }
 
@@ -125,6 +154,9 @@ export interface WeekdayStat {
  * ORAN NEGATİFİ KIRPMIYOR ama şeride sıfır olarak giriyor: zararlı bir
  * günü "az kazançlı" tonlamak, zararı bir tonun içinde saklamak olurdu.
  * Zarar rakamın kendisinde kırmızı duruyor.
+ *
+ * Yalnızca ÇALIŞILAN günler (`isWorkedDay`): Pazar yapılan bir depo alımı
+ * Pazar'ı "ortalama −1.000 ₺" gösteriyordu.
  */
 export function summarizeByWeekday(days: readonly DayEntry[]): WeekdayStat[] {
   const buckets: Array<{ total: Kurus; count: number }> = Array.from(
@@ -132,6 +164,7 @@ export function summarizeByWeekday(days: readonly DayEntry[]): WeekdayStat[] {
   );
 
   for (const day of days) {
+    if (!day.summary.isWorkedDay) continue;
     const bucket = buckets[weekdayIndex(day.date)];
     bucket.total = add(bucket.total, day.summary.profit.cashProfit);
     bucket.count += 1;

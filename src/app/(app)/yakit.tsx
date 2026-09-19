@@ -17,8 +17,17 @@ import { SheetHeader, sheetStyles } from '@/components/ui/sheet';
  * Yakıt dolumu.
  *
  * Kilometre sayacı SORULMUYOR — tam depo/sayaç zinciri kapsam dışı.
- * Buradaki kaydın iki işi var: o gün cepten çıkan parayı yazmak ve
- * birim fiyatı güncel tutmak (gün hesabı o fiyatı kullanıyor).
+ * Buradaki kaydın iki işi var:
+ *
+ * - Litre fiyatını güncel tutmak: vardiya sonunda fiyat olarak önerilir.
+ * - Tüketimi hesaplanamayan vardiyanın yakıtı olmak. YAKIT VARDİYA BAŞINA
+ *   TEK SAYI: vardiyada km × tüketim × fiyat hesaplanabiliyorsa dolum
+ *   AYRICA düşülmez (aynı yakıt iki kez düşülürdü). Vardiya açıkken
+ *   girilen dolum o vardiyaya bağlanır; hiç vardiya olmayan günün depo
+ *   alımı hesaba girmez, yalnızca fiyat kaynağıdır (bkz. `day-summary.ts`).
+ *
+ * Bu yüzden ekran dolumun "o gün cepten çıkan para" olarak düşüleceğini
+ * vaat etmiyor; ipuçları kuralı söylüyor.
  */
 export default function AddFuelScreen() {
   const { colors } = useTheme();
@@ -99,7 +108,12 @@ export default function AddFuelScreen() {
           </View>
         ) : null}
 
-        <AmountInput label="Ödediğin tutar" value={total} onChangeText={setTotal} autoFocus />
+        <AmountInput
+          label="Ödediğin tutar" value={total} onChangeText={setTotal} autoFocus
+          hint={openShift
+            ? 'Vardiya sonunda ortalama tüketimi girersen yakıt tüketimden hesaplanır; bu tutar ayrıca düşülmez.'
+            : 'Vardiya dışında alınan yakıt, o gün bu araçla vardiya yoksa hesaba ayrıca girmez — yakıt çalıştığın günlerde sayılır.'}
+        />
         <AmountInput
           label="Litre fiyatı"
           value={unitPrice}

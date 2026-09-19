@@ -66,24 +66,6 @@ export function getTodaySummary(
   return getDaySummary(userId, date, now);
 }
 
-/**
- * Bir iş günü aralığının özeti — hafta, ay, "tümü".
- *
- * Günlere bölünmez, aralığın tamamı tek seferde toplanır: gün gün
- * toplayıp sonra birleştirmek her günde bir yuvarlama yapar ve aylık
- * toplam, günlerin toplamıyla tutmaz.
- */
-export function getRangeSummary(
-  userId: string, from: BusinessDate, to: BusinessDate, now: UnixMs = Date.now(),
-): DaySummary {
-  return calculateDaySummary({
-    rides: readRides(userId, from, to),
-    expenses: readExpenses(userId, from, to),
-    fuelLogs: readFuelLogs(userId, from, to),
-    shifts: readShiftRows(userId, from, to),
-    now,
-  });
-}
 
 /**
  * Aralıktaki her GÜNÜN ayrı özeti — istatistik ekranının girdisi.
@@ -96,6 +78,11 @@ export function getRangeSummary(
  * KAYDI OLMAYAN GÜN LİSTEDE YOK. Boş günü sıfır kazançlı bir gün gibi
  * döndürmek ortalamaları bozar: sürücü çalışmadığı Pazar'ı "0 ₺ kazandığı
  * gün" olarak saymaz ve haklıdır.
+ *
+ * Dönem özeti BU GÜNLERİN TOPLAMI — aralık tek seferde hesaplanmıyor.
+ * Yakıt vardiya ve gün kapsamında seçiliyor; aralığın tamamına tek karar
+ * uygulamak ayın tek tüketimli vardiyasıyla o ayın bütün dolumlarını
+ * silerdi. (Öyle çalışan `getRangeSummary` kullanılmıyordu, kaldırıldı.)
  */
 export function listDaySummaries(
   userId: string, from: BusinessDate, to: BusinessDate, now: UnixMs = Date.now(),
@@ -187,6 +174,9 @@ function readExpensesByDay(userId: string, from: BusinessDate, to: BusinessDate)
 function readFuelLogsByDay(userId: string, from: BusinessDate, to: BusinessDate) {
   return getDb().select({
     businessDate: fuelLogs.businessDate,
+    id: fuelLogs.id,
+    shiftId: fuelLogs.shiftId,
+    vehicleId: fuelLogs.vehicleId,
     totalAmountKurus: fuelLogs.totalAmountKurus,
   }).from(fuelLogs).where(and(
     alive(fuelLogs, userId),
@@ -200,6 +190,8 @@ function readShiftRowsByDay(
 ): Array<ShiftRow & { businessDate: BusinessDate }> {
   return getDb().select({
     businessDate: shifts.businessDate,
+    id: shifts.id,
+    vehicleId: shifts.vehicleId,
     startedAt: shifts.startedAt,
     endedAt: shifts.endedAt,
     workedMinutes: shifts.workedMinutes,
@@ -251,7 +243,12 @@ function readExpenses(userId: string, from: BusinessDate, to: BusinessDate = fro
 }
 
 function readFuelLogs(userId: string, from: BusinessDate, to: BusinessDate = from) {
-  return getDb().select({ totalAmountKurus: fuelLogs.totalAmountKurus })
+  return getDb().select({
+    id: fuelLogs.id,
+    shiftId: fuelLogs.shiftId,
+    vehicleId: fuelLogs.vehicleId,
+    totalAmountKurus: fuelLogs.totalAmountKurus,
+  })
     .from(fuelLogs).where(and(
       alive(fuelLogs, userId),
       gte(fuelLogs.businessDate, from),
@@ -273,6 +270,8 @@ function readShiftRows(
   userId: string, from: BusinessDate, to: BusinessDate = from,
 ): ShiftRow[] {
   return getDb().select({
+    id: shifts.id,
+    vehicleId: shifts.vehicleId,
     startedAt: shifts.startedAt,
     endedAt: shifts.endedAt,
     workedMinutes: shifts.workedMinutes,
@@ -291,6 +290,8 @@ function readShiftRows(
     ))
     .all()
     .map((r) => ({
+      id: r.id,
+      vehicleId: r.vehicleId,
       startedAt: r.startedAt,
       endedAt: r.endedAt,
       workedMinutes: r.workedMinutes,

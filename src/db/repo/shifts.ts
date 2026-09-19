@@ -16,7 +16,7 @@ import {
   type UnixMs, alive, assertOwned, ownedById, softDeleteRow, stampNew, updateOwned, withOutbox,
 } from './_base';
 import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
-import type { Kurus } from '@/lib/money';
+import { type Kurus, roundHalfAwayFromZero } from '@/lib/money';
 import { toWholePositive } from '@/lib/whole-number';
 
 /**
@@ -70,6 +70,9 @@ export interface EndShiftInput {
   /**
    * O gün uygulamaya ödenen toplam komisyon — TEK RAKAM, oran değil.
    * Sürücü yüzdesini bilmiyor; eline geçeni ve kesileni biliyor.
+   *
+   * Boş BİLİNMİYOR, 0 GERÇEKTEN SIFIR: ikisi hesaba aynı girer ama
+   * özet yalnızca boş bırakılanı "girilmemiş" diye söyler.
    */
   commissionKurus?: Kurus | null;
 
@@ -121,7 +124,7 @@ export function endShift(
      */
     ...(current.wearPerKmKurus == null
       ? { wearPerKmKurus: vehicleWear(userId, current.vehicleId) } : {}),
-    commissionKurus: sanitizeAmount(input.commissionKurus),
+    commissionKurus: sanitizeCommission(input.commissionKurus),
     fuelConsumptionPer100Km: toWholePositive(input.fuelConsumptionPer100Km),
     fuelPriceKurus: sanitizeAmount(input.fuelPriceKurus),
     distanceKm: toWholePositive(input.distanceKm),
@@ -154,7 +157,7 @@ export function updateShiftTotals(
 
   const changed = updateOwned(shifts, 'shifts', userId, id, {
     ...(input.commissionKurus !== undefined
-      ? { commissionKurus: sanitizeAmount(input.commissionKurus) } : {}),
+      ? { commissionKurus: sanitizeCommission(input.commissionKurus) } : {}),
     ...(input.fuelConsumptionPer100Km !== undefined
       ? { fuelConsumptionPer100Km: toWholePositive(input.fuelConsumptionPer100Km) } : {}),
     ...(input.fuelPriceKurus !== undefined
@@ -257,14 +260,24 @@ export function getLastClosedShift(userId: string): Shift | undefined {
 
 
 /**
- * Tutarı temizler: negatif ve sıfır `null` olur.
- *
- * Sıfır komisyon ile "komisyon girilmedi" arasındaki farkı korumak
- * gerekmiyor — ikisi de hesaba sıfır olarak giriyor. Ama negatif bir
- * tutar komisyonu GELİRE çevirirdi.
+ * Fiyatı temizler: negatif ve sıfır `null` olur — sıfır litre fiyatı
+ * "bilinmiyor" demektir, bedava yakıt değil.
  */
 function sanitizeAmount(value: Kurus | null | undefined): Kurus | null {
   if (value == null) return null;
   if (!Number.isFinite(value) || value <= 0) return null;
-  return Math.round(value) as Kurus;
+  return roundHalfAwayFromZero(value) as Kurus;
+}
+
+/**
+ * Komisyonu temizler: negatif `null` olur — negatif bir tutar komisyonu
+ * GELİRE çevirirdi. SIFIR KORUNUR: sıfır komisyon ile "komisyon
+ * girilmedi" hesaba aynı girer ama aynı şey değil. Eskiden ikisi de boş
+ * kaydediliyordu ve özet, 0 yazan sürücüye komisyonu girmediğini
+ * söyleyemiyordu — ya da söylerse yanlış söylüyordu.
+ */
+function sanitizeCommission(value: Kurus | null | undefined): Kurus | null {
+  if (value == null) return null;
+  if (!Number.isFinite(value) || value < 0) return null;
+  return roundHalfAwayFromZero(value) as Kurus;
 }

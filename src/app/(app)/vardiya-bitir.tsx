@@ -28,11 +28,11 @@ import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
  * gösterilirse geri kalanı doldurmaya kimse devam etmez.
  *
  * GİDER ADIMINDA YAKIT ÇİPİ YOK. Tasarım listesinde vardı ama bir önceki
- * adım zaten tüketimi ve litre fiyatını soruyor: gün hesabı yakıtı
- * ondan üretiyor ve kaydedilen dolumu yok sayıyor (ikisi birden
- * sayılsaydı aynı yakıt iki kez düşülürdü). İki adım arayla aynı şeyi
- * iki kez sormak, sürücüye girdiğinin sayılmadığı bir alan sunmaktır.
- * Dolum kaydı gerekiyorsa Kayıtlar'daki "Yakıt" oradan giriliyor.
+ * adım zaten tüketimi ve litre fiyatını soruyor: vardiyanın yakıtı
+ * ondan üretiliyor ve o vardiyanın dolumu ayrıca sayılmıyor (ikisi
+ * birden sayılsaydı aynı yakıt iki kez düşülürdü). İki adım arayla aynı
+ * şeyi iki kez sormak, sürücüye girdiğinin sayılmadığı bir alan
+ * sunmaktır. Dolum Anasayfa'dan (açık vardiya) ya da Kayıtlar'dan girilir.
  */
 export default function EndShiftScreen() {
   const { colors } = useTheme();

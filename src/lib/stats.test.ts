@@ -93,7 +93,7 @@ describe('dönem toplamları', () => {
     ]);
     assert.equal(t.distanceKm, null);
     assert.equal(t.perKm, null);
-    assert.equal(t.daysMissingDistance, 2);
+    assert.equal(t.shiftsMissingDistance, 2);
   });
 
   it('bazı günlerin kilometresi varsa toplam bilinenlerden gelir', () => {
@@ -102,7 +102,7 @@ describe('dönem toplamları', () => {
       day('2026-09-15', { gross: 100_000, km: null }),
     ]);
     assert.equal(t.distanceKm, 120);
-    assert.equal(t.daysMissingDistance, 1);
+    assert.equal(t.shiftsMissingDistance, 1);
   });
 
   it('gün başına ortalama yalnızca ÇALIŞILAN günlere bölünür', () => {
@@ -111,6 +111,79 @@ describe('dönem toplamları', () => {
       day('2026-09-15', { gross: 200_000 }),
     ]);
     assert.equal(t.perDay, 150_000);
+  });
+
+  it('iki vardiyanın birinde km eksik olan gün dönemde KAYBOLMAZ', () => {
+    const partial: DayEntry = {
+      date: asBusinessDate('2026-09-16'),
+      summary: calculateDaySummary({
+        rides: [], expenses: [], fuelLogs: [],
+        shifts: [
+          { startedAt: 0, endedAt: 1, workedMinutes: null, distanceKm: 100 },
+          { startedAt: 2, endedAt: 3, workedMinutes: null, distanceKm: null },
+        ],
+        now: 4,
+      }),
+    };
+    const t = calculatePeriodTotals([partial]);
+    assert.equal(t.distanceKm, 100);
+    assert.equal(t.shiftsMissingDistance, 1);
+  });
+
+  it('yalnızca gider ya da depo alımı olan gün çalışılmış sayılmaz, maliyeti toplamda kalır', () => {
+    const onlyCost = (date: string, fuel: number, expense: number): DayEntry => ({
+      date: asBusinessDate(date),
+      summary: calculateDaySummary({
+        rides: [],
+        expenses: expense > 0 ? [{ amountKurus: k(expense) }] : [],
+        fuelLogs: fuel > 0 ? [{ totalAmountKurus: k(fuel), vehicleId: 'V' }] : [],
+        shifts: [],
+        now: 1,
+      }),
+    });
+    const t = calculatePeriodTotals([
+      day('2026-09-14', { gross: 100_000 }),
+      onlyCost('2026-09-13', 100_000, 0),   // Pazar: depo alımı
+      onlyCost('2026-09-12', 0, 5_000),     // Cumartesi: yalnız gider
+    ]);
+    assert.equal(t.dayCount, 3);
+    assert.equal(t.workedDayCount, 1);
+    assert.equal(t.perDay, 95_000);           // 100.000 − 5.000, tek güne
+    assert.equal(t.expensesPaid, 5_000);
+    assert.equal(t.fuelPaid, 0, 'gün dışı depo alımı maliyete girmez');
+    assert.equal(t.offDayFillsKurus, 100_000);
+    assert.equal(t.shiftsMissingDistance, 1, 'yalnızca vardiyalı gün sayılır');
+
+    const sunday = summarizeByWeekday([
+      day('2026-09-14', { gross: 100_000 }),
+      onlyCost('2026-09-13', 100_000, 0),
+    ])[6];
+    assert.equal(sunday.dayCount, 0, 'depo alımı Pazar\'ı çalışılmış göstermez');
+  });
+
+  it('gün dışı depo alımı ertesi günün tüketimiyle İKİ KEZ düşülmez', () => {
+    const sunday: DayEntry = {
+      date: asBusinessDate('2026-09-13'),
+      summary: calculateDaySummary({
+        rides: [], expenses: [], fuelLogs: [{ totalAmountKurus: k(100_000), vehicleId: 'V' }],
+        shifts: [], now: 1,
+      }),
+    };
+    const monday: DayEntry = {
+      date: asBusinessDate('2026-09-14'),
+      summary: calculateDaySummary({
+        rides: [{ grossAmountKurus: k(200_000), commissionKurus: k(0), tipKurus: k(0) }],
+        expenses: [], fuelLogs: [],
+        shifts: [{
+          startedAt: 0, endedAt: 1, workedMinutes: null, distanceKm: 100, vehicleId: 'V',
+          fuelConsumptionPer100Km: 10_000, fuelPriceKurus: k(5_000),
+        }],
+        now: 1,
+      }),
+    };
+    const t = calculatePeriodTotals([sunday, monday]);
+    assert.equal(t.fuelPaid, 50_000);          // 1.500 ₺ değil
+    assert.equal(t.workedDayCount, 1);
   });
 });
 
