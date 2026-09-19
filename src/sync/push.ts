@@ -17,7 +17,7 @@ import {
 } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import { outbox } from '@/db/schema';
-import { NO_GUARD, SessionChangedError, type SyncGuard } from './guard';
+import { NO_GUARD, type SyncGuard, isSessionChanged } from './guard';
 import { SYNC_TABLES, isSyncTable, toCloudRow } from './tables';
 
 /** Tek istekte gönderilecek en fazla kuyruk kaydı. */
@@ -194,7 +194,7 @@ async function pushBatch(
       acknowledge(sending);
       result.sent += sending.length;
     } catch (error) {
-      if (error instanceof SessionChangedError) throw error;
+      if (isSessionChanged(error)) throw error;
       const message = describe(error);
       result.failed += sending.length;
       result.errors.push(`${table}: ${message}`);

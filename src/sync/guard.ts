@@ -21,6 +21,16 @@ export class SessionChangedError extends Error {
   }
 }
 
+/**
+ * Hata oturum değişiminden mi? Ada da bakılıyor: derlenmiş sınıf
+ * dönüşümlerinde `Error`'dan türeyen sınıfın `instanceof`'u güvenilir
+ * olmayabiliyor ve kaçan bir durdurma, kaydı boşuna "başarısız" sayardı.
+ */
+export function isSessionChanged(error: unknown): boolean {
+  return error instanceof SessionChangedError
+    || (error instanceof Error && error.name === 'SessionChangedError');
+}
+
 /** Oturum hâlâ turun başladığı hesaba aitse sessiz döner, değilse fırlatır. */
 export type SyncGuard = () => void;
 

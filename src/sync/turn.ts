@@ -7,7 +7,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { NO_GUARD, SessionChangedError, type SyncGuard } from './guard';
+import { NO_GUARD, type SyncGuard, isSessionChanged } from './guard';
 import { type PullResult, pullChanges } from './pull';
 import {
   type PushResult, clearTransientBackoff, pendingCount, pushOutbox, readyCount,
@@ -82,7 +82,7 @@ export async function syncTurn(
 
     return { ran: true, userId, push, pull, errors, pending, more };
   } catch (error) {
-    if (error instanceof SessionChangedError || !stillCurrent(guard)) {
+    if (isSessionChanged(error) || !stillCurrent(guard)) {
       // Hiçbir durum yazılmaz: bu turun sonucu artık kimseye ait değil.
       return {
         ran: false, skipped: 'session_changed', userId, errors: [],

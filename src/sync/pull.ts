@@ -15,7 +15,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getDb } from '@/db/client';
 import { type PullKey, compareKeys, keyFilter, lookbackKey, maxKey, tsMicros } from './cursor';
-import { NO_GUARD, SessionChangedError, type SyncGuard } from './guard';
+import { NO_GUARD, type SyncGuard, isSessionChanged } from './guard';
 import {
   finishRecovery, finishTableRecovery, isTableRecovered, noteSeen, requeueNewerLocal,
 } from './recovery';
@@ -86,7 +86,7 @@ export async function pullChanges(
     try {
       if (!await pullTable(supabase, userId, table, guard, now, limits, result)) drained = false;
     } catch (error) {
-      if (error instanceof SessionChangedError) throw error;
+      if (isSessionChanged(error)) throw error;
       // Yalnızca BU tablo durur; diğerlerinin imleci bağımsız.
       drained = false;
       result.errors.push(`${table}: ${describe(error)}`);
