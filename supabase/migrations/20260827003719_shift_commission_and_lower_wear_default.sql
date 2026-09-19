@@ -1,8 +1,5 @@
 -- Vardiya sonunda tek rakam olarak girilen komisyon.
---
--- ORAN KULLANILMIYOR: sürücü yüzdesini bilmiyor, eline geçeni ve kesileni
--- biliyor. Sefer başına oran uygulamak hem girişi yavaşlatıyordu hem de
--- sürücünün doğrulayamadığı bir sayı üretiyordu.
+-- Oran kullanılmıyor: sürücü yüzdesini bilmiyor, kesileni biliyor.
 alter table public.shifts
   add column if not exists commission_kurus bigint;
 

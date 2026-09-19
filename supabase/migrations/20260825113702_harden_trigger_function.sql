@@ -1,6 +1,6 @@
 -- Tetikleyici fonksiyonunu sıkılaştır.
 --
--- Supabase güvenlik denetçisi iki uyarı verdi:
+-- İki sorun vardı:
 -- 1) SECURITY DEFINER gereksizdi. Fonksiyon yalnızca NEW üzerinde bir sütun
 --    set ediyor; ayrıcalıklı erişime ihtiyacı yok. INVOKER yeterli ve
 --    ayrıcalık yükseltme yüzeyini tamamen kaldırıyor.

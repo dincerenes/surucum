@@ -2,11 +2,7 @@
 --
 -- Politikalarda auth.uid() DOĞRUDAN DEĞİL, (select auth.uid()) olarak yazılıyor.
 -- Sarmalanmadığında Postgres bu çağrıyı her satır için yeniden değerlendirir;
--- select içine alındığında bir kez hesaplanıp önbelleğe alınır (initPlan).
--- Binlerce seferi olan bir sürücüde bu, rapor sorgularında kat kat fark eder.
---
--- select/insert/update/delete için AYRI politikalar yazılıyor, tek bir
--- "for all" yerine: ileride biri daraltılmak istendiğinde diğerleri etkilenmesin.
+-- select içine alındığında bir kez hesaplanıp önbelleğe alınır.
 
 do $do$
 declare
