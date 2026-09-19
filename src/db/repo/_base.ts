@@ -11,9 +11,8 @@
  * tutarı yazar, ekran o an güncellenir.
  */
 
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { getDb } from '../client';
-import { outbox } from '../schema';
 import { newId } from '@/lib/id';
 
 /** Milisaniye cinsinden unix damgası. */
@@ -88,21 +87,35 @@ export function withOutbox<T>(
  * Çakışmada `operation` GÜNCELLENİR — silme, bekleyen bir güncellemeyi
  * ezmeli; yoksa silinen kayıt buluta güncelleme olarak gider ve dirilir.
  * Deneme sayacı da sıfırlanır: kayıt değişti, eski hata artık geçersiz.
+ * `revision` BİR ARTAR: gönderim o sırada eski hâli taşıyan bir isteği
+ * bekliyorsa, onayı bu kaydı silemesin (bkz. `outbox.revision`).
+ *
+ * Sahip (`user_id`) satırın kendisinden, AYNI İŞLEMDE okunur. Satır yoksa
+ * — var olmayan bir kimlik güncellendi ya da silindi — kuyruğa HİÇBİR
+ * ŞEY yazılmaz: gönderilecek bir şey yok. Eskiden böyle bir girdi
+ * kuyruğa düşüyor, gönderim de yerelde satır bulamayınca kaydı buluttan
+ * sert siliyordu.
  */
 export function enqueue(
-  tx: Pick<Tx, 'insert'>,
+  tx: Pick<Tx, 'run'>,
   tableName: SyncedTableName,
   rowId: string,
   operation: OutboxOperation,
   now: UnixMs = Date.now(),
 ): void {
-  tx.insert(outbox)
-    .values({ tableName, rowId, operation, createdAt: now, attemptCount: 0 })
-    .onConflictDoUpdate({
-      target: [outbox.tableName, outbox.rowId],
-      set: { operation, attemptCount: 0, lastError: null, nextAttemptAt: null },
-    })
-    .run();
+  tx.run(sql`
+    INSERT INTO outbox
+      (table_name, row_id, user_id, operation, revision, attempt_count, created_at)
+    SELECT ${tableName}, id, user_id, ${operation}, 1, 0, ${now}
+    FROM ${sql.identifier(tableName)} WHERE id = ${rowId}
+    ON CONFLICT (table_name, row_id) DO UPDATE SET
+      operation = excluded.operation,
+      user_id = excluded.user_id,
+      revision = outbox.revision + 1,
+      attempt_count = 0,
+      last_error = NULL,
+      next_attempt_at = NULL
+  `);
 }
 
 /**

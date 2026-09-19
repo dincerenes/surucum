@@ -1,5 +1,5 @@
 import {
-  index, integer, sqliteTable, text, uniqueIndex,
+  index, integer, primaryKey, sqliteTable, text, uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
 import { GOAL_PERIODS, businessDate, kurus, syncColumns } from './_shared';
 
@@ -67,6 +67,29 @@ export const outbox = sqliteTable(
     rowId: text().notNull(),
     operation: text({ enum: ['upsert', 'delete'] }).notNull(),
 
+    /**
+     * Satırın SAHİBİ — kuyruğa yazılırken satırın kendisinden, aynı
+     * işlemde okunur.
+     *
+     * Aynı cihazda iki hesap kullanıldığında kuyrukta ikisinin kaydı da
+     * durur. Gönderim yalnızca oturumdaki hesabın kayıtlarını seçmeli;
+     * süzgeç olmadan A'nın bekleyen 400 kaydı her turda sıranın başını
+     * tutuyor ve B'nin hiçbir kaydı gitmiyordu. Yalnızca eski sürümden
+     * kalan ve yerel satırı olmayan girdilerde boştur.
+     */
+    userId: text(),
+
+    /**
+     * Her kuyruğa yazmada bir artar.
+     *
+     * Gönderim ağ isteğini beklerken sürücü aynı kaydı düzeltirse kuyruk
+     * satırı YERİNDE güncellenir, kimliği değişmez. Onay yalnızca kimliğe
+     * bakıyor olsaydı, gönderilmemiş yeni düzeltmenin kuyruk kaydını da
+     * siler ve bulut eski hâlde kalırdı. Onay ve geri çekilme bu yüzden
+     * kimlik + revizyon eşleşirse yazılır.
+     */
+    revision: integer().notNull().default(1),
+
     attemptCount: integer().notNull().default(0),
     lastError: text(),
     lastAttemptAt: integer(),
@@ -79,8 +102,29 @@ export const outbox = sqliteTable(
   (t) => [
     // Aynı satır için tek bekleyen kayıt — tekrar düzenlemeler çakışır.
     uniqueIndex('outbox_row_unique_idx').on(t.tableName, t.rowId),
-    index('outbox_ready_idx').on(t.nextAttemptAt, t.id),
+    // Gönderim her zaman tek hesabın hazır kayıtlarını ekleme sırasıyla ister.
+    index('outbox_user_ready_idx').on(t.userId, t.nextAttemptAt, t.id),
   ],
+);
+
+/**
+ * Kurtarma taramasında buluttan GÖRÜLEN satırlar — geçici defter.
+ *
+ * Eski senkron bazı düzeltmeleri kuyruktan buluta hiç göndermeden
+ * düşürdü. Bir hesabın ilk tam taramasında buluttan gelen her kimlik
+ * buraya yazılır; tablo sonuna kadar inince, cihazda olup burada
+ * olmayan ve kuyrukta da beklemeyen satırlar yeniden kuyruğa alınır ve
+ * defter temizlenir. Tarama birkaç tura yayılabildiği ve uygulama
+ * arada kapanabildiği için bellek değil tablo.
+ */
+export const syncRecoverySeen = sqliteTable(
+  'sync_recovery_seen',
+  {
+    userId: text().notNull(),
+    tableName: text().notNull(),
+    rowId: text().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.tableName, t.rowId] })],
 );
 
 /**

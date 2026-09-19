@@ -17,7 +17,7 @@ import { vehicles, vehicleFuelTypes } from './vehicles';
 import { earningSources, shifts, rides } from './earnings';
 import { expenseCategories, expenses, recurringExpenses } from './expenses';
 import { fuelLogs, fuelPrices } from './fuel';
-import { appSettings, devicePrefs, goals, outbox, syncState } from './system';
+import { appSettings, devicePrefs, goals, outbox, syncRecoverySeen, syncState } from './system';
 
 /**
  * Buluta senkronlanan tablolar, YABANCI ANAHTAR SIRASIYLA.
@@ -62,5 +62,6 @@ export const LOCAL_ONLY_TABLES = {
   fuel_prices: fuelPrices,
   outbox,
   sync_state: syncState,
+  sync_recovery_seen: syncRecoverySeen,
   device_prefs: devicePrefs,
 } as const;
