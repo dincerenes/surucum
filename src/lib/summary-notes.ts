@@ -72,7 +72,13 @@ export function buildDayNotes(summary: DaySummary): SummaryNote[] {
     notes.push(warn(`${c.shiftsMissingCommission} vardiyanın komisyonu girilmemiş; sıfır sayıldı.`));
   }
 
-  if (c.fuelSource === 'filled') {
+  if (c.fuelSource === 'filled' && c.closedShiftCount === 0) {
+    // Vardiya henüz açık: tüketim "girilmemiş" değil, vardiya sonunda sorulacak.
+    notes.push(info(
+      'Yakıt şimdilik dolum tutarından sayılıyor; vardiya sonunda ortalama tüketimi '
+      + 'girersen tüketimden hesaplanır.',
+    ));
+  } else if (c.fuelSource === 'filled') {
     notes.push(info('Ortalama tüketim girilmediği için yakıt, kaydedilen dolum tutarından sayıldı.'));
   } else if (c.fuelSource === 'mixed') {
     notes.push(info(

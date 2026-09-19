@@ -81,6 +81,18 @@ describe('gün açıklamaları', () => {
     assert.match(buildDayNotes(offDay)[0].text, /^1\.000,00 ₺ depo alımı hesaba ayrıca girmedi/);
   });
 
+  it('açık vardiyada dolumdan sayılan yakıt "girilmemiş" denmeden söylenir', () => {
+    const s = calculateDaySummary({
+      rides: [ride], expenses: [],
+      fuelLogs: [{ id: 'f', shiftId: 'S', vehicleId: 'V', totalAmountKurus: k(70_000) }],
+      shifts: [closed({ endedAt: null, distanceKm: null })], now: 2,
+    });
+    const notes = buildDayNotes(s);
+    assert.equal(notes.length, 1);
+    assert.equal(notes[0].tone, 'info');
+    assert.match(notes[0].text, /şimdilik dolum tutarından/);
+  });
+
   it('açık vardiya hiçbir uyarı üretmez', () => {
     const s = calculateDaySummary({
       rides: [ride], expenses: [], fuelLogs: [],
