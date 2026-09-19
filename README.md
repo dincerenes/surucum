@@ -16,15 +16,15 @@ Sürücü akşam cebinde 480 ₺ ile eve gider ve kazandığını sanır. Aracı
 238 kilometre eridiğini görmez. Uygulama her yerde **üç satır** gösterir:
 
 ```
-Ciro                447,50 ₺
-Komisyon           −215,50 ₺
-Yakıt · 17,9 lt    −892,50 ₺
-Gider              −150,00 ₺
-────────────────────────────
-CEBE KALAN         −810,50 ₺     ← komisyon, yakıt ve gider düşülmüş
-Yıpranma · 238 km  −595,00 ₺
-────────────────────────────
-GERÇEK KÂR       −1.405,50 ₺     ← aracın eridiği de düşülmüş
+Ciro                          447,50 ₺
+Komisyon                     −215,50 ₺
+Yakıt · tüketimden 17,9 lt   −892,50 ₺
+Gider                        −150,00 ₺
+──────────────────────────────────────
+CEBE KALAN                   −810,50 ₺     ← komisyon, yakıt ve gider düşülmüş
+Yıpranma · 238 km            −595,00 ₺
+──────────────────────────────────────
+GERÇEK KÂR                 −1.405,50 ₺     ← aracın eridiği de düşülmüş
 ```
 
 - **Ciro** — brüt hasılat.

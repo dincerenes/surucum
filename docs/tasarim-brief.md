@@ -378,15 +378,15 @@ Ekranda görünen tek şey: **tutar alanı ve Kaydet.**
 ## Özet TAM OLARAK bu yapıda
 
 ```
-Ciro                447,50 ₺
-Komisyon           −215,50 ₺
-Yakıt · 17,9 lt    −892,50 ₺
-Gider              −150,00 ₺
-────────────────────────────
-CEBE KALAN         −810,50 ₺
-Yıpranma · 238 km  −595,00 ₺
-────────────────────────────
-GERÇEK KÂR       −1.405,50 ₺
+Ciro                          447,50 ₺
+Komisyon                     −215,50 ₺
+Yakıt · tüketimden 17,9 lt   −892,50 ₺
+Gider                        −150,00 ₺
+──────────────────────────────────────
+CEBE KALAN                   −810,50 ₺
+Yıpranma · 238 km            −595,00 ₺
+──────────────────────────────────────
+GERÇEK KÂR                 −1.405,50 ₺
 ```
 
 **İki satır arasındaki tek fark yıpranma payıdır.** Ekrandaki satırlar
