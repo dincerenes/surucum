@@ -18,6 +18,7 @@ import {
 import { getCutoffHour } from './settings';
 import type { Kurus } from '@/lib/money';
 import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
+import { toWholePositive } from '@/lib/whole-number';
 
 export interface NewFuelLogInput {
   vehicleId: string;
@@ -77,7 +78,8 @@ export function addFuelLog(
       volumePer1000: Math.round(input.volumePer1000),
       unitPriceKurus: input.unitPriceKurus,
       totalAmountKurus: input.totalAmountKurus,
-      odometerKm: input.odometerKm ?? null,
+      // Sayaç bulutta integer — ondalık gelirse yuvarlanır.
+      odometerKm: toWholePositive(input.odometerKm),
       isFullTank: input.isFullTank ?? true,
       stationName: input.stationName?.trim() || null,
       receiptPath: input.receiptPath ?? null,
@@ -105,7 +107,7 @@ export function updateFuelLog(
       ? { unitPriceKurus: patch.unitPriceKurus } : {}),
     ...(patch.totalAmountKurus !== undefined
       ? { totalAmountKurus: patch.totalAmountKurus } : {}),
-    ...(patch.odometerKm !== undefined ? { odometerKm: patch.odometerKm } : {}),
+    ...(patch.odometerKm !== undefined ? { odometerKm: toWholePositive(patch.odometerKm) } : {}),
     ...(patch.isFullTank !== undefined ? { isFullTank: patch.isFullTank } : {}),
     ...(patch.stationName !== undefined
       ? { stationName: patch.stationName?.trim() || null } : {}),

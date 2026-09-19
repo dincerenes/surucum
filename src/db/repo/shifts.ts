@@ -17,6 +17,7 @@ import {
 } from './_base';
 import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
 import type { Kurus } from '@/lib/money';
+import { toWholePositive } from '@/lib/whole-number';
 
 /**
  * Vardiyayı başlatır.
@@ -63,6 +64,11 @@ export interface EndShiftInput {
   /**
    * Vardiya boyunca kat edilen yol — kilometre SAYACI DEĞİL.
    * Boşsa yıpranma payı da yakıt maliyeti de hesaplanmaz, tahmin edilmez.
+   *
+   * TAM SAYI olarak yazılır: ondalık gelirse burada yuvarlanır. Bulutta
+   * sütun `integer`; "238,5" gönderilseydi Postgres reddeder ve bütün
+   * vardiya yedeği takılırdı (bkz. `whole-number.ts`). Süre ve tüketim
+   * de aynı kurala tabi.
    */
   distanceKm?: number | null;
 
@@ -97,10 +103,10 @@ export function endShift(
   const changed = updateOwned(shifts, 'shifts', userId, id, {
     endedAt: current.endedAt ?? now,
     commissionKurus: sanitizeAmount(input.commissionKurus),
-    fuelConsumptionPer100Km: sanitizePositive(input.fuelConsumptionPer100Km),
+    fuelConsumptionPer100Km: toWholePositive(input.fuelConsumptionPer100Km),
     fuelPriceKurus: sanitizeAmount(input.fuelPriceKurus),
-    distanceKm: sanitizePositive(input.distanceKm),
-    workedMinutes: sanitizePositive(input.workedMinutes),
+    distanceKm: toWholePositive(input.distanceKm),
+    workedMinutes: toWholePositive(input.workedMinutes),
     ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
   }, now);
   if (!changed) return false;
@@ -131,13 +137,13 @@ export function updateShiftTotals(
     ...(input.commissionKurus !== undefined
       ? { commissionKurus: sanitizeAmount(input.commissionKurus) } : {}),
     ...(input.fuelConsumptionPer100Km !== undefined
-      ? { fuelConsumptionPer100Km: sanitizePositive(input.fuelConsumptionPer100Km) } : {}),
+      ? { fuelConsumptionPer100Km: toWholePositive(input.fuelConsumptionPer100Km) } : {}),
     ...(input.fuelPriceKurus !== undefined
       ? { fuelPriceKurus: sanitizeAmount(input.fuelPriceKurus) } : {}),
     ...(input.distanceKm !== undefined
-      ? { distanceKm: sanitizePositive(input.distanceKm) } : {}),
+      ? { distanceKm: toWholePositive(input.distanceKm) } : {}),
     ...(input.workedMinutes !== undefined
-      ? { workedMinutes: sanitizePositive(input.workedMinutes) } : {}),
+      ? { workedMinutes: toWholePositive(input.workedMinutes) } : {}),
     ...(input.notes !== undefined ? { notes: input.notes?.trim() || null } : {}),
   }, now);
   if (!changed) return false;
@@ -202,18 +208,6 @@ export function getLastClosedShift(userId: string): Shift | undefined {
     .find((s) => s.endedAt != null);
 }
 
-/**
- * Sıfır ve negatif değerleri `null`'a düşürür.
- *
- * Sürücü alanı boş bırakır ya da yanlışlıkla 0 yazarsa bu BİLİNMİYOR
- * demektir, "sıfır kilometre yaptı" demek değil. Sıfır yazsaydık
- * yıpranma payı sıfır çıkar ve rapor sessizce yanlış olurdu.
- */
-function sanitizePositive(value: number | null | undefined): number | null {
-  if (value == null) return null;
-  if (!Number.isFinite(value) || value <= 0) return null;
-  return value;
-}
 
 /**
  * Tutarı temizler: negatif ve sıfır `null` olur.

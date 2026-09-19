@@ -14,6 +14,7 @@ import {
 import type { BusinessDate } from '@/lib/business-date';
 import { type Kurus, formatKurus, parseAmount } from '@/lib/money';
 import { useDriver } from '@/lib/use-driver';
+import { parseWholeKm } from '@/lib/whole-number';
 import { requestSync } from '@/sync/scheduler';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
@@ -112,12 +113,12 @@ export default function EndShiftScreen() {
     if (!userId || !openShift) return;
     setClosedDate(openShift.businessDate);
 
-    const kmValue = Number(km.replace(',', '.'));
     const hoursValue = Number(hours.replace(',', '.'));
     const consumptionValue = Number(consumption.replace(',', '.'));
 
     endShift(userId, openShift.id, {
-      distanceKm: Number.isFinite(kmValue) && kmValue > 0 ? kmValue : null,
+      // Kilometre TAM SAYI: bulutta sütun integer, ondalık reddedilir.
+      distanceKm: parseWholeKm(km),
       workedMinutes: Number.isFinite(hoursValue) && hoursValue > 0
         ? Math.round(hoursValue * 60) : null,
       commissionKurus: parseAmount(commission) as Kurus | null,
@@ -171,7 +172,7 @@ export default function EndShiftScreen() {
                 note="Kilometre girmezsen yıpranma payı ve yakıt maliyeti hesaplanmaz."
               />
               <AmountInput label="Kaç km yaptın?" value={km} onChangeText={setKm}
-                unit="km" autoFocus />
+                unit="km" keyboard="number-pad" autoFocus />
               <AmountInput label="Kaç saat çalıştın?" value={hours} onChangeText={setHours}
                 unit="saat" hint="Mola düştüysen gerçek süreyi yaz." />
             </>

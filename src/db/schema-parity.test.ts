@@ -21,9 +21,12 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
+import { BOOLEAN_COLUMNS } from '../sync/tables.ts';
 
 interface CloudManifest {
   bool: Record<string, string[]>;
+  /** Bulutta tam sayı olan sütunlar: 'integer' (32 bit) ya da 'bigint'. */
+  int: Record<string, Record<string, 'integer' | 'bigint'>>;
   tables: Record<string, string[]>;
 }
 
@@ -55,6 +58,12 @@ function columnsOf(db: DatabaseSync, table: string): string[] {
     .map((r) => String((r as { name: unknown }).name));
 }
 
+function typesOf(db: DatabaseSync, table: string): Map<string, string> {
+  return new Map(db.prepare('select name, type from pragma_table_info(?)')
+    .all(table)
+    .map((r) => [String(r.name), String(r.type).toLowerCase()]));
+}
+
 describe('yerel şema ile bulut şeması', () => {
   const db = buildLocalSchema();
 
@@ -83,6 +92,34 @@ describe('yerel şema ile bulut şeması', () => {
         assert.ok(local.has(c), `${table}.${c} yerelde yok`);
       }
     }
+  });
+
+  /**
+   * Ad eşitliği yetmiyor: SQLite her sütuna her şeyi yazdırıyor, Postgres
+   * yazdırmıyor. Yerelde INTEGER olan bir sütun bulutta metin olsaydı —
+   * ya da tersi — gönderim o tabloyu kalıcı olarak takardı.
+   */
+  for (const table of Object.keys(manifest.tables)) {
+    it(`${table} — tip sınıfları eşleşiyor (INTEGER ↔ integer/bigint/boolean)`, () => {
+      const cloudInt = new Set(Object.keys(manifest.int[table] ?? {}));
+      const cloudBool = new Set(manifest.bool[table] ?? []);
+      for (const [name, type] of typesOf(db, table)) {
+        const cloudNumeric = cloudInt.has(name) || cloudBool.has(name);
+        if (type === 'integer') {
+          assert.ok(cloudNumeric, `${table}.${name}: yerelde integer, bulutta tam sayı değil`);
+        } else {
+          assert.equal(type, 'text', `${table}.${name}: beklenmeyen yerel tip ${type}`);
+          assert.ok(!cloudNumeric, `${table}.${name}: yerelde metin, bulutta sayı`);
+        }
+      }
+    });
+  }
+
+  it('senkronun çevirdiği boolean listesi buluttakiyle birebir aynı', () => {
+    const normalize = (m: Readonly<Record<string, readonly string[]>>) => Object.fromEntries(
+      Object.entries(m).map(([t, cols]) => [t, [...cols].sort()]).sort(([a], [b]) => (a < b ? -1 : 1)),
+    );
+    assert.deepEqual(normalize(BOOLEAN_COLUMNS), normalize(manifest.bool));
   });
 
   it('server_updated_at yerelde YOK — o yalnızca sunucunun imleci', () => {

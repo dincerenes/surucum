@@ -17,6 +17,12 @@ interface Props {
   /** Sağda birim etiketi — "₺", "lt", "km". */
   unit?: string;
   hint?: string;
+  /**
+   * Tam sayı alanlarında (kilometre) `number-pad`: ayraç tuşu hiç
+   * çıkmaz, sürücü "238,5" yazamaz. Bulutta bu sütunlar `integer` ve
+   * ondalık değer orada reddediliyor. Tutarlar için varsayılan kalır.
+   */
+  keyboard?: 'decimal-pad' | 'number-pad';
 }
 
 /**
@@ -32,7 +38,7 @@ interface Props {
  */
 export function AmountInput({
   value, onChangeText, onValueChange, label, placeholder = '0',
-  autoFocus = false, unit = '₺', hint,
+  autoFocus = false, unit = '₺', hint, keyboard = 'decimal-pad',
 }: Props) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
@@ -78,8 +84,8 @@ export function AmountInput({
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
           placeholderTextColor={colors.textFaint}
-          keyboardType="decimal-pad"
-          inputMode="decimal"
+          keyboardType={keyboard}
+          inputMode={keyboard === 'number-pad' ? 'numeric' : 'decimal'}
           style={[styles.input, { color: invalid ? colors.negative : colors.text }]}
           accessibilityLabel={label}
         />

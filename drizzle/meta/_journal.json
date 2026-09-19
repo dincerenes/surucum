@@ -64,6 +64,13 @@
       "when": 1789791257853,
       "tag": "0008_outbox_owner_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1789830961138,
+      "tag": "0009_whole_integer_columns",
+      "breakpoints": true
     }
   ]
 }

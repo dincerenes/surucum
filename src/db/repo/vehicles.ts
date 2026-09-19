@@ -18,6 +18,7 @@ import {
   type Tx, type UnixMs, alive, enqueue, ownedById, softDeleteRow, stampNew, updateOwned,
 } from './_base';
 import { newId } from '@/lib/id';
+import { toWholePositive } from '@/lib/whole-number';
 
 export interface NewVehicleInput {
   label: string;
@@ -52,9 +53,10 @@ export function createVehicle(
       plate: normalize(input.plate),
       make: normalize(input.make),
       model: normalize(input.model),
-      modelYear: input.modelYear ?? null,
+      // Yıl ve kilometre bulutta integer — ondalık gelirse burada yuvarlanır.
+      modelYear: toWholePositive(input.modelYear),
       ownership: input.ownership,
-      initialOdometerKm: input.initialOdometerKm ?? null,
+      initialOdometerKm: toWholePositive(input.initialOdometerKm),
       wearPerKmKurus: defaultWearPerKm(input.ownership),
       notes: normalize(input.notes),
     }).returning().get();
@@ -102,9 +104,9 @@ export function updateVehicle(
     ...(patch.plate !== undefined ? { plate: normalize(patch.plate) } : {}),
     ...(patch.make !== undefined ? { make: normalize(patch.make) } : {}),
     ...(patch.model !== undefined ? { model: normalize(patch.model) } : {}),
-    ...(patch.modelYear !== undefined ? { modelYear: patch.modelYear } : {}),
+    ...(patch.modelYear !== undefined ? { modelYear: toWholePositive(patch.modelYear) } : {}),
     ...(patch.initialOdometerKm !== undefined
-      ? { initialOdometerKm: patch.initialOdometerKm } : {}),
+      ? { initialOdometerKm: toWholePositive(patch.initialOdometerKm) } : {}),
     ...(patch.notes !== undefined ? { notes: normalize(patch.notes) } : {}),
     ...(patch.ownership !== undefined ? {
       ownership: patch.ownership,

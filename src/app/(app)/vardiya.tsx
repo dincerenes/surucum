@@ -17,6 +17,7 @@ import {
 import { calculateShiftStats } from '@/lib/shift';
 import { calculateWearShare } from '@/lib/profit';
 import { calculateFuelCost } from '@/lib/fuel-cost';
+import { parseWholeKm } from '@/lib/whole-number';
 import { requestSync } from '@/sync/scheduler';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
@@ -93,7 +94,8 @@ export default function ShiftDetailScreen() {
       ? shift.fuelConsumptionPer100Km / 1000 : null);
   const priceText = price ?? formatAmountForInput(shift.fuelPriceKurus);
 
-  const kmValue = readNumber(kmText);
+  // Kilometre TAM SAYI: bulutta sütun integer, ondalık reddedilir.
+  const kmValue = parseWholeKm(kmText);
   const hoursValue = readNumber(hoursText);
   const consumptionValue = readNumber(consumptionText);
 
@@ -209,6 +211,7 @@ export default function ShiftDetailScreen() {
 
         <AmountInput
           label="Kaç km yaptın?" value={kmText} onChangeText={setKm} unit="km"
+          keyboard="number-pad"
           hint="Boş bırakılırsa yıpranma payı ve yakıt maliyeti hesaplanmaz."
         />
         <AmountInput

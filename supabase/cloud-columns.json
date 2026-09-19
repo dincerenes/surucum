@@ -27,6 +27,101 @@
       "is_active"
     ]
   },
+  "_int_sutunlar": "Bulutta integer (int4, 32 bit) ya da bigint (int8) olan sütunlar; boolean olanlar yukarıda. SQLite ondalığı sessizce kabul ediyor, Postgres reddediyor ve gönderim tabloyu tek istekte yolladığı için tek bir ondalık değer o tablonun bütün yedeğini takıyor. schema-parity.test.ts yerel yazma yollarının bu sütunlara yalnızca tam sayı yazdığını sınıyor. Kaynak: supabase/migrations altındaki create/alter table tanımları (19 Eylül 2026); uzak şemayla information_schema.columns üzerinden doğrulanmalı.",
+  "int": {
+    "app_settings": {
+      "created_at": "bigint",
+      "updated_at": "bigint",
+      "deleted_at": "bigint",
+      "day_cutoff_hour": "integer",
+      "onboarding_completed_at": "bigint"
+    },
+    "vehicles": {
+      "created_at": "bigint",
+      "updated_at": "bigint",
+      "deleted_at": "bigint",
+      "model_year": "integer",
+      "initial_odometer_km": "integer",
+      "wear_per_km_kurus": "bigint",
+      "sort_order": "integer"
+    },
+    "vehicle_fuel_types": {
+      "created_at": "bigint",
+      "updated_at": "bigint",
+      "deleted_at": "bigint",
+      "avg_consumption_per_100km": "integer",
+      "last_unit_price_kurus": "bigint"
+    },
+    "earning_sources": {
+      "created_at": "bigint",
+      "updated_at": "bigint",
+      "deleted_at": "bigint",
+      "default_commission_bps": "integer",
+      "sort_order": "integer"
+    },
+    "expense_categories": {
+      "created_at": "bigint",
+      "updated_at": "bigint",
+      "deleted_at": "bigint",
+      "sort_order": "integer"
+    },
+    "shifts": {
+      "created_at": "bigint",
+      "updated_at": "bigint",
+      "deleted_at": "bigint",
+      "started_at": "bigint",
+      "ended_at": "bigint",
+      "start_odometer_km": "integer",
+      "end_odometer_km": "integer",
+      "distance_km": "integer",
+      "worked_minutes": "integer",
+      "commission_kurus": "bigint",
+      "fuel_consumption_per_100km": "integer",
+      "fuel_price_kurus": "bigint"
+    },
+    "rides": {
+      "created_at": "bigint",
+      "updated_at": "bigint",
+      "deleted_at": "bigint",
+      "occurred_at": "bigint",
+      "gross_amount_kurus": "bigint",
+      "commission_kurus": "bigint",
+      "net_amount_kurus": "bigint",
+      "commission_bps": "integer",
+      "tip_kurus": "bigint",
+      "distance_meters": "integer",
+      "duration_seconds": "integer"
+    },
+    "expenses": {
+      "created_at": "bigint",
+      "updated_at": "bigint",
+      "deleted_at": "bigint",
+      "amount_kurus": "bigint",
+      "occurred_at": "bigint"
+    },
+    "recurring_expenses": {
+      "created_at": "bigint",
+      "updated_at": "bigint",
+      "deleted_at": "bigint",
+      "amount_kurus": "bigint"
+    },
+    "fuel_logs": {
+      "created_at": "bigint",
+      "updated_at": "bigint",
+      "deleted_at": "bigint",
+      "occurred_at": "bigint",
+      "volume_per1000": "integer",
+      "unit_price_kurus": "bigint",
+      "total_amount_kurus": "bigint",
+      "odometer_km": "integer"
+    },
+    "goals": {
+      "created_at": "bigint",
+      "updated_at": "bigint",
+      "deleted_at": "bigint",
+      "target_net_kurus": "bigint"
+    }
+  },
   "tables": {
     "app_settings": [
       "id",

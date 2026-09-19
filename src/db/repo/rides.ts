@@ -20,6 +20,7 @@ import { getCutoffHour } from './settings';
 import { type BasisPoints, type Kurus } from '@/lib/money';
 import { calculateRideAmounts } from '@/lib/ride';
 import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
+import { toWholePositive } from '@/lib/whole-number';
 
 export interface NewRideInput {
   grossAmountKurus: Kurus;
@@ -121,8 +122,9 @@ export function addRide(
       commissionBps: amounts.commissionBps,
       tipKurus: amounts.tipKurus,
       paymentMethod: input.paymentMethod ?? 'app',
-      distanceMeters: input.distanceMeters ?? null,
-      durationSeconds: input.durationSeconds ?? null,
+      // Metre ve saniye bulutta integer — ondalık gelirse yuvarlanır.
+      distanceMeters: toWholePositive(input.distanceMeters),
+      durationSeconds: toWholePositive(input.durationSeconds),
       notes: input.notes?.trim() || null,
     }).returning().get()
   ), now);
@@ -168,9 +170,9 @@ export function updateRide(
     ...(patch.paymentMethod !== undefined
       ? { paymentMethod: patch.paymentMethod } : {}),
     ...(patch.distanceMeters !== undefined
-      ? { distanceMeters: patch.distanceMeters } : {}),
+      ? { distanceMeters: toWholePositive(patch.distanceMeters) } : {}),
     ...(patch.durationSeconds !== undefined
-      ? { durationSeconds: patch.durationSeconds } : {}),
+      ? { durationSeconds: toWholePositive(patch.durationSeconds) } : {}),
     ...(patch.notes !== undefined ? { notes: patch.notes?.trim() || null } : {}),
     grossAmountKurus: amounts.grossAmountKurus,
     commissionKurus: amounts.commissionKurus,
