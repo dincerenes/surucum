@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AmountText, Button, Card, SummaryRows } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import {
-  getCutoffHour, getDaySummary, listExpensesInRange, listFuelLogsInRange,
+  getCutoffHour, getDaySummary, listDaySummaries, listExpensesInRange, listFuelLogsInRange,
   listRidesInRange, listShiftsInRange,
 } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -16,6 +16,8 @@ import type { DaySummary } from '@/lib/day-summary';
 import type { Shift } from '@/db/schema/earnings';
 import { type Kurus, formatDecimal } from '@/lib/money';
 import { resolveShiftDuration } from '@/lib/shift';
+import { groupRecordsByDay } from '@/lib/records-by-day';
+import { fuelLogNote } from '@/lib/summary-notes';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 /** Kaç günlük geçmiş gösteriliyor. Sayfalama Faz 3'te. */
@@ -30,6 +32,13 @@ interface Entry {
   detail: string;
   amount: Kurus;
   incoming: boolean;
+  /**
+   * Günün hesabına GİRMEYEN kayıt — tüketimden hesaplandığı için ayrıca
+   * düşülmeyen ya da vardiya olmayan günde yapılmış dolum. Soluk çiziliyor
+   * ve nedeni yazıyor: listede −700 ₺ görüp özette 500 ₺ yakıt gören
+   * sürücü sayıları topluyor, tutmazsa sayıya güvenmiyor.
+   */
+  uncounted: boolean;
 }
 
 interface Day {
@@ -70,54 +79,47 @@ export default function RecordsScreen() {
     const to = todayBusinessDate(cutoff);
     const from = addDays(to, -WINDOW_DAYS);
 
-    const shiftsByDay = new Map<BusinessDate, Shift[]>();
-    for (const s of listShiftsInRange(userId, from, to)) {
-      shiftsByDay.set(s.businessDate, [...(shiftsByDay.get(s.businessDate) ?? []), s]);
-    }
+    /**
+     * Özetler TEK toplu okumadan — İstatistik'le aynı hesap, aynı günler.
+     * Gün başına `getDaySummary` altmış gün için dört yüz sorgu demekti.
+     * Yalnızca kaydı olan günler dönüyor.
+     */
+    const summaries = new Map(
+      listDaySummaries(userId, from, to).map((d) => [d.date, d.summary] as const),
+    );
+    const summaryOf = (date: BusinessDate) => summaries.get(date) ?? getDaySummary(userId, date);
 
-    const byDay = new Map<BusinessDate, Entry[]>();
-    const push = (d: BusinessDate, e: Entry) => {
-      const list = byDay.get(d) ?? [];
-      list.push(e);
-      byDay.set(d, list);
-    };
+    const entries: { date: BusinessDate; entry: Entry }[] = [];
 
     for (const r of listRidesInRange(userId, from, to)) {
-      push(r.businessDate, {
+      entries.push({ date: r.businessDate, entry: {
         id: r.id, kind: 'sefer', at: r.occurredAt, title: 'Sefer',
         detail: r.distanceMeters ? `${formatDecimal(r.distanceMeters / 1000)} km` : '',
-        amount: r.grossAmountKurus, incoming: true,
-      });
+        amount: r.grossAmountKurus, incoming: true, uncounted: false,
+      } });
     }
     for (const e of listExpensesInRange(userId, from, to)) {
-      push(e.businessDate, {
+      entries.push({ date: e.businessDate, entry: {
         id: e.id, kind: 'gider', at: e.occurredAt, title: 'Gider',
-        detail: e.notes ?? '', amount: e.amountKurus, incoming: false,
-      });
+        detail: e.notes ?? '', amount: e.amountKurus, incoming: false, uncounted: false,
+      } });
     }
     for (const f of listFuelLogsInRange(userId, from, to)) {
-      push(f.businessDate, {
+      // Fiyatsız dolumda hacim hesaplanamıyor ve 0 duruyor; "0,0 lt"
+      // sıfır litre almış gibi okunuyordu.
+      const litres = f.volumePer1000 > 0
+        ? `${formatDecimal(f.volumePer1000 / 1000)} lt` : 'litre bilinmiyor';
+      const note = fuelLogNote(summaryOf(f.businessDate).fuelLogStatus[f.id]);
+      entries.push({ date: f.businessDate, entry: {
         id: f.id, kind: 'yakit', at: f.occurredAt, title: 'Yakıt',
-        // Fiyatsız dolumda hacim hesaplanamıyor ve 0 duruyor; "0,0 lt"
-        // sıfır litre almış gibi okunuyordu.
-        detail: f.volumePer1000 > 0
-          ? `${formatDecimal(f.volumePer1000 / 1000)} lt` : 'litre bilinmiyor',
-        amount: f.totalAmountKurus, incoming: false,
-      });
+        detail: note ? `${litres} · ${note}` : litres,
+        amount: f.totalAmountKurus, incoming: false, uncounted: note != null,
+      } });
     }
 
-    /**
-     * Özet YALNIZCA kaydı olan günler için hesaplanıyor. Altmış günün
-     * tamamını dolaşmak, çoğu boş olan günler için beş sorgu demekti.
-     */
-    return [...byDay.entries()]
-      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
-      .map(([date, entries]) => ({
-        date,
-        entries: entries.sort((a, b) => b.at - a.at),
-        shifts: shiftsByDay.get(date) ?? [],
-        summary: getDaySummary(userId, date),
-      }));
+    /** Günler dört kümenin birleşimi — yalnızca vardiyası olan gün de. */
+    return groupRecordsByDay(entries, listShiftsInRange(userId, from, to))
+      .map((day) => ({ ...day, summary: summaryOf(day.date) }));
   }, [userId]);
 
   return (
@@ -170,48 +172,63 @@ export default function RecordsScreen() {
 function DayCard({ day }: { day: Day }) {
   const { colors } = useTheme();
 
+  /** "0 kayıt" yazmıyoruz: yalnızca vardiyası olan gün de listede. */
+  const meta = [
+    day.entries.length > 0 ? `${day.entries.length} kayıt` : null,
+    day.shifts.length > 0 ? `${day.shifts.length} vardiya` : null,
+  ].filter(Boolean).join(' · ');
+
   return (
     <Card
       title={formatBusinessDate(day.date, 'long')}
-      meta={`${day.entries.length} kayıt`}
+      meta={meta}
       style={styles.card}
     >
-      <View style={[styles.list, { borderColor: colors.border }]}>
-        {day.entries.map((entry, index) => (
-          <Pressable
-            key={entry.id}
-            onPress={() => router.push({
-              pathname: '/kayit', params: { tur: entry.kind, id: entry.id },
-            })}
-            accessibilityRole="button"
-            accessibilityLabel={`${entry.title} kaydını düzenle`}
-            style={({ pressed }) => [
-              styles.row,
-              index > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
-              pressed && { backgroundColor: colors.surfaceSunken },
-            ]}
-          >
-            <Text style={[styles.time, { color: colors.textFaint }]}>
-              {formatClock(entry.at)}
-            </Text>
-            <View style={styles.rowText}>
-              <Text style={[typeScale.body, { color: colors.text }]}>{entry.title}</Text>
-              {entry.detail ? (
-                <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-                  {entry.detail}
-                </Text>
-              ) : null}
-            </View>
-            <AmountText
-              value={entry.amount}
-              tone={entry.incoming ? 'plain' : 'cost'}
-              showMinus={!entry.incoming}
-            />
-          </Pressable>
-        ))}
-      </View>
+      {day.entries.length > 0 ? (
+        <View style={[styles.list, { borderColor: colors.border }]}>
+          {day.entries.map((entry, index) => (
+            <Pressable
+              key={entry.id}
+              onPress={() => router.push({
+                pathname: '/kayit', params: { tur: entry.kind, id: entry.id },
+              })}
+              accessibilityRole="button"
+              accessibilityLabel={`${entry.title} kaydını düzenle`}
+              style={({ pressed }) => [
+                styles.row,
+                index > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
+                pressed && { backgroundColor: colors.surfaceSunken },
+              ]}
+            >
+              <Text style={[styles.time, { color: colors.textFaint }]}>
+                {formatClock(entry.at)}
+              </Text>
+              <View style={styles.rowText}>
+                <Text style={[typeScale.body, { color: colors.text }]}>{entry.title}</Text>
+                {entry.detail ? (
+                  <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+                    {entry.detail}
+                  </Text>
+                ) : null}
+              </View>
+              <View style={entry.uncounted ? styles.uncounted : null}>
+                <AmountText
+                  value={entry.amount}
+                  tone={entry.incoming ? 'plain' : 'cost'}
+                  showMinus={!entry.incoming}
+                />
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
-      {day.shifts.length > 0 ? <ShiftRows shifts={day.shifts} /> : null}
+      {day.shifts.length > 0 ? (
+        <ShiftRows
+          shifts={day.shifts}
+          fuelUnknownIds={day.summary.completeness.fuelUnknownShiftIds}
+        />
+      ) : null}
 
       <SummaryRows summary={day.summary} detailed={false} />
     </Card>
@@ -221,12 +238,15 @@ function DayCard({ day }: { day: Day }) {
 /**
  * Günün vardiyaları.
  *
- * Kilometresi girilmemiş vardiya AYRICA işaretleniyor: gün özetindeki
- * "yıpranma payı hesaplanmadı" uyarısının karşılığı burada, dokunulabilir
- * hâlde duruyor. Sürücüye eksiği söyleyip düzeltme yolu vermemek,
- * uyarı değil suçlamadır.
+ * Eksiği olan KAPANMIŞ vardiya AYRICA işaretleniyor: gün özetindeki
+ * uyarıların karşılığı burada, dokunulabilir hâlde duruyor. Sürücüye
+ * eksiği söyleyip düzeltme yolu vermemek, uyarı değil suçlamadır.
+ * Açık vardiya işaretlenmiyor — kilometresi ve komisyonu vardiya
+ * biterken sorulacak, henüz eksik değil.
  */
-function ShiftRows({ shifts }: { shifts: readonly Shift[] }) {
+function ShiftRows({
+  shifts, fuelUnknownIds,
+}: { shifts: readonly Shift[]; fuelUnknownIds: readonly string[] }) {
   const { colors } = useTheme();
   const now = Date.now();
 
@@ -234,7 +254,12 @@ function ShiftRows({ shifts }: { shifts: readonly Shift[] }) {
     <View style={styles.shifts}>
       {shifts.map((shift) => {
         const duration = resolveShiftDuration(shift, now);
-        const missing = shift.distanceKm == null;
+        const closed = shift.endedAt != null;
+        const missing = closed ? [
+          shift.distanceKm == null ? 'km eksik' : null,
+          fuelUnknownIds.includes(shift.id) ? 'yakıt bilinmiyor' : null,
+          shift.commissionKurus == null ? 'komisyon boş' : null,
+        ].filter(Boolean).join(' · ') : '';
 
         return (
           <Pressable
@@ -257,7 +282,7 @@ function ShiftRows({ shifts }: { shifts: readonly Shift[] }) {
             </Text>
             {missing ? (
               <Text style={[typeScale.caption, { color: colors.warning }]}>
-                km eksik
+                {missing}
               </Text>
             ) : null}
           </Pressable>
@@ -283,6 +308,7 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
   },
   time: { ...typeScale.body, fontVariant: ['tabular-nums'] },
+  uncounted: { opacity: 0.45 },
   rowText: { flex: 1 },
   empty: {
     borderWidth: 1, borderStyle: 'dashed', borderRadius: 14,
