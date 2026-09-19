@@ -139,13 +139,15 @@ export function buildPeriodNotes(totals: PeriodTotals): SummaryNote[] {
 /**
  * Yakıt satırının etiketi — tutarın NEREDEN geldiğini söyler.
  *
- * Tüketimden: "Yakıt · 17,9 lt". Dolumdan: "Yakıt · dolumdan". İkisi
- * birden: "Yakıt · 17,9 lt + dolum". Kaynak bilinmiyorsa düz "Yakıt".
+ * Tüketimden: "Yakıt · tüketimden 17,9 lt". Dolumdan: "Yakıt · dolumdan".
+ * İkisi birden: "Yakıt · tüketimden 17,9 lt + dolum". Litre tek başına
+ * yazıldığında sürücü onu pompadan aldığı litre sanıyordu; oysa km ×
+ * ortalama tüketimden hesaplanmış bir sayı. Kaynak yoksa düz "Yakıt".
  */
 export function fuelRowLabel(source: FuelSource, volumeMl: number | null): string {
   const litres = volumeMl != null ? `${formatDecimal(volumeMl / 1000)} lt` : null;
-  if (source === 'burned' && litres) return `Yakıt · ${litres}`;
-  if (source === 'mixed' && litres) return `Yakıt · ${litres} + dolum`;
+  if (source === 'burned' && litres) return `Yakıt · tüketimden ${litres}`;
+  if (source === 'mixed' && litres) return `Yakıt · tüketimden ${litres} + dolum`;
   if (source === 'filled') return 'Yakıt · dolumdan';
   return 'Yakıt';
 }

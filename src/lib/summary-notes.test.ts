@@ -129,9 +129,9 @@ describe('satır etiketleri', () => {
   });
 
   it('yakıt satırı kaynağını söyler', () => {
-    assert.equal(fuelRowLabel('burned', 17_900), 'Yakıt · 17,9 lt');
+    assert.equal(fuelRowLabel('burned', 17_900), 'Yakıt · tüketimden 17,9 lt');
     assert.equal(fuelRowLabel('filled', null), 'Yakıt · dolumdan');
-    assert.equal(fuelRowLabel('mixed', 15_000), 'Yakıt · 15,0 lt + dolum');
+    assert.equal(fuelRowLabel('mixed', 15_000), 'Yakıt · tüketimden 15,0 lt + dolum');
     assert.equal(fuelRowLabel('none', null), 'Yakıt');
   });
 
