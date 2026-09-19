@@ -304,7 +304,7 @@ export default function VehicleEditScreen() {
 
         <AmountInput
           label="Kilometre" value={odometerText} onChangeText={setOdometer}
-          unit="km" hint="Zorunlu değil."
+          unit="km" keyboard="number-pad" hint="Zorunlu değil."
         />
 
         <View style={[styles.wear, { backgroundColor: colors.surfaceSunken }]}>

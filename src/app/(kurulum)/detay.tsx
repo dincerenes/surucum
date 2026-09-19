@@ -94,7 +94,7 @@ export default function DetailStep() {
 
           <AmountInput
             label="Kilometre" value={odometer} onChangeText={setOdometer}
-            unit="km" hint="Zorunlu değil."
+            unit="km" keyboard="number-pad" hint="Zorunlu değil."
           />
 
           <View style={[styles.wear, { backgroundColor: colors.surfaceSunken }]}>

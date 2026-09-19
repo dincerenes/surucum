@@ -66,7 +66,6 @@ export function getTodaySummary(
   return getDaySummary(userId, date, now);
 }
 
-
 /**
  * Aralıktaki her GÜNÜN ayrı özeti — istatistik ekranının girdisi.
  *
