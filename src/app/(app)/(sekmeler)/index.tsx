@@ -25,7 +25,13 @@ export default function HomeScreen() {
   const state = useDriver();
 
   const { summary, openShift, rides, vehicle, userId, goal } = state;
-  const hasRecords = rides.length > 0 || (summary?.profit.revenue ?? 0) !== 0;
+  /**
+   * Gösterilecek bir şey var mı — sefer, gider, yakıt ya da kapanmış
+   * vardiya. Eskiden yalnızca seferlere bakılıyordu: ilk seferden önce
+   * yakıt alan sürücü "vardiya açık, henüz kayıt yok" görüyordu, oysa
+   * −700 ₺ yazılmıştı. Yalnızca açık vardiya olan boş gün hâlâ boş.
+   */
+  const hasRecords = summary?.hasActivity ?? false;
 
   function baslat() {
     if (!userId || !vehicle) return;
