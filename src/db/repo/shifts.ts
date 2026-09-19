@@ -6,7 +6,7 @@
  * bağlıdır — hiçbir soru akışı bloklamaz.
  */
 
-import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, isNull, lte, or } from 'drizzle-orm';
 import { getDb } from '../client';
 import { shifts, vehicles } from '../schema';
 import { rememberStatedFuelFigures } from './fuel';
@@ -112,9 +112,7 @@ export function endShift(
   if (!changed) return false;
 
   // Bir dahaki vardiya sonunda alanlar dolu gelsin diye araca hatırlatılıyor.
-  rememberStatedFuelFigures(
-    userId, current.vehicleId, input.fuelConsumptionPer100Km, input.fuelPriceKurus, now,
-  );
+  rememberIfLatest(userId, current, input, now);
   return true;
 }
 
@@ -126,6 +124,8 @@ export function endShift(
  * detaydan düzelten sürücünün aracında değer boş kalır ve bir sonraki
  * vardiya sonunda alan yine boş gelirdi — aynı sayıyı her seferinde
  * yeniden yazmak zorunda kalırdı.
+ *
+ * Ama YALNIZCA o aracın en yeni vardiyası hatırlatıyor (`rememberIfLatest`).
  */
 export function updateShiftTotals(
   userId: string, id: string, input: EndShiftInput, now: UnixMs = Date.now(),
@@ -148,10 +148,38 @@ export function updateShiftTotals(
   }, now);
   if (!changed) return false;
 
-  rememberStatedFuelFigures(
-    userId, current.vehicleId, input.fuelConsumptionPer100Km, input.fuelPriceKurus, now,
-  );
+  rememberIfLatest(userId, current, input, now);
   return true;
+}
+
+/**
+ * Vardiyanın tüketim ve fiyatını araca hatırlatır — yalnızca o aracın
+ * EN YENİ vardiyasıysa.
+ *
+ * Araçtaki değer sürücünün SON beyanı. İki ay önceki bir vardiyanın
+ * yalnızca kilometresini düzelten sürücü, o vardiyanın eski litre
+ * fiyatını da (ekran alanları kaydın değeriyle açılıyor) araca geri
+ * yazıyordu; bir sonraki vardiya sonu bayat fiyatla açılıyor ve
+ * onaylanınca yeni günün yakıtı yanlış hesaplanıyordu.
+ */
+function rememberIfLatest(
+  userId: string, shift: Shift, input: EndShiftInput, now: UnixMs,
+): void {
+  const newer = getDb().select({ id: shifts.id }).from(shifts)
+    .where(and(
+      alive(shifts, userId),
+      eq(shifts.vehicleId, shift.vehicleId),
+      or(
+        gt(shifts.startedAt, shift.startedAt),
+        and(eq(shifts.startedAt, shift.startedAt), gt(shifts.id, shift.id)),
+      ),
+    ))
+    .get();
+  if (newer) return;
+
+  rememberStatedFuelFigures(
+    userId, shift.vehicleId, input.fuelConsumptionPer100Km, input.fuelPriceKurus, now,
+  );
 }
 
 export function deleteShift(userId: string, id: string, now: UnixMs = Date.now()): boolean {

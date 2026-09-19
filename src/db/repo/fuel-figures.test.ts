@@ -10,8 +10,8 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 import {
-  addFuelLog, createVehicle, getKnownFuelFigures, listVehicleFuelTypes,
-  rememberStatedFuelFigures, setVehicleFuelTypes,
+  addFuelLog, createVehicle, endShift, getKnownFuelFigures, getShift, listVehicleFuelTypes,
+  rememberStatedFuelFigures, setVehicleFuelTypes, startShift, updateShiftTotals,
 } from '@/db/repo';
 import type { Kurus } from '@/lib/money';
 import { rawTestDb, resetTestDb } from '../../../tools/test-db.ts';
@@ -130,5 +130,32 @@ describe('dolumun litre fiyatı', () => {
       }, 4, T0 + 2);
       assert.equal(getKnownFuelFigures(U, v.id).unitPriceKurus, 4550, `fiyat ${price}`);
     }
+  });
+});
+
+describe('geçmiş vardiyayı düzeltmek', () => {
+  beforeEach(() => resetTestDb());
+
+  const DAY = 24 * 3_600_000;
+
+  it('eski vardiyanın düzeltmesi aracın SON beyanını ezmez; en yenisininki günceller', () => {
+    const v = createVehicle(U, { label: 'Araç', ownership: 'owned', fuelTypes: ['gasoline'] }, T0);
+    const old = startShift(U, v.id, 4, T0);
+    endShift(U, old.id, { distanceKm: 100, fuelConsumptionPer100Km: 7000, fuelPriceKurus: k(4000) }, T0 + 1000);
+    const latest = startShift(U, v.id, 4, T0 + DAY);
+    endShift(U, latest.id, { distanceKm: 200, fuelConsumptionPer100Km: 7500, fuelPriceKurus: k(4500) }, T0 + DAY + 1000);
+
+    // Sürücü eski vardiyanın yalnızca km'sini düzeltiyor; ekran diğer
+    // alanları kaydın eski değerleriyle gönderiyor.
+    updateShiftTotals(U, old.id, {
+      distanceKm: 110, fuelConsumptionPer100Km: 7000, fuelPriceKurus: k(4000),
+    }, T0 + 2 * DAY);
+    assert.deepEqual(getKnownFuelFigures(U, v.id), {
+      consumptionPer100Km: 7500, unitPriceKurus: 4500, isMeasured: false,
+    });
+    assert.equal(getShift(U, old.id)?.distanceKm, 110);
+
+    updateShiftTotals(U, latest.id, { fuelPriceKurus: k(4700) }, T0 + 2 * DAY + 1);
+    assert.equal(getKnownFuelFigures(U, v.id).unitPriceKurus, 4700);
   });
 });
