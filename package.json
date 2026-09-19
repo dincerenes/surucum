@@ -44,7 +44,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node --test \"src/**/*.test.ts\"",
+    "test": "node --import ./tools/test-register.mjs --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
