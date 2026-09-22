@@ -289,7 +289,8 @@ Aşağıdakiler ikinci turda düzeltilecek.
   Açık vardiya bir *durum* değil, bir *yer*.
 - ~~Anasayfa `1c`'nin "gün defteri" düzeniyle olacak~~ — **23 Eylül 2026'da değişti:**
   sürücünün raporu üzerine Anasayfa KART düzenine geçti (selamlama, Günlük kazancın,
-  Aylık ortalama, Aracın bu ay eridi, Son 7 gün). Çıkarma işleminin görünür dökümü
+  Aylık ortalama, Bu ayın en iyi günü, Son 7 gün). Palet de aynı gün canlı
+  maviye geçti (`tokens.ts`). Çıkarma işleminin görünür dökümü
   vardiya detayında duruyor.
 - **`1e` tam ekran canlı mod** Sürüş sekmesinin içeriği olacak.
 - Palet, boşluk ölçeği, 52px dokunma hedefi aynen kalacak.

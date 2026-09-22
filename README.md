@@ -254,11 +254,12 @@ boyu oraya dönüp sefer ekliyor.
 **Anasayfa kartlardan oluşuyor** (eski "gün defteri" düzeni kaldırıldı;
 vardiya vardiya döküm vardiya detayında): saate göre selamlama ve ilk ad,
 avatar (fotoğraf yoksa baş harf; dokununca Profil), bayat kalmış açık
-vardiya uyarısı, **Günlük kazancın** (açık vardiyada yolcu/ciro/süre ve
-Yolcu ekle, kapalıyken bugünün toplamı ve başlat; hedef girilmişse hedef
-çubuğu), **Aylık ortalama** (çalışılan gün başına cebe kalan; yolcu, km,
+vardiya uyarısı, **Günlük kazancın** (mavi vurgu kartı, YALNIZCA bilgi:
+açık vardiyada yolcu/ciro/süre, kapalıyken bugünün cebe kalanı; hedef
+girilmişse hedef çubuğu; kayıt girişi Sürüş'te, karta dokununca oraya
+gidiliyor), **Aylık ortalama** (çalışılan gün başına cebe kalan; yolcu, km,
 saat ve ciro gün başına — km yalnızca km'si girilmiş günlerden),
-**Aracın bu ay ne kadar eridi** (yıpranma ve km), **Son 7 gün** (günlük
+**Bu ayın en iyi günü** (cebe kalanı en yüksek kârlı gün), **Son 7 gün** (günlük
 cebe kalan; kaydı olmayan gün boş çubuk olarak duruyor, yutulmuyor).
 Aritmetik `src/lib/home.ts` ve `profile.ts`'te, okuma
 `src/db/repo/home.ts` (`getHomeOverview`).

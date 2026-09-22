@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AmountText, Avatar, Button, Card, GoalBar, StatGrid, StatTile,
 } from '@/components/ui';
-import { getCutoffHour, getHomeOverview, getSettings, startShift } from '@/db/repo';
+import { getCutoffHour, getHomeOverview, getSettings } from '@/db/repo';
 import { useDbValue } from '@/db/use-db';
 import {
   formatBusinessDate, monthName, todayBusinessDate, weekdayIndex,
@@ -17,7 +17,6 @@ import { formatDuration, isShiftStale } from '@/lib/shift';
 import { upperTr } from '@/lib/text';
 import { useDriver } from '@/lib/use-driver';
 import { useNow } from '@/lib/use-now';
-import { requestSync } from '@/sync/scheduler';
 import { HIT_SIZE, radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 /**
@@ -86,7 +85,7 @@ export default function HomeScreen() {
       {data ? (
         <>
           <MonthCard overview={data.overview} month={Number(data.today.slice(5, 7))} />
-          <WearCard overview={data.overview} />
+          <BestDayCard overview={data.overview} />
           <WeekCard bars={data.overview.week} />
         </>
       ) : null}
@@ -121,79 +120,97 @@ function StaleShiftCard({ startedAt, now }: { startedAt: number; now: number }) 
 }
 
 /**
- * "Günlük kazancın".
+ * "Günlük kazancın" — YALNIZCA BİLGİ, renkli vurgu kartı.
  *
- * Vardiya AÇIKKEN canlı: bu vardiyanın yolcusu, cirosu, süresi. Büyük
+ * Kayıt girişi burada YOK (sürücünün kararı): yolcu, gider ve yakıt
+ * Sürüş sekmesinden giriliyor. Anasayfa bakılan yer; iki ekranda aynı
+ * düğmeler olunca hangisinin "asıl" yer olduğu bulanıklaşıyordu. Karta
+ * dokunmak Sürüş'ü açıyor.
+ *
+ * Vardiya AÇIKKEN canlı: bu vardiyanın cirosu, yolcusu, süresi. Büyük
  * sayı CİRO — komisyon ve yakıt vardiya biterken soruluyor, bilinmeyen
  * kesintiyi düşülmüş gibi göstermek sayıya güveni bitirir.
- *
- * Vardiya KAPALIYKEN bugünün toplamı ve cebe kalan; hiç kayıt yoksa
- * başlatma çağrısı.
+ * Vardiya KAPALIYKEN bugünün cebe kalanı.
  */
 function TodayCard({ now }: { now: number }) {
   const { colors } = useTheme();
-  const { userId, vehicle, openShift, shiftRides, shiftGross, goal, summary } = useDriver();
-
-  function baslat() {
-    if (!userId || !vehicle) return;
-    startShift(userId, vehicle.id);
-    requestSync();
-  }
-
-  if (openShift) {
-    const minutes = Math.max(0, Math.floor((now - openShift.startedAt) / 60_000));
-    return (
-      <Card title="Günlük kazancın" meta="vardiya açık" style={{ borderColor: colors.positive }}>
-        <View style={styles.bigRow}>
-          <AmountText value={shiftGross} size="display" />
-          <Text style={[typeScale.caption, { color: colors.textFaint }]}>ciro</Text>
-        </View>
-        <StatGrid>
-          <StatTile value={formatInteger(shiftRides.length)} label="yolcu" />
-          <StatTile value={formatDuration(minutes)} label="süre" />
-        </StatGrid>
-        {goal ? <GoalBar goal={goal} /> : null}
-        <Button label="Yolcu ekle" size="hero" plus onPress={() => router.push('/sefer')} />
-        <View style={styles.pair}>
-          <Button label="Gider" variant="secondary" style={styles.half}
-            onPress={() => router.push('/gider')} />
-          <Button label="Yakıt" variant="secondary" style={styles.half}
-            onPress={() => router.push('/yakit')} />
-        </View>
-      </Card>
-    );
-  }
+  const { openShift, shiftRides, shiftGross, goal, summary } = useDriver();
+  const on = colors.accentText;
 
   const worked = summary?.hasActivity ?? false;
+  const minutes = openShift
+    ? Math.max(0, Math.floor((now - openShift.startedAt) / 60_000)) : 0;
+
+  const facts: { value: string; label: string }[] = openShift
+    ? [
+      { value: formatInteger(shiftRides.length), label: 'yolcu' },
+      { value: formatDuration(minutes), label: 'süre' },
+    ]
+    : worked && summary
+      ? [
+        { value: formatInteger(summary.rideCount), label: 'yolcu' },
+        { value: formatKurus(summary.profit.revenue, { decimals: false }), label: 'ciro' },
+      ]
+      : [];
+
   return (
-    <Card title="Günlük kazancın" meta="bugün">
-      {worked && summary ? (
-        <>
-          <View style={styles.bigRow}>
-            <AmountText value={summary.profit.cashProfit} size="display" tone="signed" />
-            <Text style={[typeScale.caption, { color: colors.textFaint }]}>cebe kalan</Text>
+    <Pressable
+      onPress={() => router.push('/surus')}
+      accessibilityRole="button"
+      accessibilityLabel="Günlük kazancın, Sürüş'ü aç"
+      style={({ pressed }) => [styles.hero, {
+        backgroundColor: colors.accent, opacity: pressed ? 0.92 : 1,
+      }]}
+    >
+      <View style={styles.heroHead}>
+        <Text style={[styles.heroLabel, { color: on }]}>GÜNLÜK KAZANCIN</Text>
+        {openShift ? (
+          <View style={[styles.livePill, { backgroundColor: colors.positive }]}>
+            <View style={[styles.liveDot, { backgroundColor: colors.surface }]} />
+            <Text style={[typeScale.label, { color: colors.surface }]}>VARDİYA AÇIK</Text>
           </View>
-          <StatGrid>
-            <StatTile value={formatInteger(summary.rideCount)} label="yolcu" />
-            <StatTile
-              value={formatKurus(summary.profit.revenue, { decimals: false })}
-              label="ciro"
-            />
-          </StatGrid>
-          {goal ? <GoalBar goal={goal} /> : null}
-        </>
+        ) : (
+          <Text style={[typeScale.caption, { color: on, opacity: 0.8 }]}>bugün</Text>
+        )}
+      </View>
+
+      {openShift || worked ? (
+        <View style={styles.bigRow}>
+          <AmountText
+            value={openShift ? shiftGross : summary!.profit.cashProfit}
+            size="display"
+            style={{ color: on, fontSize: 38, lineHeight: 44 }}
+          />
+          <Text style={[typeScale.caption, { color: on, opacity: 0.8 }]}>
+            {openShift ? 'ciro' : 'cebe kalan'}
+          </Text>
+        </View>
       ) : (
-        <Text style={[typeScale.body, { color: colors.textSoft }]}>
-          Bugün henüz vardiya yok. Başlat, gün boyu aldığın yolcuları yaz;
-          akşam cebinde ne kaldığını göstereyim.
+        <Text style={[typeScale.body, { color: on }]}>
+          Bugün henüz vardiya yok. Sürüş sekmesinden başlattığında kazancın
+          burada canlı görünecek.
         </Text>
       )}
-      <Button
-        label={worked ? 'Yeni vardiya başlat' : 'Vardiyayı başlat'}
-        size="hero"
-        onPress={baslat}
-      />
-    </Card>
+
+      {facts.length > 0 ? (
+        <View style={styles.heroFacts}>
+          {facts.map((f) => (
+            <View key={f.label} style={[styles.heroFact, { backgroundColor: 'rgba(255,255,255,0.16)' }]}>
+              <Text style={[typeScale.title, { color: on }]} numberOfLines={1} adjustsFontSizeToFit>
+                {f.value}
+              </Text>
+              <Text style={[typeScale.caption, { color: on, opacity: 0.85 }]}>{f.label}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {goal ? (
+        <View style={[styles.goalWrap, { backgroundColor: colors.surface }]}>
+          <GoalBar goal={goal} />
+        </View>
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -210,7 +227,7 @@ function MonthCard({ overview, month }: {
   const a = overview.averages;
 
   return (
-    <Card title="Aylık ortalama" meta={monthName(month)}>
+    <Card title="Aylık ortalama" meta={monthName(month)} icon={{ ios: 'calendar', android: 'calendar_month' }}>
       {a.perDay == null ? (
         <Text style={[typeScale.body, { color: colors.textSoft }]}>
           Bu ay henüz çalışılan gün yok. İlk vardiyadan sonra gün başına ne
@@ -244,44 +261,42 @@ function MonthCard({ overview, month }: {
 }
 
 /**
- * "Aracın bu ay ne kadar eridi" — ürünün asıl tezi.
+ * "Bu ayın en iyi günü" — sürücünün kendi rekoru.
  *
- * Yıpranma payı cebe kalanın içinde duruyor ama sürücünün değil aracın
- * parası: lastik, bakım, değer kaybı. Km girilmemiş vardiyada hesaplanamaz,
- * o yüzden eksik vardiya sayısı da yazıyor.
+ * Ortalama "genelde" ne olduğunu söylüyor; en iyi gün neyin MÜMKÜN
+ * olduğunu. O günün yolcusu ve süresi yanında: rekorun nasıl geldiği
+ * (çok yolcu mu, uzun gün mü) bir bakışta okunuyor. Dokununca Kayıtlar.
  */
-function WearCard({ overview }: { overview: ReturnType<typeof getHomeOverview> }) {
+function BestDayCard({ overview }: { overview: ReturnType<typeof getHomeOverview> }) {
   const { colors } = useTheme();
-  const m = overview.month;
-  if (m.shiftCount === 0) return null;
+  const best = overview.best;
+  if (!best) return null;
+  const s = best.summary;
 
   return (
-    <Card title="Aracın bu ay eridi">
-      {m.distanceKm == null ? (
+    <Pressable
+      onPress={() => router.push('/kayitlar')}
+      accessibilityRole="button"
+      accessibilityLabel="Bu ayın en iyi günü, Kayıtlar'ı aç"
+    >
+      <Card
+        title="Bu ayın en iyi günü"
+        icon={{ ios: 'trophy.fill', android: 'emoji_events' }}
+        meta={formatBusinessDate(best.date, 'weekday')}
+      >
+        <View style={styles.bigRow}>
+          <AmountText value={s.profit.cashProfit} size="title" tone="signed" />
+          <Text style={[typeScale.caption, { color: colors.textFaint }]}>cebe kalan</Text>
+        </View>
         <Text style={[typeScale.body, { color: colors.textSoft }]}>
-          Vardiya sonunda km girdiğinde aracının ne kadar eridiğini burada
-          göreceksin.
+          {[
+            `${formatInteger(s.rideCount)} yolcu`,
+            s.durationMinutes > 0 ? formatDuration(s.durationMinutes) : null,
+            `ciro ${formatKurus(s.profit.revenue, { decimals: false })}`,
+          ].filter(Boolean).join(' · ')}
         </Text>
-      ) : (
-        <>
-          <View style={styles.bigRow}>
-            <AmountText value={m.wearShare} size="title" tone="cost" />
-            <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-              {formatInteger(m.distanceKm)} km yolda
-            </Text>
-          </View>
-          <Text style={[typeScale.caption, { color: colors.textSoft }]}>
-            Cebinde duruyor ama aracına ait: lastik, bakım ve değer kaybı payı.
-            Gerçek kâr bu pay düşülerek hesaplanıyor.
-          </Text>
-        </>
-      )}
-      {m.shiftsMissingDistance > 0 ? (
-        <Text style={[typeScale.caption, { color: colors.warning }]}>
-          {formatInteger(m.shiftsMissingDistance)} vardiyada km eksik
-        </Text>
-      ) : null}
-    </Card>
+      </Card>
+    </Pressable>
   );
 }
 
@@ -305,7 +320,11 @@ function WeekCard({ bars }: { bars: DailyBar[] }) {
       accessibilityRole="button"
       accessibilityLabel="Son 7 gün, İstatistik'i aç"
     >
-      <Card title="Son 7 gün" meta={any ? formatKurus(total, { decimals: false }) : undefined}>
+      <Card
+        title="Son 7 gün"
+        meta={any ? formatKurus(total, { decimals: false }) : undefined}
+        icon={{ ios: 'chart.bar.fill', android: 'bar_chart' }}
+      >
         <View style={styles.chart}>
           {bars.map((b) => {
             const ratio = barRatio(b.cashProfit, bars);
@@ -359,8 +378,17 @@ const styles = StyleSheet.create({
   date: { ...typeScale.label, letterSpacing: 1 },
   stale: { borderRadius: radius.lg, padding: space.lg, gap: space.sm },
   bigRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm, flexWrap: 'wrap' },
-  pair: { flexDirection: 'row', gap: space.md },
-  half: { flex: 1 },
+  hero: { borderRadius: radius.lg, padding: space.xl, gap: space.md },
+  heroHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  heroLabel: { ...typeScale.label, letterSpacing: 1, opacity: 0.9 },
+  livePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: radius.pill, paddingHorizontal: space.sm, paddingVertical: 4,
+  },
+  liveDot: { width: 7, height: 7, borderRadius: 4 },
+  heroFacts: { flexDirection: 'row', gap: space.sm },
+  heroFact: { flex: 1, borderRadius: radius.md, padding: space.md, gap: 2 },
+  goalWrap: { borderRadius: radius.md, padding: space.md },
   chart: {
     flexDirection: 'row', justifyContent: 'space-between', gap: space.xs,
     minHeight: HIT_SIZE,

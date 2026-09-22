@@ -17,9 +17,9 @@ import struct
 import zlib
 
 # src/theme/tokens.ts — açık tema vurgu rengi ve yüzeyi.
-ACCENT = (0x0E, 0x5A, 0x63)
+ACCENT = (0x25, 0x63, 0xEB)
 ACCENT_TEXT = (0xFF, 0xFF, 0xFF)
-ACCENT_SOFT = (0xDC, 0xED, 0xEF)
+ACCENT_SOFT = (0xDC, 0xE8, 0xFF)
 
 
 def rounded_rect_sdf(px, py, cx, cy, hw, hh, r):

@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 
 import type { BusinessDate } from './business-date.ts';
 import type { DaySummary } from './day-summary.ts';
-import { barRatio, lastDays, monthlyAverages } from './home.ts';
+import { barRatio, bestDay, lastDays, monthlyAverages } from './home.ts';
 import type { Kurus } from './money.ts';
 import { type DayEntry, type PeriodTotals, calculatePeriodTotals } from './stats.ts';
 
@@ -63,5 +63,18 @@ describe('aylık ortalama', () => {
     assert.equal(a.ridesPerDay, 12.5);
     assert.equal(a.kmPerDay, 300);
     assert.equal(a.minutesPerDay, 600);
+  });
+});
+
+describe('en iyi gün', () => {
+  it('cebe kalanı en yüksek çalışılmış gün; eşitlikte en yenisi', () => {
+    const b = bestDay([day('2026-09-01', 500), day('2026-09-02', 900), day('2026-09-03', 900)]);
+    assert.equal(b?.date, '2026-09-03');
+  });
+
+  it('zararlı ya da çalışılmamış gün aday değil', () => {
+    assert.equal(bestDay([day('2026-09-01', -500)]), null);
+    assert.equal(bestDay([day('2026-09-01', 800, { isWorkedDay: false })]), null);
+    assert.equal(bestDay([]), null);
   });
 });

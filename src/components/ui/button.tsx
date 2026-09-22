@@ -39,7 +39,7 @@ export function Button({
 
   const fg =
     variant === 'primary' ? colors.accentText
-    : variant === 'danger' ? '#FFFFFF'
+    : variant === 'danger' ? colors.surface
     : variant === 'ghost' ? colors.accent
     : colors.text;
 

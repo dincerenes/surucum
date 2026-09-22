@@ -75,3 +75,22 @@ export function barRatio(value: Kurus | null, bars: readonly DailyBar[]): number
   if (value == null || value <= 0 || best <= 0) return 0;
   return value / best;
 }
+
+/**
+ * Dönemin EN İYİ GÜNÜ — cebe kalanı en yüksek çalışılmış gün.
+ *
+ * Yalnızca çalışılmış ve kârlı günler aday: zararlı bir günü "en iyi"
+ * diye göstermek teselli değil alay olur. Eşitlikte en yenisi.
+ */
+export function bestDay(entries: readonly DayEntry[]): DayEntry | null {
+  let best: DayEntry | null = null;
+  for (const e of entries) {
+    if (!e.summary.isWorkedDay || e.summary.profit.cashProfit <= 0) continue;
+    if (
+      best == null
+      || e.summary.profit.cashProfit > best.summary.profit.cashProfit
+      || (e.summary.profit.cashProfit === best.summary.profit.cashProfit && e.date > best.date)
+    ) best = e;
+  }
+  return best;
+}

@@ -50,56 +50,65 @@ export interface Colors {
 
 export type ColorScheme = 'light' | 'dark';
 
+/**
+ * CANLI PALET — 23 Eylül 2026.
+ *
+ * Önceki palet (koyu petrol yeşili vurgu, yeşilimsi gri zemin) sürücüye
+ * "aşırı soluk" geldi. Vurgu artık doygun mavi: beyaz yazıyla okunaklı
+ * (AA), yeşil kazanç ve kırmızı giderle karışmıyor. Zemin nötr-soğuk,
+ * kartlar beyaz; anlamsal renkler (kazanç/gider/uyarı) daha parlak ve
+ * yumuşak zeminleri daha belirgin.
+ */
 export const palette: Record<ColorScheme, Colors> = {
   light: {
-    background: '#F4F6F4',
+    background: '#F2F5FA',
     surface: '#FFFFFF',
-    surfaceSunken: '#EAEEEB',
+    surfaceSunken: '#EAF0F8',
 
-    text: '#141C18',
-    textSoft: '#586460',
-    textFaint: '#8B9691',
+    text: '#0F172A',
+    textSoft: '#475569',
+    textFaint: '#7C8BA1',
 
-    border: '#D6DDD8',
-    borderStrong: '#B4BEB8',
+    border: '#DFE6F0',
+    borderStrong: '#C3CEDD',
 
-    accent: '#0E5A63',
+    accent: '#2563EB',
     accentText: '#FFFFFF',
-    accentSoft: '#DCEDEF',
+    accentSoft: '#DCE8FF',
 
-    positive: '#15803D',
-    positiveSoft: '#DCF3E4',
-    negative: '#B3261E',
-    negativeSoft: '#FADEDC',
-    warning: '#8A5D14',
-    warningSoft: '#F6E9CF',
+    positive: '#16A34A',
+    positiveSoft: '#D5F7E1',
+    negative: '#DC2626',
+    negativeSoft: '#FDE2E2',
+    warning: '#C2410C',
+    warningSoft: '#FFEDD5',
 
-    accentScale: ['#DCEDEF', '#B4D6DA', '#8FB9BE', '#4E8E95', '#0E5A63'],
+    accentScale: ['#DCE8FF', '#B3CCFF', '#7FA8FA', '#4B82F2', '#2563EB'],
   },
   dark: {
-    background: '#101512',
-    surface: '#191F1B',
-    surfaceSunken: '#0B0F0D',
+    background: '#0B1120',
+    surface: '#141C2F',
+    surfaceSunken: '#0A0F1C',
 
-    text: '#E6EBE7',
-    textSoft: '#9AA5A0',
-    textFaint: '#6D7873',
+    text: '#EAF0FA',
+    textSoft: '#A5B3C8',
+    textFaint: '#6E7D95',
 
-    border: '#2A332E',
-    borderStrong: '#3D4842',
+    border: '#222D44',
+    borderStrong: '#33415E',
 
-    accent: '#4FC3D0',
-    accentText: '#062327',
-    accentSoft: '#0E3238',
+    accent: '#5B9BFF',
+    accentText: '#081226',
+    accentSoft: '#15264A',
 
-    positive: '#5CC98A',
-    positiveSoft: '#12301F',
-    negative: '#F2837C',
-    negativeSoft: '#3A1A18',
-    warning: '#D8A94E',
-    warningSoft: '#33280F',
+    positive: '#4ADE80',
+    positiveSoft: '#0E2E1B',
+    negative: '#F87171',
+    negativeSoft: '#3A1517',
+    warning: '#FB923C',
+    warningSoft: '#3A2210',
 
-    accentScale: ['#0E3238', '#14484F', '#256E77', '#3A9AA5', '#4FC3D0'],
+    accentScale: ['#15264A', '#1E3A7A', '#2F5BC0', '#4680F0', '#5B9BFF'],
   },
 };
 
@@ -131,8 +140,8 @@ export const space = {
 
 export const radius = {
   sm: 6,
-  md: 10,
-  lg: 14,
+  md: 12,
+  lg: 18,
   pill: 999,
 } as const;
 

@@ -3,9 +3,11 @@ import type { ColorValue } from 'react-native';
 
 type SymbolName = Extract<SymbolViewProps['name'], { ios?: unknown }>;
 
+/** iOS'ta SF Symbols, Android'de Material Symbols adı. */
+export type IconName = Required<Pick<SymbolName, 'ios' | 'android'>>;
+
 interface Props {
-  /** iOS'ta SF Symbols, Android'de Material Symbols adı. */
-  name: Required<Pick<SymbolName, 'ios' | 'android'>>;
+  name: IconName;
   size?: number;
   color: ColorValue;
 }

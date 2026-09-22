@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 import { upperTr } from '@/lib/text';
+import { Icon, type IconName } from './icon';
 
 interface Props {
   children: React.ReactNode;
@@ -13,6 +14,8 @@ interface Props {
    * üst üste iki beyaz yüzey sınırsız kalıyor ve derinlik okunmuyor.
    */
   sunken?: boolean;
+  /** Başlığın solunda renkli daire içinde ikon — kartı bir bakışta tanıtır. */
+  icon?: IconName;
   style?: ViewStyle;
 }
 
@@ -23,7 +26,7 @@ interface Props {
  * `elevation` ile ayrı ayarlanması gerekiyor. Kenarlık iki temada da
  * aynı davranıyor.
  */
-export function Card({ children, title, meta, sunken = false, style }: Props) {
+export function Card({ children, title, meta, sunken = false, icon, style }: Props) {
   const { colors } = useTheme();
 
   return (
@@ -39,7 +42,16 @@ export function Card({ children, title, meta, sunken = false, style }: Props) {
     >
       {title ? (
         <View style={styles.head}>
-          <Text style={[styles.title, { color: colors.textFaint }]}>{upperTr(title)}</Text>
+          <View style={styles.titleRow}>
+            {icon ? (
+              <View style={[styles.iconDot, { backgroundColor: colors.accentSoft }]}>
+                <Icon name={icon} size={15} color={colors.accent} />
+              </View>
+            ) : null}
+            <Text style={[styles.title, { color: icon ? colors.textSoft : colors.textFaint }]}>
+              {upperTr(title)}
+            </Text>
+          </View>
           {meta ? (
             <Text style={[typeScale.caption, { color: colors.textFaint }]}>{meta}</Text>
           ) : null}
@@ -60,8 +72,12 @@ const styles = StyleSheet.create({
   head: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap: space.sm,
+  },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexShrink: 1 },
+  iconDot: {
+    width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
   },
   /** Büyük harf `upperTr` ile — `textTransform` Türkçe İ'yi bilmiyor. */
   title: { ...typeScale.label },
