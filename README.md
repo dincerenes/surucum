@@ -71,7 +71,13 @@ tek bir çalışma günü. Her kayıt `business_date` taşıyor ve tüm dönüş
 **Vardiyaya bağlı kayıt, vardiyanın gününü alır** — kendi saatinden değil.
 Bu kural yaşanarak bulundu: 03:52'de girilen iki sefer 27 Ağustos'a, 04:01'de
 girilen ikisi 28 Ağustos'a düştü ve tek bir kesintisiz vardiya iki güne
-bölündü. Gün kesme saati (varsayılan 04:00) kullanıcı ayarı.
+bölündü.
+
+Günü bölen şey saat değil **vardiya**: vardiyanın günü başladığı takvim
+günüdür. Eskiden bir de "gün kesme saati" ayarı vardı (varsayılan 04:00);
+yalnızca vardiya dışı kayıtları etkiliyordu, sürücüye anlamı
+açıklanamadı ve kaldırıldı. Kesme artık her zaman gece yarısı
+(`DEFAULT_CUTOFF_HOUR = 0`); ayar sütunu bulutta duruyor ama okunmuyor.
 
 ### Cihaz kaynak-doğruluktur
 

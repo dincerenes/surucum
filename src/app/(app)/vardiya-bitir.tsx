@@ -14,6 +14,7 @@ import {
 import type { BusinessDate } from '@/lib/business-date';
 import { type Kurus, formatKurus, parseAmount } from '@/lib/money';
 import { useDriver } from '@/lib/use-driver';
+import { readDecimal } from '@/lib/number-input';
 import { parseWholeKm } from '@/lib/whole-number';
 import { requestSync } from '@/sync/scheduler';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
@@ -119,8 +120,8 @@ export default function EndShiftScreen() {
     if (!userId || !openShift) return;
     setClosedDate(openShift.businessDate);
 
-    const hoursValue = Number(hours.replace(',', '.'));
-    const consumptionValue = Number(consumption.replace(',', '.'));
+    const hoursValue = readDecimal(hours) ?? Number.NaN;
+    const consumptionValue = readDecimal(consumption) ?? Number.NaN;
 
     endShift(userId, openShift.id, {
       // Kilometre TAM SAYI: bulutta sütun integer, ondalık reddedilir.

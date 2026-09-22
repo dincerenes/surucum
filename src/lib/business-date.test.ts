@@ -80,9 +80,10 @@ describe('gece vardiyası — asıl mesele bu', () => {
     assert.equal(toBusinessDate(new Date(2026, 7, 25, 6, 0), 6), '2026-08-25');
   });
 
-  test('varsayılan kesme saati 04:00', () => {
-    assert.equal(DEFAULT_CUTOFF_HOUR, 4);
-    assert.equal(toBusinessDate(new Date(2026, 7, 25, 3, 0)), '2026-08-24');
+  test('varsayılan kesme saati gece yarısı — takvim günü', () => {
+    assert.equal(DEFAULT_CUTOFF_HOUR, 0);
+    assert.equal(toBusinessDate(new Date(2026, 7, 25, 3, 0)), '2026-08-25');
+    assert.equal(toBusinessDate(new Date(2026, 7, 24, 23, 59)), '2026-08-24');
   });
 
   test('zaman damgası sayı olarak da verilebilir', () => {

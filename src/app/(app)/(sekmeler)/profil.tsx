@@ -20,7 +20,7 @@ import { HIT_SIZE, radius, space, type as typeScale, useTheme } from '@/theme/us
  * Profil — hesap, aktif araç ve menü.
  *
  * Menü satırları BİR SATIR ÖZET taşıyor: "Ayarlar" tek başına ne
- * bulacağını söylemiyor, "Kesme saati 04:00 · Koyu tema" söylüyor.
+ * bulacağını söylemiyor, "Koyu tema · hedef 1.500 ₺" söylüyor.
  * Sürücü çoğu zaman girmeden cevabını alıyor.
  */
 export default function ProfileScreen() {
@@ -38,7 +38,6 @@ export default function ProfileScreen() {
         : '',
       figures: vehicle ? getKnownFuelFigures(user.id, vehicle.id) : null,
       vehicleCount: listActiveVehicles(user.id).length,
-      cutoff: getSettings(user.id)?.dayCutoffHour ?? 4,
       goal: getActiveGoal(user.id, 'daily')?.targetNetKurus ?? null,
       sync: getSyncStatus(user.id),
       pending: pendingCount(user.id),
@@ -48,7 +47,7 @@ export default function ProfileScreen() {
   const themeLabel =
     preference === 'light' ? 'açık tema'
     : preference === 'dark' ? 'koyu tema'
-    : 'cihazla aynı tema';
+    : 'sistem teması';
 
   return (
     <ScrollView
@@ -94,7 +93,7 @@ export default function ProfileScreen() {
         <MenuRow
           label="Ayarlar"
           detail={
-            `Kesme saati ${String(info?.cutoff ?? 4).padStart(2, '0')}:00 · ${themeLabel}`
+            themeLabel.charAt(0).toUpperCase() + themeLabel.slice(1)
             + (info?.goal ? ` · hedef ${formatKurus(info.goal, { decimals: false })}` : '')
           }
           onPress={() => router.push('/ayarlar')}

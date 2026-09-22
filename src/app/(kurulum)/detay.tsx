@@ -4,28 +4,27 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AboveKeyboard, AmountInput, Button, Chip, ChipGrid } from '@/components/ui';
-import { createVehicle, updateSettings } from '@/db/repo';
-import {
-  FUEL_TYPE_LABELS, type FuelType, defaultWearPerKm,
-} from '@/db/schema/_shared';
+import { completeOnboarding, createVehicle, updateSettings } from '@/db/repo';
+import { FUEL_TYPE_LABELS, type FuelType } from '@/db/schema/_shared';
 import { useAuth } from '@/lib/auth/auth-context';
-import { formatKurus } from '@/lib/money';
+import { toggleFuelSelection } from '@/lib/fuel-selection';
+import { parseWholeKm } from '@/lib/whole-number';
 import { requestSync } from '@/sync/scheduler';
-import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
+import { space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 const SELECTABLE: FuelType[] = ['gasoline', 'diesel', 'lpg', 'electric'];
 
 /**
- * Kurulum 2/3 — yakıt ve kilometre.
+ * Kurulum 2/2 — yakıt ve kilometre. Son adım: "Devam" kurulumu bitirir.
  *
- * YIPRANMA PAYI BURADA SORULMUYOR. Tasarım onu düzenlenebilir bir alan
- * yapmıştı; kural bunun tersini söylüyor. Sürücü aracının kaç kilometrede
- * ne kadar değer kaybettiğini bilmiyor — sorarsak ya boş bırakır ya
- * rastgele bir sayı yazar, ikisi de raporu kirletir.
+ * YIPRANMA PAYI BURADA NE SORULUYOR NE GÖSTERİLİYOR. Sürücü aracının kaç
+ * kilometrede ne kadar değer kaybettiğini bilmiyor; ilk dakikada ona
+ * "2,50 ₺/km" gibi bir katsayı göstermek soru sormadan kafa karıştırıyordu.
+ * Değer araç düzenlemede, sahiplik biçiminin yanında okunabiliyor.
  *
- * Yine de GİZLENMİYOR: atanan değer okunabilir bir satır olarak duruyor,
- * çünkü sürücü sonradan "bu 500 lira nereden çıktı" diye sorduğunda
- * cevabı görmüş olmalı.
+ * Günlük hedef de sorulmuyor — isteyen sonradan Profil'den ekliyor.
+ * Eskiden üçüncü bir adımdı ve sürücüyü uygulamayı görmeden önce bir
+ * karar vermeye zorluyordu.
  */
 export default function DetailStep() {
   const { colors } = useTheme();
@@ -39,18 +38,10 @@ export default function DetailStep() {
   const [odometer, setOdometer] = useState('');
 
   const label = params.label || 'Aracım';
-  const wear = defaultWearPerKm('owned');
   const valid = fuels.length > 0;
-
-  function toggle(f: FuelType) {
-    setFuels((cur) => (cur.includes(f)
-      ? cur.filter((x) => x !== f)
-      : [...cur, f]));
-  }
 
   function devam() {
     if (!user?.id || !valid) return;
-    const km = Number(odometer.replace(/[.\s]/g, '').replace(',', '.'));
 
     const vehicle = createVehicle(user.id, {
       label,
@@ -59,11 +50,12 @@ export default function DetailStep() {
       make: params.make ?? null,
       model: params.model ?? null,
       modelYear: params.year ? Number(params.year) : null,
-      initialOdometerKm: Number.isFinite(km) && km > 0 ? Math.round(km) : null,
+      initialOdometerKm: parseWholeKm(odometer),
     });
     updateSettings(user.id, { defaultVehicleId: vehicle.id });
+    completeOnboarding(user.id);
     requestSync();
-    router.push('/hazir');
+    router.replace('/');
   }
 
   return (
@@ -83,35 +75,22 @@ export default function DetailStep() {
                   key={f}
                   label={FUEL_TYPE_LABELS[f]}
                   selected={fuels.includes(f)}
-                  onPress={() => toggle(f)}
+                  onPress={() => setFuels((cur) => toggleFuelSelection(cur, f))}
                 />
               ))}
             </ChipGrid>
             <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-              Dönüşümlü LPG'li araçta hem benzini hem LPG'yi seç.
+              {'Birini seç. Dönüşümlü LPG\'li araçta benzine LPG\'yi de ekleyebilirsin.'}
             </Text>
           </View>
 
           <AmountInput
-            label="Kilometre" value={odometer} onChangeText={setOdometer}
+            label="Aracın kilometresi" value={odometer} onChangeText={setOdometer}
             unit="km" keyboard="number-pad" hint="Zorunlu değil."
           />
-
-          <View style={[styles.wear, { backgroundColor: colors.surfaceSunken }]}>
-            <View style={styles.wearRow}>
-              <Text style={[typeScale.body, { color: colors.textSoft }]}>Yıpranma payı</Text>
-              <Text style={[typeScale.bodyStrong, { color: colors.text }]}>
-                {formatKurus(wear)}/km
-              </Text>
-            </View>
-            <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-              Amortisman, lastik, bakım, sigorta ve vergiyi kapsayan tek
-              katsayı. Bilerek düşük tuttuk; senden bir şey istemiyoruz.
-            </Text>
-          </View>
         </ScrollView>
 
-        <Button label="Devam" onPress={devam} disabled={!valid} />
+        <Button label="Başla" onPress={devam} disabled={!valid} />
       </View>
     </AboveKeyboard>
   );
@@ -122,8 +101,4 @@ const styles = StyleSheet.create({
   body: { gap: space.lg, paddingBottom: space.xl },
   block: { gap: space.sm },
   label: { ...typeScale.label, textTransform: 'uppercase' },
-  wear: { borderRadius: radius.md, padding: space.md, gap: space.xs },
-  wearRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline',
-  },
 });

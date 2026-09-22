@@ -5,6 +5,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HIT_SIZE, radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
+import { upperTr } from '@/lib/text';
 
 interface Props {
   label: string;
@@ -56,7 +57,7 @@ export function SelectField({
 
   return (
     <View style={styles.wrap}>
-      <Text style={[styles.label, { color: colors.textSoft }]}>{label}</Text>
+      <Text style={[styles.label, { color: colors.textSoft }]}>{upperTr(label)}</Text>
 
       <Pressable
         onPress={() => !disabled && setOpen(true)}
@@ -200,7 +201,8 @@ function Chevron({ color }: { color: string }) {
 
 const styles = StyleSheet.create({
   wrap: { gap: space.xs },
-  label: { ...typeScale.label, textTransform: 'uppercase' },
+  /** Büyük harf `upperTr` ile — `textTransform` Türkçe İ'yi bilmiyor. */
+  label: { ...typeScale.label },
   control: {
     flexDirection: 'row',
     alignItems: 'center',

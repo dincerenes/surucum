@@ -96,13 +96,15 @@ export function consolidateSettings(userId: string, now: UnixMs = Date.now()): v
 }
 
 /**
- * Kesme saati.
+ * Kesme saati — her zaman gece yarısı (bkz. `DEFAULT_CUTOFF_HOUR`).
  *
- * Ayar satırı henüz yoksa varsayılana düşer — okuma yolunda yazma
- * yapmıyoruz, çünkü bu fonksiyon sorgu içinden de çağrılabiliyor.
+ * Ayar satırındaki `dayCutoffHour` artık OKUNMUYOR: eski bir sürümde
+ * 04:00 seçmiş hesap da takvim gününe geçiyor. Sütun buluttan inen
+ * satırlar bozulmasın diye duruyor. İmza, çağıranlar hesaba göre bir
+ * saat sorabilsin diye kullanıcı kimliği almaya devam ediyor.
  */
-export function getCutoffHour(userId: string): number {
-  return getSettings(userId)?.dayCutoffHour ?? DEFAULT_CUTOFF_HOUR;
+export function getCutoffHour(_userId: string): number {
+  return DEFAULT_CUTOFF_HOUR;
 }
 
 export interface SettingsPatch {

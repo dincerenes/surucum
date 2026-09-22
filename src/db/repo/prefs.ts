@@ -16,7 +16,7 @@ export const THEME_PREFERENCES = ['system', 'light', 'dark'] as const;
 export type ThemePreference = (typeof THEME_PREFERENCES)[number];
 
 export const THEME_LABELS: Record<ThemePreference, string> = {
-  system: 'Cihazla aynı',
+  system: 'Sistem',
   light: 'Açık',
   dark: 'Koyu',
 };

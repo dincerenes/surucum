@@ -10,7 +10,7 @@ import {
 import { space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 /**
- * Kurulum 1/3 — araç kimliği.
+ * Kurulum 1/2 — araç kimliği.
  *
  * Üçü de LİSTEDEN seçiliyor, elle yazılmıyor: aynı aracı "renault",
  * "Renault", "RENAULT" diye yazmak veriyi kirletir ve ileride araç

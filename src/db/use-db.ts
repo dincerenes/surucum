@@ -21,11 +21,21 @@ import { isOwnDatabaseEvent } from './change-events';
  * güncellenmeli, bir tur beklememelidir.
  */
 export function useDbValue<T>(read: () => T, deps: readonly unknown[] = []): T {
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  /**
+   * Bağımlılık listesi ÇAĞIRANDAN geliyor — `useDbValue`'nun kendisi bir
+   * kanca sarmalayıcısı; derleyici kuralları dizinin burada sabit
+   * yazılmasını istiyor ama o zaman her ekran kendi kancasını yazardı.
+   */
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/use-memo
   const compute = useCallback(read, deps);
   const [value, setValue] = useState<T>(compute);
 
   useEffect(() => {
+    /**
+     * Bağımlılıklar değişince (ör. İstatistik'te dönem seçimi) değer o an
+     * yeniden okunmalı; dinleyici ancak bir sonraki yazmada tetiklenir.
+     */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setValue(compute());
 
     const sub = addDatabaseChangeListener((event) => {

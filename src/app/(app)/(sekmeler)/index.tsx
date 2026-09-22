@@ -8,6 +8,7 @@ import { formatBusinessDate } from '@/lib/business-date';
 import { useDriver } from '@/lib/use-driver';
 import { requestSync } from '@/sync/scheduler';
 import { HIT_SIZE, radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
+import { upperTr } from '@/lib/text';
 
 /**
  * Anasayfa — gün defteri.
@@ -46,7 +47,7 @@ export default function HomeScreen() {
     >
       <View style={styles.head}>
         <Text style={[styles.date, { color: colors.textFaint }]}>
-          {formatBusinessDate(state.today, 'long').toUpperCase()}
+          {upperTr(formatBusinessDate(state.today, 'long'))}
         </Text>
         <View style={styles.headRow}>
           <Text style={[typeScale.display, { color: colors.text }]}>Gün defteri</Text>

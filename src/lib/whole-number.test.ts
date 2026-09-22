@@ -14,6 +14,11 @@ describe('parseWholeKm', () => {
     assert.equal(parseWholeKm('238,4'), 238);
   });
 
+  it('binlik noktalı kilometre okunur', () => {
+    assert.equal(parseWholeKm('150.000'), 150000);
+    assert.equal(parseWholeKm('1.234.567'), 1234567);
+  });
+
   it('bilinmeyen kilometre null — sıfıra düşmez', () => {
     assert.equal(parseWholeKm(''), null);
     assert.equal(parseWholeKm('   '), null);

@@ -18,7 +18,9 @@ import {
 } from '@/db/schema/_shared';
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatKurus } from '@/lib/money';
+import { toggleFuelSelection } from '@/lib/fuel-selection';
 import { OTHER_OPTION, VEHICLE_MAKES, modelYears, modelsFor } from '@/lib/vehicle-catalog';
+import { parseWholeKm } from '@/lib/whole-number';
 import { requestSync } from '@/sync/scheduler';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
@@ -100,9 +102,7 @@ export default function VehicleEditScreen() {
   }
 
   function toggleFuel(f: FuelType) {
-    setFuels(fuelValue.includes(f)
-      ? fuelValue.filter((x) => x !== f)
-      : [...fuelValue, f]);
+    setFuels(toggleFuelSelection(fuelValue, f));
   }
 
   /**
@@ -131,8 +131,7 @@ export default function VehicleEditScreen() {
 
   function kaydetVe(applyWearToPastShifts: boolean) {
     if (!userId || !valid) return;
-    const km = Number(odometerText.replace(/[.\s]/g, '').replace(',', '.'));
-    const odometerKm = Number.isFinite(km) && km > 0 ? Math.round(km) : null;
+    const odometerKm = parseWholeKm(odometerText);
 
     if (v) {
       const saved = updateVehicle(userId, v.id, {
@@ -298,7 +297,7 @@ export default function VehicleEditScreen() {
             ))}
           </ChipGrid>
           <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-            Dönüşümlü LPG'li araçta hem benzini hem LPG'yi seç.
+            {'Birini seç. Dönüşümlü LPG\'li araçta benzine LPG\'yi de ekleyebilirsin.'}
           </Text>
         </View>
 

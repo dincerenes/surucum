@@ -184,7 +184,7 @@ export default function EditRecordScreen() {
         <SheetHeader title={TITLES[kind]} />
 
         <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-          {formatClock((record as { occurredAt: number }).occurredAt)}'te girildi
+          {`${formatClock((record as { occurredAt: number }).occurredAt)}'te girildi`}
         </Text>
 
         {kind === 'gider' && categories.length > 0 ? (

@@ -9,7 +9,7 @@
 import { useMemo } from 'react';
 import { useDbValue } from '@/db/use-db';
 import {
-  ensureSettings, getDailyGoalKurus, getDaySummary, getOpenShift, getVehicle,
+  ensureSettings, getCutoffHour, getDailyGoalKurus, getDaySummary, getOpenShift, getVehicle,
   listActiveVehicles, listRidesInShift, listRidesOnDate,
 } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -89,7 +89,7 @@ export function useDriver(): DriverState {
     if (!userId) return EMPTY;
 
     const settings = ensureSettings(userId);
-    const cutoff = settings.dayCutoffHour;
+    const cutoff = getCutoffHour(userId);
     const now = Date.now();
     const today = todayBusinessDate(cutoff, new Date(now));
 

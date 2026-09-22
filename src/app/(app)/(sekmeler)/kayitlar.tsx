@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,7 +15,7 @@ import {
 } from '@/lib/business-date';
 import type { DaySummary } from '@/lib/day-summary';
 import type { Shift } from '@/db/schema/earnings';
-import { type Kurus, formatDecimal } from '@/lib/money';
+import { type Kurus, formatDecimal, formatInteger } from '@/lib/money';
 import { resolveShiftDuration } from '@/lib/shift';
 import { groupRecordsByDay } from '@/lib/records-by-day';
 import { fuelLogNote } from '@/lib/summary-notes';
@@ -248,7 +249,8 @@ function ShiftRows({
   shifts, fuelUnknownIds,
 }: { shifts: readonly Shift[]; fuelUnknownIds: readonly string[] }) {
   const { colors } = useTheme();
-  const now = Date.now();
+  /** Açık vardiyanın süresi için: çizim saf kalsın diye an bir kez alınıyor. */
+  const [now] = useState(() => Date.now());
 
   return (
     <View style={styles.shifts}>
@@ -278,7 +280,7 @@ function ShiftRows({
             </Text>
             <Text style={[typeScale.caption, { color: colors.textFaint }]}>
               {Math.floor(duration.minutes / 60)}s {duration.minutes % 60}dk
-              {shift.distanceKm != null ? ` · ${shift.distanceKm} km` : ''}
+              {shift.distanceKm != null ? ` · ${formatInteger(shift.distanceKm)} km` : ''}
             </Text>
             {missing ? (
               <Text style={[typeScale.caption, { color: colors.warning }]}>

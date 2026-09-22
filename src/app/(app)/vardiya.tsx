@@ -17,9 +17,11 @@ import {
 import { calculateShiftStats } from '@/lib/shift';
 import { calculateWearShare } from '@/lib/profit';
 import { calculateFuelCost } from '@/lib/fuel-cost';
+import { readDecimal } from '@/lib/number-input';
 import { parseWholeKm } from '@/lib/whole-number';
 import { requestSync } from '@/sync/scheduler';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
+import { upperTr } from '@/lib/text';
 
 /**
  * Vardiya detayı — geçmiş bir vardiyanın tam dökümü ve DÜZELTİLMESİ.
@@ -180,7 +182,7 @@ export default function ShiftDetailScreen() {
 
         <View style={styles.head}>
           <Text style={[styles.eyebrow, { color: colors.textFaint }]}>
-            {formatBusinessDate(shift.businessDate, 'long').toUpperCase()}
+            {upperTr(formatBusinessDate(shift.businessDate, 'long'))}
           </Text>
           <Text style={[typeScale.display, { color: colors.text }]}>
             {formatClock(shift.startedAt)}
@@ -214,8 +216,8 @@ export default function ShiftDetailScreen() {
             muted={fuel === 0}
           />
           <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-            Günün üç satırı Kayıtlar'daki gün kartında — bir günde birden
-            fazla vardiya olabilir.
+            {'Günün üç satırı Kayıtlar\'daki gün kartında — bir günde birden '
+              + 'fazla vardiya olabilir.'}
           </Text>
         </View>
 
@@ -294,7 +296,7 @@ function numberInput(value: number | null | undefined): string {
 function readNumber(raw: string): number | null {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return null;
-  const value = Number(trimmed.replace(/\s/g, '').replace(',', '.'));
+  const value = readDecimal(trimmed) ?? Number.NaN;
   if (!Number.isFinite(value) || value <= 0) return null;
   return value;
 }

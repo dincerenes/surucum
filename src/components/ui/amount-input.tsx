@@ -3,6 +3,8 @@ import {
   KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { type Kurus, formatKurus, parseAmount } from '@/lib/money';
+import { formatNumberInput, normalizeTypedNumber } from '@/lib/number-input';
+import { upperTr } from '@/lib/text';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 interface Props {
@@ -54,13 +56,20 @@ export function AmountInput({
     return () => clearTimeout(id);
   }, [autoFocus]);
 
-  const parsed = parseAmount(value);
-  const invalid = value.trim().length > 0 && parsed === null;
+  /**
+   * Basamaklar YAZARKEN ayrılıyor: 150000 → 150.000. Dışarıdan gelen
+   * değer (ön dolgu) de aynı biçimde gösteriliyor; `normalizeTypedNumber`
+   * çıktısı bu biçimin sabit noktası, yazılan kaymıyor.
+   */
+  const allowDecimal = keyboard === 'decimal-pad';
+  const shown = formatNumberInput(value, allowDecimal);
+  const parsed = parseAmount(shown);
+  const invalid = shown.trim().length > 0 && parsed === null;
 
   return (
     <View style={styles.wrap}>
       {label ? (
-        <Text style={[styles.label, { color: colors.textSoft }]}>{label}</Text>
+        <Text style={[styles.label, { color: colors.textSoft }]}>{upperTr(label)}</Text>
       ) : null}
 
       <View
@@ -75,10 +84,11 @@ export function AmountInput({
       >
         <TextInput
           ref={ref}
-          value={value}
+          value={shown}
           onChangeText={(next) => {
-            onChangeText(next);
-            onValueChange?.(parseAmount(next));
+            const normalized = normalizeTypedNumber(next, shown, allowDecimal);
+            onChangeText(normalized);
+            onValueChange?.(parseAmount(normalized));
           }}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
@@ -129,7 +139,8 @@ export function previewAmount(raw: string): string | null {
 
 const styles = StyleSheet.create({
   wrap: { gap: space.xs },
-  label: { ...typeScale.label, textTransform: 'uppercase' },
+  /** Büyük harf `upperTr` ile — `textTransform` Türkçe İ'yi bilmiyor. */
+  label: { ...typeScale.label },
   box: {
     flexDirection: 'row',
     alignItems: 'center',

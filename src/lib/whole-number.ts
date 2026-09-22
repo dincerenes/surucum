@@ -14,6 +14,7 @@
  */
 
 import { roundHalfAwayFromZero } from './money.ts';
+import { readDecimal } from './number-input.ts';
 
 /**
  * Pozitif tam sayıya yuvarlar; boş, bozuk, sıfır ve negatif `null`.
@@ -31,14 +32,13 @@ export function toWholePositive(value: number | null | undefined): number | null
 }
 
 /**
- * Sürücünün yazdığı kilometreyi okur: "238" → 238, "238,5" → 239.
+ * Sürücünün yazdığı kilometreyi okur: "238" → 238, "238,5" → 239,
+ * "150.000" → 150000.
  *
- * Okunamayan girdi `null` döner, sıfıra düşmez. Binlik ayracı kabul
- * edilmiyor: günlük kilometre binleri geçmiyor ve "1.234" ile "1,234"
- * ayrımı burada yalnızca yanlış okumaya kapı açardı.
+ * Binlik noktası KABUL EDİLİYOR: alan yazarken basamakları kendisi
+ * ayırıyor (`number-input.ts`), aracın 150.000 km'si başka türlü
+ * okunamazdı. Okunamayan girdi `null` döner, sıfıra düşmez.
  */
 export function parseWholeKm(raw: string): number | null {
-  const compact = raw.replace(/\s/g, '');
-  if (compact.length === 0) return null;
-  return toWholePositive(Number(compact.replace(',', '.')));
+  return toWholePositive(readDecimal(raw));
 }

@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
+import { upperTr } from '@/lib/text';
 
 interface Props {
   children: React.ReactNode;
@@ -38,7 +39,7 @@ export function Card({ children, title, meta, sunken = false, style }: Props) {
     >
       {title ? (
         <View style={styles.head}>
-          <Text style={[styles.title, { color: colors.textFaint }]}>{title}</Text>
+          <Text style={[styles.title, { color: colors.textFaint }]}>{upperTr(title)}</Text>
           {meta ? (
             <Text style={[typeScale.caption, { color: colors.textFaint }]}>{meta}</Text>
           ) : null}
@@ -62,5 +63,6 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: space.sm,
   },
-  title: { ...typeScale.label, textTransform: 'uppercase' },
+  /** Büyük harf `upperTr` ile — `textTransform` Türkçe İ'yi bilmiyor. */
+  title: { ...typeScale.label },
 });

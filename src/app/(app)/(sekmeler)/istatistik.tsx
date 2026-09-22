@@ -166,8 +166,8 @@ export default function StatsScreen() {
               />
             </View>
             <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-              Oranların paydası CEBE KALAN, ciro değil: "saat başına ne
-              kazandım" sorusunun cevabı eline geçen paradır.
+              {'Oranların paydası CEBE KALAN, ciro değil: "saat başına ne '
+                + 'kazandım" sorusunun cevabı eline geçen paradır.'}
             </Text>
           </Card>
 

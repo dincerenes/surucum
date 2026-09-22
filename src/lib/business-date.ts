@@ -16,7 +16,20 @@ declare const BUSINESS_DATE_BRAND: unique symbol;
 
 export type BusinessDate = string & { readonly [BUSINESS_DATE_BRAND]: true };
 
-export const DEFAULT_CUTOFF_HOUR = 4;
+/**
+ * Gün kesme saati — artık AYAR DEĞİL, gece yarısı.
+ *
+ * Eskiden kullanıcı ayarıydı (varsayılan 04:00): gece yarısından sonra
+ * girilen kayıt bir önceki güne yazılıyordu. Ama günü bölen şey saat
+ * değil VARDİYA: vardiyaya bağlı her kayıt vardiyanın gününü alıyor
+ * (başladığı takvim günü), 22:00'de açılıp 04:00'te kapanan vardiya
+ * baştan sona tek bir gün. Kesme saati yalnızca vardiya dışı kayıtları
+ * etkiliyordu ve sürücüye anlamını açıklamak mümkün olmadı.
+ *
+ * Fonksiyonların saat parametresi duruyor: geçmiş kayıtlar eski kesme
+ * saatiyle yazıldı ve testler o kuralı hâlâ koruyor.
+ */
+export const DEFAULT_CUTOFF_HOUR = 0;
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
