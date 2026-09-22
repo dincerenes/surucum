@@ -12,6 +12,7 @@ import { useDriver } from '@/lib/use-driver';
 import { requestSync } from '@/sync/scheduler';
 import { space, type as typeScale, useTheme } from '@/theme/use-theme';
 import { SheetHeader, sheetStyles } from '@/components/ui/sheet';
+import { ShiftRequired } from '@/components/ui/shift-required';
 
 /**
  * Yakıt dolumu.
@@ -59,7 +60,7 @@ export default function AddFuelScreen() {
   const valid = totalKurus != null && totalKurus > 0 && vehicle != null && priceValid;
 
   function kaydet() {
-    if (!userId || !valid || !vehicle) return;
+    if (!userId || !valid || !vehicle || !openShift) return;
     /**
      * Hacim birim fiyattan türetiliyor; fiyat girilmemişse sıfır kalıyor.
      * Sürücüye üç sayı birden yazdırmıyoruz — ödediği tutarı biliyor,
@@ -70,10 +71,10 @@ export default function AddFuelScreen() {
       ? Math.round((totalKurus / priceKurus) * 1000)
       : 0;
 
-    // Açık vardiya varsa gün ve araç ondan gelir (repo bunu kendisi çözer).
+    // Gün ve araç vardiyadan gelir (repo bunu kendisi çözer).
     addFuelLog(userId, {
       vehicleId: vehicle.id,
-      shiftId: openShift?.id ?? null,
+      shiftId: openShift.id,
       fuelType: selected,
       totalAmountKurus: totalKurus as Kurus,
       unitPriceKurus: (isKnownUnitPrice(priceKurus) ? priceKurus : 0) as Kurus,
@@ -83,6 +84,8 @@ export default function AddFuelScreen() {
     requestSync();
     router.back();
   }
+
+  if (!openShift) return <ShiftRequired title="Yakıt ekle" />;
 
   return (
     <AboveKeyboard>

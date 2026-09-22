@@ -1,22 +1,24 @@
 import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AboveKeyboard, AmountInput, Button, RideList } from '@/components/ui';
+import {
+  AboveKeyboard, AmountInput, AmountText, Button, RideList, SummaryRows,
+} from '@/components/ui';
 import { SheetHeader } from '@/components/ui/sheet';
 import { useDbValue } from '@/db/use-db';
 import {
-  deleteShift, getShift, getVehicle, listFuelLogsInShift, listRidesInShift, updateShiftTotals,
+  deleteShift, getShift, listExpenseCategories, listExpensesInShift, listFuelLogsInShift,
+  listRidesInShift, readShiftSummaryInput, updateShiftTotals,
 } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatBusinessDate, formatClock } from '@/lib/business-date';
+import { calculateDaySummary } from '@/lib/day-summary';
 import {
-  type Kurus, ZERO, add, formatAmountForInput, formatKurus, parseAmount,
+  type Kurus, ZERO, add, formatAmountForInput, formatDecimal, formatInteger, parseAmount,
 } from '@/lib/money';
 import { calculateShiftStats } from '@/lib/shift';
-import { calculateWearShare } from '@/lib/profit';
-import { calculateFuelCost } from '@/lib/fuel-cost';
 import { readDecimal } from '@/lib/number-input';
 import { parseWholeKm } from '@/lib/whole-number';
 import { requestSync } from '@/sync/scheduler';
@@ -33,8 +35,10 @@ import { upperTr } from '@/lib/text';
  * sürücünün yapabileceği hiçbir şey yoktu. Düzeltilemeyen bir uyarı,
  * uyarı değil suçlamadır.
  *
- * Buradaki sayılar TEK BİR VARDİYANIN — günün değil. Aynı iş gününde
- * iki vardiya olabilir ve gün özeti Kayıtlar'daki kartta duruyor.
+ * Buradaki sayılar TEK BİR VARDİYANIN — günün değil: yalnızca bu
+ * vardiyaya bağlı yolcular, giderler ve dolumlar. Üç satır düzeltme
+ * alanları yazıldıkça CANLI yeniden hesaplanıyor; sürücü "km'yi girersem
+ * ne değişir" sorusunun cevabını kaydetmeden görüyor.
  */
 export default function ShiftDetailScreen() {
   const { colors } = useTheme();
@@ -54,19 +58,30 @@ export default function ShiftDetailScreen() {
     const shift = getShift(userId, id);
     if (!shift) return null;
 
+    const input = readShiftSummaryInput(userId, shift.id);
+    if (!input) return null;
+
+    const now = Date.now();
     const rides = listRidesInShift(userId, shift.id);
     const gross = rides.reduce((acc, r) => add(acc, r.grossAmountKurus), ZERO);
-    const vehicle = getVehicle(userId, shift.vehicleId);
-    const fills = listFuelLogsInShift(userId, shift.id);
+    const categories = new Map(listExpenseCategories(userId).map((c) => [c.id, c.name] as const));
+
+    /** Vardiyanın gider ve dolum satırları — dokununca düzenleniyor. */
+    const costs = [
+      ...listExpensesInShift(userId, shift.id).map((e) => ({
+        kind: 'gider' as const, id: e.id, at: e.occurredAt,
+        title: categories.get(e.categoryId) ?? 'Gider', amount: e.amountKurus,
+      })),
+      ...listFuelLogsInShift(userId, shift.id).map((f) => ({
+        kind: 'yakit' as const, id: f.id, at: f.occurredAt,
+        title: f.volumePer1000 > 0 ? `Yakıt · ${formatDecimal(f.volumePer1000 / 1000)} lt` : 'Yakıt',
+        amount: f.totalAmountKurus,
+      })),
+    ].sort((a, b) => b.at - a.at);
 
     return {
-      shift,
-      rides,
-      gross,
-      /** Bu vardiyaya bağlı dolumların toplamı — tüketim yoksa yakıt bu. */
-      filled: fills.reduce((acc, f) => add(acc, f.totalAmountKurus), ZERO),
-      wearPerKmKurus: shift.wearPerKmKurus ?? vehicle?.wearPerKmKurus ?? null,
-      stats: calculateShiftStats(shift, gross, rides.length, Date.now()),
+      shift, rides, input, costs, now,
+      stats: calculateShiftStats(shift, gross, rides.length, now),
     };
   }, [id, userId]);
 
@@ -87,7 +102,7 @@ export default function ShiftDetailScreen() {
     );
   }
 
-  const { shift, rides, gross, stats, wearPerKmKurus, filled } = data;
+  const { shift, rides, stats, input, costs, now } = data;
 
   /** Alanlar kaydın MEVCUT değeriyle açılıyor; boş açmak veriyi siler. */
   const kmText = km ?? numberInput(shift.distanceKm);
@@ -108,17 +123,25 @@ export default function ShiftDetailScreen() {
   const consumptionPer100Km = consumptionValue != null
     ? Math.round(consumptionValue * 1000) : null;
 
-  const wear = calculateWearShare(kmValue, wearPerKmKurus as Kurus | null);
   /**
-   * Vardiyanın yakıtı gün özetiyle AYNI kuraldan: tüketim hesaplanıyorsa
-   * o, hesaplanmıyorsa bu vardiyaya bağlı dolumlar. Satır kaynağını
-   * söylüyor; vardiyasız dolumların hangi vardiyayı kapsadığı gün
-   * kartında.
+   * Üç satır, gün özetiyle AYNI hesaptan — vardiya satırı düzeltme
+   * alanlarındaki değerlerle değiştirilerek. Yakıt kuralı da aynı:
+   * tüketim hesaplanıyorsa o, hesaplanmıyorsa bu vardiyaya bağlı dolumlar.
    */
-  const burned = calculateFuelCost(kmValue, consumptionPer100Km, parseAmount(priceText));
-  const fuel = burned > 0 ? burned : filled;
-  const fuelLabel = burned > 0 ? 'Yakıt · tüketimden'
-    : filled > 0 ? 'Yakıt · dolumdan' : 'Yakıt';
+  const live = calculateDaySummary({
+    rides: input.rides,
+    expenses: input.expenses,
+    fuelLogs: input.fuelLogs,
+    shifts: [{
+      ...input.row,
+      distanceKm: kmValue,
+      workedMinutes: hoursValue != null ? Math.round(hoursValue * 60) : null,
+      commissionKurus: parseAmount(commissionText) as Kurus | null,
+      fuelConsumptionPer100Km: consumptionPer100Km,
+      fuelPriceKurus: parseAmount(priceText) as Kurus | null,
+    }],
+    now,
+  });
 
   function kaydet() {
     if (!userId) return;
@@ -139,19 +162,20 @@ export default function ShiftDetailScreen() {
   }
 
   /**
-   * Vardiyayı silmek SEFERLERİ SİLMEZ.
+   * Vardiyayı silmek KAYITLARINI DA SİLER — yolcular, giderler, dolumlar.
    *
-   * Seferler kendi kayıtları ve kendi iş günleri var; vardiya silinince
-   * yalnızca süre, kilometre ve komisyon ortadan kalkar. Sürücünün
-   * kazandığı parayı bir yönetim kaydıyla birlikte silmek, yapmak
-   * istediğinden fazlasını yapmaktır.
+   * Her kayıt bir vardiyaya ait; vardiyası silinen kayıt hiçbir kartta
+   * görünmez ama toplamlara girerdi. Sürücü ne silineceğini sayılarıyla
+   * görüyor.
    */
   function sil() {
     Alert.alert(
       'Vardiyayı sil',
-      rides.length > 0
-        ? `Bu vardiyanın ${rides.length} seferi SİLİNMEZ, kayıtlarda kalır. `
-          + 'Yalnızca süre, kilometre ve komisyon bilgisi gider.'
+      rides.length + costs.length > 0
+        ? `Bu vardiya, ${[
+          rides.length > 0 ? `${rides.length} yolcu` : null,
+          costs.length > 0 ? `${costs.length} gider/yakıt` : null,
+        ].filter(Boolean).join(' ve ')} kaydıyla birlikte silinecek.`
         : 'Bu vardiya kaydı silinecek.',
       [
         { text: 'Vazgeç', style: 'cancel' },
@@ -196,30 +220,41 @@ export default function ShiftDetailScreen() {
               String(stats.durationMinutes % 60).padStart(2, '0')}`}
             label={stats.isDurationEstimated ? 'süre · tahmini' : 'süre'}
           />
-          <Stat value={String(stats.rideCount)} label="sefer" />
+          <Stat value={formatInteger(stats.rideCount)} label="yolcu" />
           <Stat
-            value={stats.distanceKm != null ? String(stats.distanceKm) : '—'}
+            value={stats.distanceKm != null ? formatInteger(stats.distanceKm) : '—'}
             label="km"
           />
         </View>
 
-        <View style={[styles.box, { backgroundColor: colors.surfaceSunken }]}>
-          <Row label="Ciro" value={formatKurus(gross)} strong />
-          <Row
-            label="Yıpranma payı"
-            value={wear > 0 ? `−${formatKurus(wear)}` : 'hesaplanmadı'}
-            muted={wear === 0}
-          />
-          <Row
-            label={fuelLabel}
-            value={fuel > 0 ? `−${formatKurus(fuel)}` : 'bilinmiyor'}
-            muted={fuel === 0}
-          />
-          <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-            {'Günün üç satırı Kayıtlar\'daki gün kartında — bir günde birden '
-              + 'fazla vardiya olabilir.'}
-          </Text>
-        </View>
+        <SummaryRows summary={live} />
+
+        {costs.length > 0 ? (
+          <View style={styles.costs}>
+            <Text style={[styles.sectionLabel, { color: colors.textFaint }]}>GİDER VE YAKIT</Text>
+            <View style={[styles.list, { borderColor: colors.border }]}>
+              {costs.map((c, index) => (
+                <Pressable
+                  key={`${c.kind}:${c.id}`}
+                  onPress={() => router.push({ pathname: '/kayit', params: { tur: c.kind, id: c.id } })}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${c.title} kaydını düzenle`}
+                  style={({ pressed }) => [
+                    styles.costRow,
+                    index > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
+                    pressed && { backgroundColor: colors.surfaceSunken },
+                  ]}
+                >
+                  <Text style={[typeScale.body, { color: colors.textFaint, fontVariant: ['tabular-nums'] }]}>
+                    {formatClock(c.at)}
+                  </Text>
+                  <Text style={[typeScale.body, { color: colors.text, flex: 1 }]}>{c.title}</Text>
+                  <AmountText value={c.amount} tone="cost" showMinus />
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         <Text style={[styles.sectionLabel, { color: colors.textSoft }]}>DÜZELT</Text>
 
@@ -267,25 +302,6 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
-function Row({
-  label, value, strong = false, muted = false,
-}: { label: string; value: string; strong?: boolean; muted?: boolean }) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.row}>
-      <Text style={[typeScale.body, { color: colors.textSoft }]}>{label}</Text>
-      <Text
-        style={[
-          strong ? typeScale.bodyStrong : typeScale.body,
-          { color: muted ? colors.textFaint : colors.text, fontVariant: ['tabular-nums'] },
-        ]}
-      >
-        {value}
-      </Text>
-    </View>
-  );
-}
-
 /** Ondalık sayıyı düzenlenebilir metne çevirir — virgüllü, ayraçsız. */
 function numberInput(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return '';
@@ -312,13 +328,12 @@ const styles = StyleSheet.create({
   eyebrow: { ...typeScale.label, letterSpacing: 1 },
   stats: { flexDirection: 'row', gap: space.sm },
   stat: { flex: 1, borderRadius: radius.md, padding: space.md, gap: 2 },
-  box: { borderRadius: radius.md, padding: space.lg, gap: space.sm },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    gap: space.md,
+  costs: { gap: space.xs },
+  list: { borderWidth: 1, borderRadius: radius.md, overflow: 'hidden' },
+  costRow: {
+    flexDirection: 'row', alignItems: 'center', gap: space.md,
+    paddingHorizontal: space.md, paddingVertical: space.md,
   },
-  sectionLabel: { ...typeScale.label, textTransform: 'uppercase' },
+  sectionLabel: { ...typeScale.label },
   foot: { gap: space.sm, paddingTop: space.md },
 });

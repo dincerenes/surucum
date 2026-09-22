@@ -8,12 +8,12 @@
 
 import { and, desc, eq, gt, gte, isNull, lte, or } from 'drizzle-orm';
 import { getDb } from '../client';
-import { shifts, vehicles } from '../schema';
+import { expenses, fuelLogs, rides, shifts, vehicles } from '../schema';
 import { rememberStatedFuelFigures } from './fuel';
 import { getCutoffHour } from './settings';
 import type { Shift } from '../schema/earnings';
 import {
-  type UnixMs, alive, assertOwned, ownedById, softDeleteRow, stampNew, updateOwned, withOutbox,
+  type UnixMs, alive, assertOwned, enqueue, ownedById, stampNew, updateOwned, withOutbox,
 } from './_base';
 import { type BusinessDate, toBusinessDate } from '@/lib/business-date';
 import { type Kurus, roundHalfAwayFromZero } from '@/lib/money';
@@ -204,8 +204,39 @@ function rememberIfLatest(
   );
 }
 
+/**
+ * Vardiyayı ve ONA BAĞLI BÜTÜN KAYITLARI siler — yolcular, giderler, dolumlar.
+ *
+ * Her kayıt bir vardiyaya ait (sürücünün kararı: "vardiya dışı bir şey
+ * girilip çıkmasın"). Eskiden vardiya silinince yolcuları kalıyordu; o
+ * kayıtlar hiçbir vardiyanın kartında görünmüyor ama toplamlara giriyordu.
+ *
+ * Tek işlem: yarısı silinip yarısı kalan bir vardiya olmaz. Her silinen
+ * satır aynı işlemde kuyruğa düşüyor, bulutta da silinsin diye.
+ */
 export function deleteShift(userId: string, id: string, now: UnixMs = Date.now()): boolean {
-  return softDeleteRow(shifts, 'shifts', userId, id, now);
+  if (!getShift(userId, id)) return false;
+  return getDb().transaction((tx) => {
+    const children = [
+      { table: rides, name: 'rides' as const },
+      { table: expenses, name: 'expenses' as const },
+      { table: fuelLogs, name: 'fuel_logs' as const },
+    ];
+    for (const { table, name } of children) {
+      const ids = tx.select({ id: table.id }).from(table)
+        .where(and(alive(table, userId), eq(table.shiftId, id))).all()
+        .map((r) => r.id);
+      for (const childId of ids) {
+        tx.update(table).set({ deletedAt: now, updatedAt: now })
+          .where(and(eq(table.id, childId), eq(table.userId, userId))).run();
+        enqueue(tx, name, childId, 'delete', now);
+      }
+    }
+    tx.update(shifts).set({ deletedAt: now, updatedAt: now })
+      .where(and(eq(shifts.id, id), eq(shifts.userId, userId))).run();
+    enqueue(tx, 'shifts', id, 'delete', now);
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   STALE_SHIFT_HOURS, calculateShiftStats, canCalculateWear, earningsPerHour,
-  earningsPerKm, earningsPerRide, isShiftOpen, isShiftStale, normalizeDistance,
+  earningsPerKm, earningsPerRide, formatDuration, isShiftOpen, isShiftStale, normalizeDistance,
   resolveShiftDuration,
 } from './shift.ts';
 import { type Kurus, fromLira } from './money.ts';
@@ -159,5 +159,16 @@ describe('calculateShiftStats', () => {
   it('hiç sefer yoksa sefer başı null — sıfıra bölme yok', () => {
     const s = calculateShiftStats(timing(), k(0) as Kurus, 0, T0 + H);
     assert.equal(s.perRide, null);
+  });
+});
+
+describe('formatDuration', () => {
+  it('saat ve dakika', () => {
+    assert.equal(formatDuration(370), '6 sa 10 dk');
+    assert.equal(formatDuration(45), '45 dk');
+    assert.equal(formatDuration(120), '2 sa');
+    assert.equal(formatDuration(0), '0 dk');
+    assert.equal(formatDuration(-5), '0 dk');
+    assert.equal(formatDuration(Number.NaN), '0 dk');
   });
 });

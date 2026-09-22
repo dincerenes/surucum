@@ -193,3 +193,15 @@ export function normalizeDistance(distanceKm: number | null | undefined): number
 export function canCalculateWear(shift: Pick<ShiftTiming, 'distanceKm'>): boolean {
   return normalizeDistance(shift.distanceKm) != null;
 }
+
+/**
+ * Süreyi okunur yazar: 370 → "6 sa 10 dk", 45 → "45 dk", 120 → "2 sa".
+ * Negatif ya da bozuk süre "0 dk" — kart çökmesin.
+ */
+export function formatDuration(minutes: number): string {
+  const m = Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : 0;
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  if (h === 0) return `${rest} dk`;
+  return rest === 0 ? `${h} sa` : `${h} sa ${rest} dk`;
+}

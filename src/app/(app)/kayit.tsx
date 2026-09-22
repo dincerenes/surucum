@@ -20,7 +20,7 @@ import { SheetHeader, sheetStyles } from '@/components/ui/sheet';
 type RecordKind = 'sefer' | 'gider' | 'yakit';
 
 const TITLES: Record<RecordKind, string> = {
-  sefer: 'Seferi düzenle',
+  sefer: 'Yolcuyu düzenle',
   gider: 'Gideri düzenle',
   yakit: 'Yakıtı düzenle',
 };

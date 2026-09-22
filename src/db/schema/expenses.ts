@@ -36,6 +36,20 @@ export const expenses = sqliteTable(
     categoryId: text().notNull(),
     vehicleId: text(),
 
+    /**
+     * Giderin girildiği vardiya.
+     *
+     * Kayıtlar vardiya vardiya listeleniyor ve her vardiya kartı KENDİ
+     * cebe kalanını gösteriyor; aynı gün iki vardiya açan sürücüde
+     * giderin hangisine düştüğü ancak bu bağla bilinir. Gider artık
+     * yalnızca açık vardiyada (ya da vardiya kapanırken) giriliyor.
+     *
+     * Eski giderler için DOLDURULMADI: hangi vardiyaya ait oldukları
+     * kesin bilinmiyor; listede "vardiya dışı" duruyorlar ve günün
+     * toplamına yine giriyorlar.
+     */
+    shiftId: text(),
+
     amountKurus: kurus().notNull(),
     occurredAt: integer().notNull(),
     businessDate: businessDate().notNull(),
@@ -52,6 +66,7 @@ export const expenses = sqliteTable(
     index('expenses_user_date_idx').on(t.userId, t.businessDate),
     index('expenses_category_idx').on(t.categoryId),
     index('expenses_vehicle_idx').on(t.vehicleId),
+    index('expenses_shift_idx').on(t.shiftId),
   ],
 );
 

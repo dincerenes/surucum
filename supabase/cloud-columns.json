@@ -169,6 +169,7 @@
       "deleted_at",
       "category_id",
       "vehicle_id",
+      "shift_id",
       "amount_kurus",
       "occurred_at",
       "business_date",

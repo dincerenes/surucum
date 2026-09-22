@@ -2,31 +2,23 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Card, Chip, ChipRow, ProfitRows } from '@/components/ui';
+import {
+  Card, PeriodFilterBar, ProfitRows, StatGrid, StatTile, periodRowsData,
+} from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import { getCutoffHour, getFirstRecordDate, listDaySummaries } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
-import {
-  type BusinessDate, WEEKDAYS_TR, addDays, startOfMonth, startOfWeek,
-  todayBusinessDate,
-} from '@/lib/business-date';
+import { WEEKDAYS_TR, todayBusinessDate } from '@/lib/business-date';
 import { formatInteger, formatKurus } from '@/lib/money';
 import {
-  type DayEntry, type PeriodTotals, calculatePeriodTotals, percentChange,
-  summarizeByWeekday,
+  PERIOD_LABELS, PREVIOUS_PERIOD_LABELS, type PeriodKey, periodBounds,
+} from '@/lib/period';
+import {
+  type PeriodTotals, calculatePeriodTotals, percentChange, summarizeByWeekday,
 } from '@/lib/stats';
-import { buildPeriodNotes, isFuelUnknown } from '@/lib/summary-notes';
 import {
   accentStep, radius, space, type as typeScale, useTheme,
 } from '@/theme/use-theme';
-
-type PeriodKey = 'week' | 'month' | 'all';
-
-const PERIOD_LABELS: Record<PeriodKey, string> = {
-  week: 'Bu hafta',
-  month: 'Bu ay',
-  all: 'Tümü',
-};
 
 /**
  * Anlamlı bir karşılaştırma için gereken en az gün sayısı.
@@ -44,8 +36,12 @@ const MIN_DAYS_FOR_WEEKDAY = 5;
  * terim ("net kazanç" gibi) üretilmiyor — tanımsız bir sayı, sürücünün
  * hangi rakama baktığını bilmemesi demek.
  *
- * Sefer SAYILIYOR, yolcu değil: bir seferde dört yolcu olabilir ve
- * yolcu sayısı hiçbir yerde toplanmıyor.
+ * "Yolcu" = SEFER: her sefer bir yolcu sayılıyor. Bir seferde kaç kişinin
+ * bindiği sorulmuyor — sefer girişi tek dokunuş kalsın diye (sürücünün
+ * kararı).
+ *
+ * Dönem filtresi Kayıtlar'la AYNI (`period.ts`): "Bu ay" iki ekranda aynı
+ * günleri kapsıyor.
  */
 export default function StatsScreen() {
   const { colors } = useTheme();
@@ -57,15 +53,15 @@ export default function StatsScreen() {
   const data = useDbValue(() => {
     if (!userId) return null;
     const today = todayBusinessDate(getCutoffHour(userId));
-    /** "Tümü" ilk kayıttan başlar; sabit bir pencere eski günleri yutardı. */
+    /** "Tüm zamanlar" ilk kayıttan başlar; sabit bir pencere eski günleri yutardı. */
     const oldest = period === 'all' ? getFirstRecordDate(userId) : null;
-    const { from, previousFrom, previousTo } = periodBounds(period, today, oldest);
+    const { from, to, previousFrom, previousTo } = periodBounds(period, today, oldest);
 
-    const days = listDaySummaries(userId, from, today);
+    const days = listDaySummaries(userId, from, to);
 
     /**
      * Önceki dönem yalnızca KARŞILAŞTIRMA için okunuyor ve "Tümü"nde
-     * anlamsız: her şeyin öncesi diye bir şey yok.
+     * "Tüm zamanlar"da anlamsız: her şeyin öncesi diye bir şey yok.
      */
     const previous = previousFrom && previousTo
       ? calculatePeriodTotals(listDaySummaries(userId, previousFrom, previousTo))
@@ -88,16 +84,7 @@ export default function StatsScreen() {
     >
       <Text style={[typeScale.display, { color: colors.text }]}>İstatistik</Text>
 
-      <ChipRow>
-        {(Object.keys(PERIOD_LABELS) as PeriodKey[]).map((p) => (
-          <Chip
-            key={p}
-            label={PERIOD_LABELS[p]}
-            selected={period === p}
-            onPress={() => setPeriod(p)}
-          />
-        ))}
-      </ChipRow>
+      <PeriodFilterBar value={period} onChange={setPeriod} />
 
       {totals == null || totals.dayCount === 0 ? (
         <EmptyPeriod period={period} />
@@ -112,59 +99,38 @@ export default function StatsScreen() {
             title={PERIOD_LABELS[period]}
             meta={`${totals.workedDayCount} gün çalışıldı`}
           >
-            <ProfitRows
-              data={{
-                revenue: totals.revenue,
-                commission: totals.commission,
-                fuelPaid: totals.fuelPaid,
-                expensesPaid: totals.expensesPaid,
-                cashProfit: totals.cashProfit,
-                wearShare: totals.wearShare,
-                trueProfit: totals.trueProfit,
-                /**
-                 * Hacim ve kaynak dönem geneline yazılmıyor: günlerin bir
-                 * kısmında tüketim girilmiş, bir kısmında girilmemiş
-                 * olabilir ve yarısı ölçülmüş bir litre toplamı yanlış
-                 * bilgidir. Kaynak farkları notlarda söyleniyor.
-                 */
-                fuelVolume: null,
-                fuelSource: 'none',
-                fuelUnknown: isFuelUnknown(totals.fuelPaid, totals.shiftsMissingFuel),
-                distanceKm: totals.distanceKm,
-                notes: buildPeriodNotes(totals),
-              }}
-            />
+            <ProfitRows data={periodRowsData(totals)} />
           </Card>
 
           <Card title="Dönem ortalamaları">
-            <View style={styles.grid}>
-              <Metric
+            <StatGrid>
+              <StatTile
                 value={totals.perDay != null
                   ? formatKurus(totals.perDay, { decimals: false }) : '—'}
                 label="gün başına cebe kalan"
               />
-              <Metric
+              <StatTile
                 value={totals.perHour != null
                   ? formatKurus(totals.perHour, { decimals: false }) : '—'}
                 label="₺/saat"
               />
-              <Metric
+              <StatTile
                 value={totals.perRide != null
                   ? formatKurus(totals.perRide, { decimals: false }) : '—'}
-                label="sefer başı gelir"
+                label="yolcu başı cebe kalan"
               />
-              <Metric
+              <StatTile
                 value={totals.perKm != null
                   ? formatKurus(totals.perKm, { decimals: false }) : '—'}
                 label="₺/km"
               />
-              <Metric value={String(totals.rideCount)} label="toplam sefer" />
-              <Metric
+              <StatTile value={formatInteger(totals.rideCount)} label="toplam yolcu" />
+              <StatTile
                 value={totals.distanceKm != null
                   ? formatInteger(totals.distanceKm) : '—'}
                 label="toplam km"
               />
-            </View>
+            </StatGrid>
             <Text style={[typeScale.caption, { color: colors.textFaint }]}>
               {'Oranların paydası CEBE KALAN, ciro değil: "saat başına ne '
                 + 'kazandım" sorusunun cevabı eline geçen paradır.'}
@@ -256,7 +222,7 @@ function Comparison({
 }: { current: PeriodTotals; previous: PeriodTotals; period: PeriodKey }) {
   const { colors } = useTheme();
   const change = percentChange(current.cashProfit, previous.cashProfit);
-  const label = period === 'week' ? 'Geçen hafta' : 'Geçen ay';
+  const label = period === 'all' ? '' : PREVIOUS_PERIOD_LABELS[period];
 
   return (
     <Card title={label} meta={`${previous.workedDayCount} gün`}>
@@ -297,7 +263,7 @@ function EmptyPeriod({ period }: { period: PeriodKey }) {
         {PERIOD_LABELS[period]} için kayıt yok
       </Text>
       <Text style={[typeScale.body, { color: colors.textSoft }]}>
-        Vardiya açıp sefer girdikçe burası dolacak: hangi gün daha çok
+        Vardiya açıp yolcu girdikçe burası dolacak: hangi gün daha çok
         kazandığın, saat ve kilometre başına eline geçen, aylar arası
         karşılaştırma.
       </Text>
@@ -305,74 +271,11 @@ function EmptyPeriod({ period }: { period: PeriodKey }) {
   );
 }
 
-function Metric({ value, label }: { value: string; label: string }) {
-  const { colors } = useTheme();
-  return (
-    <View style={[styles.metric, { backgroundColor: colors.surfaceSunken }]}>
-      <Text
-        style={[typeScale.title, { color: colors.text, fontVariant: ['tabular-nums'] }]}
-        numberOfLines={1}
-      >
-        {value}
-      </Text>
-      <Text style={[typeScale.caption, { color: colors.textFaint }]} numberOfLines={2}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-
-/**
- * Dönemin sınırları ve karşılaştırılacak önceki dönem.
- *
- * Bitiş her zaman BUGÜN: yarısı geçmiş bir ayı tam ay gibi göstermek,
- * sürücüye ayın kötü geçtiğini düşündürür. Önceki dönem de aynı sebeple
- * tam alınıyor ve karşılaştırma notunda gün sayısı yazılıyor.
- */
-function periodBounds(
-  period: PeriodKey, today: BusinessDate, oldest: BusinessDate | null,
-): {
-  from: BusinessDate;
-  previousFrom: BusinessDate | null;
-  previousTo: BusinessDate | null;
-} {
-  if (period === 'week') {
-    const from = startOfWeek(today);
-    return {
-      from,
-      previousFrom: addDays(from, -7),
-      previousTo: addDays(from, -1),
-    };
-  }
-
-  if (period === 'month') {
-    const from = startOfMonth(today);
-    const previousTo = addDays(from, -1);
-    return { from, previousFrom: startOfMonth(previousTo), previousTo };
-  }
-
-  /** Hiç kayıt yoksa bugün — sorgu boş döner ve ekran boş durumu gösterir. */
-  return { from: oldest ?? today, previousFrom: null, previousTo: null };
-}
-
 const styles = StyleSheet.create({
   page: { paddingHorizontal: space.xl, paddingBottom: space.xxxl, gap: space.lg },
   empty: {
     borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.lg,
     padding: space.xl, gap: space.sm,
-  },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  metric: {
-    /**
-     * İki sütun: `space.sm` boşluk düşülerek. Üç sütun denendi ve
-     * altı haneli tutarlar kırpıldı — para asla kırpılmaz.
-     */
-    flexBasis: '48%',
-    flexGrow: 1,
-    borderRadius: radius.md,
-    padding: space.md,
-    gap: 2,
   },
   line: {
     flexDirection: 'row',

@@ -35,6 +35,9 @@ export interface PeriodTotals {
    */
   workedDayCount: number;
 
+  /** Dönemdeki vardiya sayısı — açık vardiya dahil. */
+  shiftCount: number;
+
   revenue: Kurus;
   cashProfit: Kurus;
   trueProfit: Kurus;
@@ -47,6 +50,11 @@ export interface PeriodTotals {
   rideCount: number;
   /** Bilinen kilometrelerin toplamı. Hiç girilmemişse `null`. */
   distanceKm: number | null;
+  /**
+   * Kilometresi bilinen gün sayısı — gün başına km ortalamasının paydası.
+   * Km'si girilmemiş günü paydaya katmak ortalamayı sessizce düşürürdü.
+   */
+  distanceDayCount: number;
   durationMinutes: number;
 
   /** Türetilmiş oranlar — paydası CEBE KALAN. Payda yoksa `null`. */
@@ -55,6 +63,8 @@ export interface PeriodTotals {
   perRide: Kurus | null;
   /** Çalışılan gün başına cebe kalan. */
   perDay: Kurus | null;
+  /** Çalışılan gün başına ciro. */
+  revenuePerDay: Kurus | null;
 
   /**
    * Eksiklikler — günlerinkinin toplamı, tutardan bağımsız. Yalnızca
@@ -108,6 +118,8 @@ export function calculatePeriodTotals(days: readonly DayEntry[]): PeriodTotals {
   return {
     dayCount,
     workedDayCount,
+    shiftCount: count((d) => d.summary.completeness.closedShiftCount
+      + d.summary.completeness.openShiftCount),
     revenue,
     cashProfit,
     trueProfit,
@@ -117,17 +129,34 @@ export function calculatePeriodTotals(days: readonly DayEntry[]): PeriodTotals {
     wearShare: sum(days.map((d) => d.summary.profit.wearShare)),
     rideCount,
     distanceKm,
+    distanceDayCount: knownDistances.length,
     durationMinutes,
     perHour: earningsPerHour(cashProfit, durationMinutes),
     perKm: earningsPerKm(cashProfit, distanceKm),
     perRide: earningsPerRide(cashProfit, rideCount),
     perDay: earningsPerDay(cashProfit, workedDayCount),
+    revenuePerDay: earningsPerDay(revenue, workedDayCount),
     shiftsMissingDistance: count((d) => d.summary.completeness.shiftsMissingDistance),
     shiftsMissingFuel: count((d) => d.summary.completeness.shiftsMissingFuel),
     shiftsMissingCommission: count((d) => d.summary.completeness.shiftsMissingCommission),
     fillsNotCountedKurus: sum(days.map((d) => d.summary.completeness.fillsNotCountedKurus)),
     offDayFillsKurus: sum(days.map((d) => d.summary.completeness.offDayFillsKurus)),
   };
+}
+
+/**
+ * Günleri aylara böler ve her ayın toplamını çıkarır — aylık arşivin
+ * listesi. Anahtar 'YYYY-MM'. Kaydı olmayan ay haritada yok.
+ */
+export function totalsByMonth(days: readonly DayEntry[]): Map<string, PeriodTotals> {
+  const groups = new Map<string, DayEntry[]>();
+  for (const d of days) {
+    const key = d.date.slice(0, 7);
+    const list = groups.get(key);
+    if (list) list.push(d);
+    else groups.set(key, [d]);
+  }
+  return new Map([...groups].map(([key, list]) => [key, calculatePeriodTotals(list)]));
 }
 
 export interface WeekdayStat {

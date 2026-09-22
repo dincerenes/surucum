@@ -16,3 +16,4 @@ export * from './settings';
 export * from './goals';
 export * from './prefs';
 export * from './summary';
+export * from './records';

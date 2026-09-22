@@ -53,7 +53,7 @@ export default function HomeScreen() {
           <Text style={[typeScale.display, { color: colors.text }]}>Gün defteri</Text>
           {rides.length > 0 ? (
             <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-              {rides.length} sefer
+              {rides.length} yolcu
             </Text>
           ) : null}
         </View>
@@ -79,7 +79,7 @@ export default function HomeScreen() {
       <View style={styles.actions}>
         {openShift ? (
           <>
-            <Button label="Sefer ekle" size="hero" plus
+            <Button label="Yolcu ekle" size="hero" plus
               onPress={() => router.push('/sefer')} />
             <View style={styles.pair}>
               <Button

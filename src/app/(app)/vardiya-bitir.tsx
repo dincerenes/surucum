@@ -8,10 +8,9 @@ import {
 } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import {
-  addExpense, endShift, getDaySummary, getKnownFuelFigures,
+  addExpense, endShift, getKnownFuelFigures, getShiftSummary,
   listActiveExpenseCategories, seedSystemCategories,
 } from '@/db/repo';
-import type { BusinessDate } from '@/lib/business-date';
 import { type Kurus, formatKurus, parseAmount } from '@/lib/money';
 import { useDriver } from '@/lib/use-driver';
 import { readDecimal } from '@/lib/number-input';
@@ -38,7 +37,7 @@ import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 export default function EndShiftScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { userId, openShift, vehicle, today } = useDriver();
+  const { userId, openShift, vehicle } = useDriver();
 
   /**
    * Ön dolgu VARDİYANIN ARACINDAN: vardiya ortasında Araçlarım'da başka
@@ -51,15 +50,14 @@ export default function EndShiftScreen() {
   );
 
   /**
-   * Özetin günü, vardiya KAPANMADAN ÖNCE sabitlenir.
+   * Özetin vardiyası, vardiya KAPANMADAN ÖNCE sabitlenir.
    *
-   * Kapanınca `today` vardiyanın gününden takvim gününe atlar. Sabitlemezsek
-   * ödül anında boş bir gün gösteririz: gece 22:00'de başlayıp 05:00'te
-   * kapanan vardiya 28'e yazılıdır, ekran 29'a geçer ve sürücü kazandığı
-   * paranın kaybolduğunu görür.
+   * Kapanınca açık vardiya ortadan kalkar; sabitlemezsek ödül anında boş
+   * bir ekran gösteririz. Gösterilen YALNIZCA BU VARDİYANIN hesabı —
+   * aynı gün kapanmış başka bir vardiyanın parası buraya karışmıyor.
    */
-  const [closedDate, setClosedDate] = useState<BusinessDate | null>(null);
-  const summaryDate = closedDate ?? openShift?.businessDate ?? today;
+  const [closedShiftId, setClosedShiftId] = useState<string | null>(null);
+  const summaryShiftId = closedShiftId ?? openShift?.id ?? null;
 
   const [step, setStep] = useState(1);
   const [km, setKm] = useState('');
@@ -83,11 +81,11 @@ export default function EndShiftScreen() {
     return listActiveExpenseCategories(userId);
   }, [userId]);
 
-  /** Özet adımında gösterilecek, HENÜZ KAYDEDİLMEMİŞ hesap. */
+  /** Özet adımında gösterilecek hesap — kapanan vardiyanın kendisi. */
   const preview = useDbValue(() => {
-    if (!userId) return null;
-    return getDaySummary(userId, summaryDate);
-  }, [userId, summaryDate, step]);
+    if (!userId || !summaryShiftId) return null;
+    return getShiftSummary(userId, summaryShiftId);
+  }, [userId, summaryShiftId, step]);
 
   const expenseAmount = parseAmount(expenseRaw);
   const selectedCategory = categoryId ?? categories[0]?.id ?? null;
@@ -118,7 +116,7 @@ export default function EndShiftScreen() {
 
   function kapat() {
     if (!userId || !openShift) return;
-    setClosedDate(openShift.businessDate);
+    setClosedShiftId(openShift.id);
 
     const hoursValue = readDecimal(hours) ?? Number.NaN;
     const consumptionValue = readDecimal(consumption) ?? Number.NaN;

@@ -91,6 +91,8 @@ export default function AppLayout() {
       <Stack.Screen name="vardiya" options={{ presentation: 'modal' }} />
       <Stack.Screen name="ayarlar" />
       <Stack.Screen name="araclar" />
+      <Stack.Screen name="arsiv" />
+      <Stack.Screen name="arsiv-ay" />
       <Stack.Screen name="arac-duzenle" />
       <Stack.Screen
         name="vardiya-bitir"

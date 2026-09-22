@@ -12,12 +12,15 @@ import { useDriver } from '@/lib/use-driver';
 import { requestSync } from '@/sync/scheduler';
 import { space, type as typeScale, useTheme } from '@/theme/use-theme';
 import { SheetHeader, sheetStyles } from '@/components/ui/sheet';
+import { ShiftRequired } from '@/components/ui/shift-required';
 
 /**
  * Gider ekleme — çip seç, tutar yaz.
  *
  * Kategoriler serbest metin değil çip: sürücü hareket hâlindeki bir
  * araçta klavye açıp "otopark" yazmıyor, tek dokunuşla seçiyor.
+ *
+ * Yalnızca AÇIK VARDİYADA: gider o vardiyanın hesabına yazılıyor.
  */
 export default function AddExpenseScreen() {
   const { colors } = useTheme();
@@ -46,17 +49,19 @@ export default function AddExpenseScreen() {
     && category?.isSystem === true && WEAR_COVERED_CATEGORY_ICONS.has(category.icon ?? '');
 
   function kaydet() {
-    if (!userId || !valid) return;
-    // Açık vardiya varsa gün ve araç ondan gelir (repo bunu kendisi çözer).
+    if (!userId || !valid || !openShift) return;
+    // Gün ve araç vardiyadan gelir (repo bunu kendisi çözer).
     addExpense(userId, {
       categoryId: selected,
       amountKurus: amount as Kurus,
       vehicleId: vehicle?.id ?? null,
-      shiftId: openShift?.id ?? null,
+      shiftId: openShift.id,
     });
     requestSync();
     router.back();
   }
+
+  if (!openShift) return <ShiftRequired title="Gider ekle" />;
 
   return (
     <AboveKeyboard>

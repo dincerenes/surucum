@@ -3,326 +3,112 @@ import { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AmountText, Button, Card, SummaryRows } from '@/components/ui';
+import {
+  Icon, PeriodFilterBar, PeriodSummaryCard, ShiftCard,
+} from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
-import {
-  getCutoffHour, getDaySummary, listDaySummaries, listExpensesInRange, listFuelLogsInRange,
-  listRidesInRange, listShiftsInRange,
-} from '@/db/repo';
+import { getCutoffHour, getFirstRecordDate, listPeriodRecords } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
-import {
-  type BusinessDate, addDays, formatBusinessDate, formatClock, todayBusinessDate,
-} from '@/lib/business-date';
-import type { DaySummary } from '@/lib/day-summary';
-import type { Shift } from '@/db/schema/earnings';
-import { type Kurus, formatDecimal, formatInteger } from '@/lib/money';
-import { resolveShiftDuration } from '@/lib/shift';
-import { groupRecordsByDay } from '@/lib/records-by-day';
-import { fuelLogNote } from '@/lib/summary-notes';
-import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
-
-/** Kaç günlük geçmiş gösteriliyor. Sayfalama Faz 3'te. */
-const WINDOW_DAYS = 60;
-
-interface Entry {
-  id: string;
-  /** Düzenleme ekranı hangi tabloya bakacağını buradan biliyor. */
-  kind: 'sefer' | 'gider' | 'yakit';
-  at: number;
-  title: string;
-  detail: string;
-  amount: Kurus;
-  incoming: boolean;
-  /**
-   * Günün hesabına GİRMEYEN kayıt — tüketimden hesaplandığı için ayrıca
-   * düşülmeyen ya da vardiya olmayan günde yapılmış dolum. Soluk çiziliyor
-   * ve nedeni yazıyor: listede −700 ₺ görüp özette 500 ₺ yakıt gören
-   * sürücü sayıları topluyor, tutmazsa sayıya güvenmiyor.
-   */
-  uncounted: boolean;
-}
-
-interface Day {
-  date: BusinessDate;
-  entries: Entry[];
-  /** O günün vardiyaları — detayına ve düzeltmesine buradan giriliyor. */
-  shifts: Shift[];
-  summary: DaySummary;
-}
+import { todayBusinessDate } from '@/lib/business-date';
+import { PERIOD_LABELS, type PeriodKey, periodBounds } from '@/lib/period';
+import { HIT_SIZE, radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 /**
- * Kayıtlar — gün gün kartlar.
+ * Kayıtlar — VARDİYA VARDİYA.
  *
- * HER GÜN KENDİ KARTINDA. Kesintisiz bir liste, altmış günlük "Sefer,
- * Sefer, Sefer" duvarına dönüşüyor: sürücü nerede olduğunu kaybediyor
- * ve gün ayırıcısını kaydırıp geçince hangi güne baktığını unutuyor.
+ * Sürücü günü değil vardiyayı yaşıyor: açıp kapattığı şey vardiya, gün
+ * içinde iki vardiya olabiliyor ve gece vardiyası iki takvim gününe
+ * yayılıyor. Eski gün kartı bir günün vardiyalarını alt satırlara
+ * gömüyordu; her vardiya artık kendi kartında, kendi parasıyla.
  *
- * Kart yalnızca kayıtları değil O GÜNÜN SONUCUNU da taşıyor. Geçmiş bir
- * günün üç satırını görebileceği başka yer yok — Anasayfa yalnızca bugünü
- * gösteriyor. Sürücünün asıl sorusu "27 Ağustos'ta ne kaldı", tek tek
- * seferler değil.
+ * Üstte dönem filtresi ve HER FİLTREDE duran dönem özeti: sürücü "bu ay
+ * kaç vardiya, kaç yolcu, ne kaldı" sorusunun cevabını listeyi
+ * toplamadan görüyor. Sağ üstteki arşiv geçmiş ayları tek tek açıyor.
  *
- * Sefer, gider ve yakıt AYNI kartta: sürücü günü tek akış olarak yaşıyor,
- * üç ayrı sekmede aramıyor.
- *
- * Her satır dokunulabilir: yanlış girilmiş bir tutarı düzeltmenin ya da
- * silmenin tek yolu burası. Kart başlığı o günün tam dökümüne açılıyor.
+ * Gider ve yakıt buradan GİRİLMİYOR — yalnızca açık vardiyada. "Vardiya
+ * dışı" kayıt yok: her yolcu, gider ve dolum bir vardiyanın kartında;
+ * kalemleri vardiya detayında düzeltiliyor.
  */
 export default function RecordsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const [period, setPeriod] = useState<PeriodKey>('month');
 
-  const days = useDbValue<Day[]>(() => {
-    if (!userId) return [];
-    const cutoff = getCutoffHour(userId);
-    const to = todayBusinessDate(cutoff);
-    const from = addDays(to, -WINDOW_DAYS);
-
-    /**
-     * Özetler TEK toplu okumadan — İstatistik'le aynı hesap, aynı günler.
-     * Gün başına `getDaySummary` altmış gün için dört yüz sorgu demekti.
-     * Yalnızca kaydı olan günler dönüyor.
-     */
-    const summaries = new Map(
-      listDaySummaries(userId, from, to).map((d) => [d.date, d.summary] as const),
-    );
-    const summaryOf = (date: BusinessDate) => summaries.get(date) ?? getDaySummary(userId, date);
-
-    const entries: { date: BusinessDate; entry: Entry }[] = [];
-
-    for (const r of listRidesInRange(userId, from, to)) {
-      entries.push({ date: r.businessDate, entry: {
-        id: r.id, kind: 'sefer', at: r.occurredAt, title: 'Sefer',
-        detail: r.distanceMeters ? `${formatDecimal(r.distanceMeters / 1000)} km` : '',
-        amount: r.grossAmountKurus, incoming: true, uncounted: false,
-      } });
-    }
-    for (const e of listExpensesInRange(userId, from, to)) {
-      entries.push({ date: e.businessDate, entry: {
-        id: e.id, kind: 'gider', at: e.occurredAt, title: 'Gider',
-        detail: e.notes ?? '', amount: e.amountKurus, incoming: false, uncounted: false,
-      } });
-    }
-    for (const f of listFuelLogsInRange(userId, from, to)) {
-      // Fiyatsız dolumda hacim hesaplanamıyor ve 0 duruyor; "0,0 lt"
-      // sıfır litre almış gibi okunuyordu.
-      const litres = f.volumePer1000 > 0
-        ? `${formatDecimal(f.volumePer1000 / 1000)} lt` : 'litre bilinmiyor';
-      const note = fuelLogNote(summaryOf(f.businessDate).fuelLogStatus[f.id]);
-      entries.push({ date: f.businessDate, entry: {
-        id: f.id, kind: 'yakit', at: f.occurredAt, title: 'Yakıt',
-        detail: note ? `${litres} · ${note}` : litres,
-        amount: f.totalAmountKurus, incoming: false, uncounted: note != null,
-      } });
-    }
-
-    /** Günler dört kümenin birleşimi — yalnızca vardiyası olan gün de. */
-    return groupRecordsByDay(entries, listShiftsInRange(userId, from, to))
-      .map((day) => ({ ...day, summary: summaryOf(day.date) }));
-  }, [userId]);
+  const data = useDbValue(() => {
+    if (!userId) return null;
+    const now = Date.now();
+    const today = todayBusinessDate(getCutoffHour(userId), new Date(now));
+    const oldest = period === 'all' ? getFirstRecordDate(userId) : null;
+    const { from, to } = periodBounds(period, today, oldest);
+    return {
+      ...listPeriodRecords(userId, from, to, now),
+      currentYear: Number(today.slice(0, 4)),
+    };
+  }, [userId, period]);
 
   return (
     <FlatList
-      data={days}
-      keyExtractor={(day) => day.date}
-      contentContainerStyle={[
-        styles.page,
-        { paddingTop: insets.top + space.lg },
-        days.length === 0 && styles.pageEmpty,
-      ]}
+      data={data?.items ?? []}
+      keyExtractor={(item) => item.key}
+      contentContainerStyle={[styles.page, { paddingTop: insets.top + space.lg }]}
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
         <View style={styles.header}>
-          <Text style={[typeScale.display, { color: colors.text }]}>Kayıtlar</Text>
-
-          {/*
-            * Gider ve yakıt VARDİYADAN BAĞIMSIZ da girilebilmeli.
-            *
-            * İkisine tek giriş Anasayfa'daki açık vardiya butonlarıydı:
-            * vardiya kapalıyken sürücünün otoparka ödediği parayı yazacak
-            * hiçbir yeri yoktu. Kayıt için önce vardiya başlatmak, kaydı
-            * hiç girmemeye yol açıyor.
-            */}
-          <View style={styles.actions}>
-            <Button
-              label="Gider" variant="secondary" plus
-              style={styles.half} onPress={() => router.push('/gider')}
-            />
-            <Button
-              label="Yakıt" variant="secondary" plus
-              style={styles.half} onPress={() => router.push('/yakit')}
-            />
+          <View style={styles.titleRow}>
+            <Text style={[typeScale.display, { color: colors.text }]}>Kayıtlar</Text>
+            <Pressable
+              onPress={() => router.push('/arsiv')}
+              accessibilityRole="button"
+              accessibilityLabel="Aylık arşiv"
+              hitSlop={space.sm}
+              style={({ pressed }) => [styles.archive, {
+                backgroundColor: pressed ? colors.surfaceSunken : colors.surface,
+                borderColor: colors.border,
+              }]}
+            >
+              <Icon name={{ ios: 'archivebox', android: 'inventory_2' }} color={colors.accent} />
+            </Pressable>
           </View>
+
+          <PeriodFilterBar value={period} onChange={setPeriod} />
+
+          {data ? <PeriodSummaryCard totals={data.totals} meta={PERIOD_LABELS[period]} /> : null}
         </View>
       }
       ListEmptyComponent={
         <View style={[styles.empty, { borderColor: colors.border }]}>
-          <Text style={[typeScale.heading, { color: colors.text }]}>Henüz kayıt yok</Text>
+          <Text style={[typeScale.heading, { color: colors.text }]}>
+            {PERIOD_LABELS[period]} için vardiya yok
+          </Text>
           <Text style={[typeScale.body, { color: colors.textSoft }]}>
-            Girdiğin her sefer, gider ve yakıt burada gün gün sıralanacak.
+            Sürüş sekmesinden vardiya başlattığında her vardiya burada kendi
+            kartında görünecek.
           </Text>
         </View>
       }
-      renderItem={({ item }) => <DayCard day={item} />}
+      renderItem={({ item }) => (
+        <ShiftCard
+          shift={item.data.shift}
+          summary={item.data.summary}
+          currentYear={data?.currentYear ?? 0}
+        />
+      )}
     />
   );
 }
 
-function DayCard({ day }: { day: Day }) {
-  const { colors } = useTheme();
-
-  /** "0 kayıt" yazmıyoruz: yalnızca vardiyası olan gün de listede. */
-  const meta = [
-    day.entries.length > 0 ? `${day.entries.length} kayıt` : null,
-    day.shifts.length > 0 ? `${day.shifts.length} vardiya` : null,
-  ].filter(Boolean).join(' · ');
-
-  return (
-    <Card
-      title={formatBusinessDate(day.date, 'long')}
-      meta={meta}
-      style={styles.card}
-    >
-      {day.entries.length > 0 ? (
-        <View style={[styles.list, { borderColor: colors.border }]}>
-          {day.entries.map((entry, index) => (
-            <Pressable
-              key={entry.id}
-              onPress={() => router.push({
-                pathname: '/kayit', params: { tur: entry.kind, id: entry.id },
-              })}
-              accessibilityRole="button"
-              accessibilityLabel={`${entry.title} kaydını düzenle`}
-              style={({ pressed }) => [
-                styles.row,
-                index > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
-                pressed && { backgroundColor: colors.surfaceSunken },
-              ]}
-            >
-              <Text style={[styles.time, { color: colors.textFaint }]}>
-                {formatClock(entry.at)}
-              </Text>
-              <View style={styles.rowText}>
-                <Text style={[typeScale.body, { color: colors.text }]}>{entry.title}</Text>
-                {entry.detail ? (
-                  <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-                    {entry.detail}
-                  </Text>
-                ) : null}
-              </View>
-              <View style={entry.uncounted ? styles.uncounted : null}>
-                <AmountText
-                  value={entry.amount}
-                  tone={entry.incoming ? 'plain' : 'cost'}
-                  showMinus={!entry.incoming}
-                />
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-
-      {day.shifts.length > 0 ? (
-        <ShiftRows
-          shifts={day.shifts}
-          fuelUnknownIds={day.summary.completeness.fuelUnknownShiftIds}
-        />
-      ) : null}
-
-      <SummaryRows summary={day.summary} detailed={false} />
-    </Card>
-  );
-}
-
-/**
- * Günün vardiyaları.
- *
- * Eksiği olan KAPANMIŞ vardiya AYRICA işaretleniyor: gün özetindeki
- * uyarıların karşılığı burada, dokunulabilir hâlde duruyor. Sürücüye
- * eksiği söyleyip düzeltme yolu vermemek, uyarı değil suçlamadır.
- * Açık vardiya işaretlenmiyor — kilometresi ve komisyonu vardiya
- * biterken sorulacak, henüz eksik değil.
- */
-function ShiftRows({
-  shifts, fuelUnknownIds,
-}: { shifts: readonly Shift[]; fuelUnknownIds: readonly string[] }) {
-  const { colors } = useTheme();
-  /** Açık vardiyanın süresi için: çizim saf kalsın diye an bir kez alınıyor. */
-  const [now] = useState(() => Date.now());
-
-  return (
-    <View style={styles.shifts}>
-      {shifts.map((shift) => {
-        const duration = resolveShiftDuration(shift, now);
-        const closed = shift.endedAt != null;
-        const missing = closed ? [
-          shift.distanceKm == null ? 'km eksik' : null,
-          fuelUnknownIds.includes(shift.id) ? 'yakıt bilinmiyor' : null,
-          shift.commissionKurus == null ? 'komisyon boş' : null,
-        ].filter(Boolean).join(' · ') : '';
-
-        return (
-          <Pressable
-            key={shift.id}
-            onPress={() => router.push({ pathname: '/vardiya', params: { id: shift.id } })}
-            accessibilityRole="button"
-            accessibilityLabel="Vardiya detayı"
-            style={({ pressed }) => [
-              styles.shiftRow,
-              { backgroundColor: pressed ? colors.border : colors.surfaceSunken },
-            ]}
-          >
-            <Text style={[typeScale.body, { color: colors.text }]}>
-              {formatClock(shift.startedAt)}
-              {shift.endedAt ? `–${formatClock(shift.endedAt)}` : ' · açık'}
-            </Text>
-            <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-              {Math.floor(duration.minutes / 60)}s {duration.minutes % 60}dk
-              {shift.distanceKm != null ? ` · ${formatInteger(shift.distanceKm)} km` : ''}
-            </Text>
-            {missing ? (
-              <Text style={[typeScale.caption, { color: colors.warning }]}>
-                {missing}
-              </Text>
-            ) : null}
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  page: { paddingHorizontal: space.xl, paddingBottom: space.xxxl, gap: space.lg },
-  pageEmpty: { flexGrow: 1 },
-  header: { gap: space.md, marginBottom: space.md },
-  actions: { flexDirection: 'row', gap: space.md },
-  half: { flex: 1 },
-  card: { gap: space.lg },
-  list: { borderWidth: 1, borderRadius: radius.md, overflow: 'hidden' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    paddingHorizontal: space.md,
-    paddingVertical: space.md,
+  page: { paddingHorizontal: space.xl, paddingBottom: space.xxxl, gap: space.md },
+  header: { gap: space.md, marginBottom: space.xs },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  archive: {
+    width: HIT_SIZE, height: HIT_SIZE, borderRadius: radius.pill, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
   },
-  time: { ...typeScale.body, fontVariant: ['tabular-nums'] },
-  uncounted: { opacity: 0.45 },
-  rowText: { flex: 1 },
   empty: {
-    borderWidth: 1, borderStyle: 'dashed', borderRadius: 14,
+    borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.lg,
     padding: space.xl, gap: space.sm,
-  },
-  shifts: { gap: space.xs },
-  shiftRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: space.sm,
-    borderRadius: radius.sm,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
   },
 });

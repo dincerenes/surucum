@@ -6,13 +6,17 @@
  * Buraya hesap yazılmaz.
  */
 
-import { and, asc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNotNull, lte, sql } from 'drizzle-orm';
 import { getDb } from '../client';
 import { expenses, fuelLogs, rides, shifts, vehicles } from '../schema';
 import { type UnixMs, alive } from './_base';
 import { getCutoffHour } from './settings';
 import type { Kurus } from '@/lib/money';
-import { type DaySummary, type ShiftRow, calculateDaySummary } from '@/lib/day-summary';
+import {
+  type AmountRow, type DaySummary, type FuelRow, type RideRow, type ShiftRow,
+  calculateDaySummary,
+} from '@/lib/day-summary';
+import type { Shift } from '../schema/earnings';
 import { type BusinessDate, todayBusinessDate } from '@/lib/business-date';
 
 /**
@@ -106,6 +110,169 @@ export function listDaySummaries(
         shifts: shifts.get(date) ?? [],
         now,
       }),
+    }));
+}
+
+// ---------------------------------------------------------------------------
+// Vardiya özetleri — Kayıtlar vardiya vardiya
+// ---------------------------------------------------------------------------
+
+/**
+ * Bir vardiyanın özetini hesaplamak için gereken satırlar.
+ *
+ * Vardiya kartı YALNIZCA KENDİ kayıtlarını sayıyor: kendisine bağlı
+ * yolcular, dolumlar ve giderler. Bağsız (eski sürümde girilmiş) gider ve
+ * dolum hiçbir vardiyanın kartına girmiyor; Kayıtlar'da "vardiya dışı"
+ * satır olarak duruyor ve gün/dönem toplamına yine giriyor.
+ */
+export interface ShiftSummaryInput {
+  row: ShiftRow;
+  rides: RideRow[];
+  expenses: AmountRow[];
+  fuelLogs: FuelRow[];
+}
+
+export interface ShiftSummary {
+  shift: Shift;
+  summary: DaySummary;
+}
+
+/**
+ * Tek vardiyanın özet girdisi. Vardiya bu hesabın değilse ya da
+ * silinmişse `null`.
+ *
+ * Girdi olarak dönüyor, hesaplanmış özet olarak değil: vardiya detayı
+ * düzeltme alanlarını yazarken satırı değiştirip özeti CANLI yeniden
+ * hesaplıyor (`calculateDaySummary`).
+ */
+export function readShiftSummaryInput(
+  userId: string, shiftId: string,
+): ShiftSummaryInput | null {
+  const row = selectShiftRows(userId, eq(shifts.id, shiftId))[0];
+  if (!row) return null;
+  return {
+    row,
+    rides: selectShiftRides(userId, eq(rides.shiftId, shiftId)).map(stripShiftId),
+    expenses: selectShiftExpenses(userId, eq(expenses.shiftId, shiftId)).map(stripShiftId),
+    fuelLogs: selectShiftFuel(userId, eq(fuelLogs.shiftId, shiftId)),
+  };
+}
+
+export function getShiftSummary(
+  userId: string, shiftId: string, now: UnixMs = Date.now(),
+): DaySummary | null {
+  const input = readShiftSummaryInput(userId, shiftId);
+  if (!input) return null;
+  return calculateDaySummary({ ...input, shifts: [input.row], now });
+}
+
+/**
+ * Aralıktaki vardiyalar, her biri KENDİ özetiyle — en yeni önce.
+ *
+ * Vardiya başına ayrı sorgu atılmıyor: dört toplu okuma yapılıp satırlar
+ * bellekte vardiyaya göre gruplanıyor (`listDaySummaries` gibi). Vardiyaya
+ * bağlı kayıt vardiyanın gününü aldığı için iş günü aralığı yetiyor.
+ */
+export function listShiftSummariesInRange(
+  userId: string, from: BusinessDate, to: BusinessDate, now: UnixMs = Date.now(),
+): ShiftSummary[] {
+  const inRange = <T extends typeof rides | typeof expenses | typeof fuelLogs | typeof shifts>(
+    t: T,
+  ) => and(gte(t.businessDate, from), lte(t.businessDate, to));
+
+  const list = getDb().select().from(shifts)
+    .where(and(alive(shifts, userId), inRange(shifts)))
+    .orderBy(desc(shifts.startedAt))
+    .all();
+  if (list.length === 0) return [];
+
+  const rows = new Map(selectShiftRows(userId, inRange(shifts)).map((r) => [r.id, r]));
+  const rideMap = groupByShift(selectShiftRides(userId, inRange(rides)));
+  const expenseMap = groupByShift(selectShiftExpenses(userId, inRange(expenses)));
+  const fuelMap = groupByShift(selectShiftFuel(userId, inRange(fuelLogs)));
+
+  return list.map((shift) => {
+    const row = rows.get(shift.id) ?? { ...shift, wearPerKmKurus: shift.wearPerKmKurus };
+    return {
+      shift,
+      summary: calculateDaySummary({
+        rides: (rideMap.get(shift.id) ?? []).map(stripShiftId),
+        expenses: (expenseMap.get(shift.id) ?? []).map(stripShiftId),
+        fuelLogs: fuelMap.get(shift.id) ?? [],
+        shifts: [row],
+        now,
+      }),
+    };
+  });
+}
+
+function stripShiftId<T extends { shiftId: string | null }>(
+  { shiftId: _shiftId, ...rest }: T,
+): Omit<T, 'shiftId'> {
+  return rest;
+}
+
+function groupByShift<T extends { shiftId: string | null }>(rows: readonly T[]): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const row of rows) {
+    if (!row.shiftId) continue;
+    const list = map.get(row.shiftId);
+    if (list) list.push(row);
+    else map.set(row.shiftId, [row]);
+  }
+  return map;
+}
+
+type Condition = ReturnType<typeof and>;
+
+function selectShiftRides(userId: string, where: Condition) {
+  return getDb().select({
+    shiftId: rides.shiftId,
+    grossAmountKurus: rides.grossAmountKurus,
+    commissionKurus: rides.commissionKurus,
+    tipKurus: rides.tipKurus,
+  }).from(rides).where(and(alive(rides, userId), isNotNull(rides.shiftId), where)).all();
+}
+
+function selectShiftExpenses(userId: string, where: Condition) {
+  return getDb().select({
+    shiftId: expenses.shiftId,
+    amountKurus: expenses.amountKurus,
+  }).from(expenses).where(and(alive(expenses, userId), isNotNull(expenses.shiftId), where)).all();
+}
+
+function selectShiftFuel(userId: string, where: Condition) {
+  return getDb().select({
+    id: fuelLogs.id,
+    shiftId: fuelLogs.shiftId,
+    vehicleId: fuelLogs.vehicleId,
+    totalAmountKurus: fuelLogs.totalAmountKurus,
+  }).from(fuelLogs).where(and(alive(fuelLogs, userId), isNotNull(fuelLogs.shiftId), where)).all();
+}
+
+/** Vardiya satırları yıpranma oranıyla — `readShiftRows` ile aynı kural. */
+function selectShiftRows(userId: string, where: Condition): Array<ShiftRow & { id: string }> {
+  return getDb().select({
+    id: shifts.id,
+    vehicleId: shifts.vehicleId,
+    startedAt: shifts.startedAt,
+    endedAt: shifts.endedAt,
+    workedMinutes: shifts.workedMinutes,
+    distanceKm: shifts.distanceKm,
+    commissionKurus: shifts.commissionKurus,
+    fuelConsumptionPer100Km: shifts.fuelConsumptionPer100Km,
+    fuelPriceKurus: shifts.fuelPriceKurus,
+    wearPerKmKurus: shiftWear,
+  })
+    .from(shifts)
+    .leftJoin(vehicles, ownVehicleOfShift)
+    .where(and(alive(shifts, userId), where))
+    .all()
+    .map((r) => ({
+      ...r,
+      commissionKurus: r.commissionKurus as Kurus | null,
+      fuelPriceKurus: r.fuelPriceKurus as Kurus | null,
+      wearPerKmKurus: r.wearPerKmKurus as Kurus | null,
     }));
 }
 

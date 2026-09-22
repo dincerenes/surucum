@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { calculatePeriodTotals, percentChange, summarizeByWeekday } from './stats.ts';
+import {
+  calculatePeriodTotals, percentChange, summarizeByWeekday, totalsByMonth,
+} from './stats.ts';
 import type { DayEntry } from './stats.ts';
 import { asBusinessDate } from './business-date.ts';
 import { calculateDaySummary } from './day-summary.ts';
@@ -48,6 +50,17 @@ function day(
 }
 
 describe('dönem toplamları', () => {
+  it('vardiya sayısı, gün başına ciro ve km\'si bilinen gün sayısı', () => {
+    const t = calculatePeriodTotals([
+      day('2026-09-14', { gross: 100_000, km: 100 }),
+      day('2026-09-15', { gross: 300_000, km: null }),
+    ]);
+    assert.equal(t.shiftCount, 2);
+    assert.equal(t.revenuePerDay, 200_000);
+    assert.equal(t.distanceDayCount, 1);
+    assert.equal(calculatePeriodTotals([]).revenuePerDay, null);
+  });
+
   it('boş dönem sıfırlarla döner, oranlar null', () => {
     const t = calculatePeriodTotals([]);
     assert.equal(t.dayCount, 0);
@@ -246,5 +259,19 @@ describe('yüzde değişim', () => {
 
   it('önceki dönem negatifse null — işaret yüzdenin içinde kaybolmaz', () => {
     assert.equal(percentChange(k(100), k(-50)), null);
+  });
+});
+
+describe('totalsByMonth', () => {
+  it('günler aylarına toplanır, kaydı olmayan ay yok', () => {
+    const months = totalsByMonth([
+      day('2026-08-30', { gross: 100_000 }),
+      day('2026-09-01', { gross: 200_000 }),
+      day('2026-09-15', { gross: 300_000 }),
+    ]);
+    assert.deepEqual([...months.keys()].sort(), ['2026-08', '2026-09']);
+    assert.equal(months.get('2026-09')?.revenue, 500_000);
+    assert.equal(months.get('2026-09')?.shiftCount, 2);
+    assert.equal(months.get('2026-07'), undefined);
   });
 });

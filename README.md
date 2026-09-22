@@ -127,8 +127,19 @@ biliniyor. Üçü çarpılıp o günün yakıt gideri bulunuyor.
   **İkisi birden sayılmıyor** — aynı yakıt iki kez düşülürdü.
 - Bu yüzden vardiya sonu sihirbazının gider adımında **Yakıt çipi yok**:
   bir önceki adım tüketimi ve fiyatı zaten soruyor. Dolum kaydı gerekiyorsa
-  Kayıtlar'daki "Yakıt" girişinden yapılıyor. Depo ya da kilometre sayacı
+  açık vardiyadaki "Yakıt" butonundan yapılıyor. Depo ya da kilometre sayacı
   takibi yok.
+
+### Her kayıt bir vardiyaya ait
+
+Yolcu, gider ve yakıt **yalnızca açık vardiyada** giriliyor ve o vardiyaya
+bağlanıyor (`shift_id`). "Vardiya dışı" kayıt yok: Kayıtlar vardiya vardiya
+listeleniyor, her kart yalnızca kendi kayıtlarını sayıyor ve kartların
+toplamı dönem özetine eşit. Vardiya silinince yolcuları, giderleri ve
+dolumları da siliniyor (`deleteShift`) — sahipsiz kalıp toplamlara giren
+ama hiçbir kartta görünmeyen kayıt olmasın diye. Ekranlarda "sefer" yerine
+**"yolcu"** yazıyor (her sefer bir yolcu); kodda ve veritabanında adı
+`rides`.
 
 ### Yıpranma payı sorulmaz
 

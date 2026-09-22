@@ -8,7 +8,7 @@ import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 interface Props {
   rides: readonly Ride[];
-  /** En fazla kaç satır. Aşan kısım "+N sefer daha" olarak özetlenir. */
+  /** En fazla kaç satır. Aşan kısım "+N yolcu daha" olarak özetlenir. */
   limit?: number;
   /** Kayıt yokken gösterilecek metin. Boşsa hiçbir şey çizilmez. */
   emptyText?: string;
@@ -43,7 +43,7 @@ export function RideList({ rides, limit = 8, emptyText }: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
-        <Text style={[styles.label, { color: colors.textFaint }]}>SEFERLER</Text>
+        <Text style={[styles.label, { color: colors.textFaint }]}>YOLCULAR</Text>
         <Text style={[typeScale.caption, { color: colors.textFaint }]}>
           {rides.length}
         </Text>
@@ -57,7 +57,7 @@ export function RideList({ rides, limit = 8, emptyText }: Props) {
               pathname: '/kayit', params: { tur: 'sefer', id: ride.id },
             })}
             accessibilityRole="button"
-            accessibilityLabel="Seferi düzenle"
+            accessibilityLabel="Yolcu kaydını düzenle"
             style={({ pressed }) => [
               styles.row,
               index > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
@@ -75,7 +75,7 @@ export function RideList({ rides, limit = 8, emptyText }: Props) {
 
       {rest > 0 ? (
         <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-          +{rest} sefer daha
+          +{rest} yolcu daha
         </Text>
       ) : null}
     </View>

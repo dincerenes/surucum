@@ -138,11 +138,11 @@ export function hideExpenseCategory(
 // ---------------------------------------------------------------------------
 
 /**
- * Giderin vardiyaya değil, İŞ GÜNÜNE bağlandığına dikkat: `shiftId` yok.
+ * Gider hem İŞ GÜNÜNE hem VARDİYAYA bağlanıyor.
  *
- * Gün özeti zaten `business_date` üzerinden topluyor. Vardiya kimliği de
- * saklasaydık, aynı günde iki vardiya açan sürücüde giderin hangisine
- * ait olduğu iki farklı yerden okunur ve ikisi çelişebilirdi.
+ * Gün ve dönem özeti `business_date` üzerinden topluyor; vardiya kartı
+ * ise yalnızca kendi giderlerini (`shiftId`) sayıyor. Vardiyası verilen
+ * giderin günü HER ZAMAN vardiyanın günü, yani iki okuma çelişmiyor.
  */
 export interface NewExpenseInput {
   categoryId: string;
@@ -151,10 +151,9 @@ export interface NewExpenseInput {
   occurredAt?: UnixMs;
 
   /**
-   * Açık vardiya varsa kimliği. SAKLANMAZ (yukarıdaki not); yalnızca
-   * giderin GÜNÜNÜ ve ARACINI vardiyadan almak için. Vardiya verildiyse
-   * `vehicleId` ve `businessDate` yok sayılır: vardiya ortasında başka
-   * araç seçilse bile gider vardiyanın aracına yazılır.
+   * Giderin girildiği vardiya — saklanıyor. Vardiya verildiyse `vehicleId`
+   * ve `businessDate` yok sayılır: vardiya ortasında başka araç seçilse
+   * bile gider vardiyanın aracına ve gününe yazılır.
    */
   shiftId?: string | null;
 
@@ -187,6 +186,7 @@ export function addExpense(
     tx.insert(expenses).values({
       ...stamp,
       categoryId: input.categoryId,
+      shiftId: shift ? input.shiftId : null,
       vehicleId,
       amountKurus: input.amountKurus,
       occurredAt,
@@ -238,6 +238,13 @@ export function getExpense(userId: string, id: string): Expense | undefined {
 export function listExpensesOnDate(userId: string, date: BusinessDate): Expense[] {
   return getDb().select().from(expenses)
     .where(and(alive(expenses, userId), eq(expenses.businessDate, date)))
+    .orderBy(desc(expenses.occurredAt))
+    .all();
+}
+
+export function listExpensesInShift(userId: string, shiftId: string): Expense[] {
+  return getDb().select().from(expenses)
+    .where(and(alive(expenses, userId), eq(expenses.shiftId, shiftId)))
     .orderBy(desc(expenses.occurredAt))
     .all();
 }

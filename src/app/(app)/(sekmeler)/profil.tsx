@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Card } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import {
-  getActiveGoal, getKnownFuelFigures, getSettings, listActiveVehicles,
+  getActiveGoal, getKnownFuelFigures, listActiveVehicles,
   listVehicleFuelTypes,
 } from '@/db/repo';
 import { getSyncStatus } from '@/sync/state';

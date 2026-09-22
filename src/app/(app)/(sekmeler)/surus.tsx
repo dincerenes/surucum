@@ -1,10 +1,17 @@
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AmountText, Button, RideList } from '@/components/ui';
-import { startShift } from '@/db/repo';
-import { formatKurus } from '@/lib/money';
+import { AmountText, Button, Icon, RideList } from '@/components/ui';
+import { useDbValue } from '@/db/use-db';
+import { getLastClosedShift, getShiftSummary, listVehicleFuelTypes, startShift } from '@/db/repo';
+import { FUEL_TYPE_LABELS } from '@/db/schema/_shared';
+import { formatBusinessDate, formatClock } from '@/lib/business-date';
+import { formatInteger, formatKurus } from '@/lib/money';
 import { earningsPerRide } from '@/lib/shift';
 import { useDriver } from '@/lib/use-driver';
 import { requestSync } from '@/sync/scheduler';
@@ -13,7 +20,7 @@ import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 /**
  * Sürüş — açık vardiyanın tam ekran hâli.
  *
- * Sürücü gün boyu bu ekranda. Tek dev hedef var: "Sefer ekle". Anasayfa
+ * Sürücü gün boyu bu ekranda. Tek dev hedef var: "Yolcu ekle". Anasayfa
  * kaydırılabilir bir defter; burada kaydırma yok, başparmak nereye
  * gideceğini düşünmüyor.
  *
@@ -82,10 +89,10 @@ export default function DriveScreen() {
       </View>
 
       <View style={styles.stats}>
-        <Stat value={String(rides.length)} label="sefer" />
+        <Stat value={formatInteger(rides.length)} label="yolcu" />
         <Stat
           value={perRide != null ? formatKurus(perRide, { symbol: false, decimals: false }) : '—'}
-          label="₺/sefer"
+          label="₺/yolcu"
         />
       </View>
 
@@ -96,12 +103,12 @@ export default function DriveScreen() {
       >
         <RideList
           rides={rides}
-          emptyText="Henüz sefer yok. İlk parayı aldığında aşağıdaki butona bas."
+          emptyText="Henüz yolcu yok. İlk parayı aldığında aşağıdaki butona bas."
         />
       </ScrollView>
 
       <View style={styles.liveActions}>
-        <Button label="Sefer ekle" size="hero" plus onPress={() => router.push('/sefer')} />
+        <Button label="Yolcu ekle" size="hero" plus onPress={() => router.push('/sefer')} />
         <View style={styles.pair}>
           <Button label="Gider" variant="secondary" style={styles.half}
             onPress={() => router.push('/gider')} />
@@ -127,22 +134,128 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
-/** Vardiya kapalıyken sekme boş kalmıyor — buradan da başlatılabiliyor. */
+/** Başlat butonunun çapı — ekranın ortasında, başparmağın düşünmeden gittiği yer. */
+const START_SIZE = 200;
+
+/**
+ * Vardiya kapalıyken: ortada BÜYÜK bir Başlat butonu.
+ *
+ * Eskiden bir başlık, bir paragraf ve ekran genişliğinde sıradan bir
+ * butondu; sekme boş ve cansız görünüyordu. Sürücü bu ekrana tek bir iş
+ * için geliyor: direksiyona geçti, vardiyayı açacak. Buton o işin kendisi
+ * ve ekranın ortasında, yavaş bir nabızla duruyor.
+ *
+ * Üstte hangi araçla başlayacağı (vardiya o araca yazılıyor), altta son
+ * vardiyanın özeti: ekran boş kalmıyor ve sürücü nerede kaldığını görüyor.
+ *
+ * Gider/yakıt girişi YOK: ikisi de yalnızca açık vardiyada giriliyor.
+ */
 function ClosedState({ onStart }: { onStart: () => void }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { userId, vehicle } = useDriver();
+
+  const info = useDbValue(() => {
+    if (!userId) return null;
+    const last = getLastClosedShift(userId);
+    const summary = last ? getShiftSummary(userId, last.id) : null;
+    return {
+      fuels: vehicle
+        ? listVehicleFuelTypes(userId, vehicle.id)
+          .map((f) => FUEL_TYPE_LABELS[f.fuelType]).join(' + ')
+        : '',
+      last: last && summary ? { shift: last, summary } : null,
+    };
+  }, [userId, vehicle?.id]);
+
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withTiming(1, { duration: 1800, easing: Easing.out(Easing.quad) }), -1,
+    );
+  }, [pulse]);
+  const ring = useAnimatedStyle(() => ({
+    opacity: 0.35 * (1 - pulse.value),
+    transform: [{ scale: 1 + pulse.value * 0.22 }],
+  }));
+
+  const last = info?.last ?? null;
 
   return (
     <View style={[
       styles.closed,
-      { backgroundColor: colors.background, paddingTop: insets.top + space.xxxl },
+      { backgroundColor: colors.background, paddingTop: insets.top + space.lg },
     ]}>
-      <Text style={[typeScale.title, { color: colors.text }]}>Vardiya kapalı</Text>
-      <Text style={[typeScale.body, { color: colors.textSoft, textAlign: 'center' }]}>
-        Direksiyona geçtiğinde vardiyayı başlat. Bu ekran o zaman canlı
-        sayaca dönüşür ve sefer eklemek tek dokunuş olur.
-      </Text>
-      <Button label="Vardiyayı başlat" onPress={onStart} style={{ alignSelf: 'stretch' }} />
+      <View style={styles.closedHead}>
+        <Text style={[typeScale.display, { color: colors.text }]}>Sürüş</Text>
+        {vehicle ? (
+          <View style={[styles.vehicle, {
+            backgroundColor: colors.surface, borderColor: colors.border,
+          }]}>
+            <Icon name={{ ios: 'car.fill', android: 'directions_car' }} size={18} color={colors.accent} />
+            <Text style={[typeScale.bodyStrong, { color: colors.text }]} numberOfLines={1}>
+              {vehicle.label}
+            </Text>
+            {info?.fuels ? (
+              <Text style={[typeScale.caption, { color: colors.textFaint }]}>{info.fuels}</Text>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.center}>
+        <View style={styles.startWrap}>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.ring, { backgroundColor: colors.accent }, ring]}
+          />
+          <Pressable
+            onPress={onStart}
+            accessibilityRole="button"
+            accessibilityLabel="Vardiyayı başlat"
+            style={({ pressed }) => [styles.start, {
+              backgroundColor: colors.accent,
+              transform: [{ scale: pressed ? 0.96 : 1 }],
+            }]}
+          >
+            <Icon name={{ ios: 'play.fill', android: 'play_arrow' }} size={64} color={colors.accentText} />
+            <Text style={[typeScale.heading, { color: colors.accentText }]}>Başlat</Text>
+          </Pressable>
+        </View>
+        <Text style={[typeScale.body, styles.hint, { color: colors.textSoft }]}>
+          Direksiyona geçtiğinde bas. Vardiya açılınca yolcu eklemek tek dokunuş.
+        </Text>
+      </View>
+
+      {last ? (
+        <Pressable
+          onPress={() => router.push({ pathname: '/vardiya', params: { id: last.shift.id } })}
+          accessibilityRole="button"
+          accessibilityLabel="Son vardiyanın detayı"
+          style={({ pressed }) => [styles.last, {
+            backgroundColor: pressed ? colors.surfaceSunken : colors.surface,
+            borderColor: colors.border,
+          }]}
+        >
+          <View style={styles.lastText}>
+            <Text style={[typeScale.label, { color: colors.textFaint }]}>SON VARDİYA</Text>
+            <Text style={[typeScale.body, { color: colors.text }]}>
+              {formatBusinessDate(last.shift.businessDate, 'dayMonth')}
+              {' · '}
+              {formatClock(last.shift.startedAt)}–{formatClock(last.shift.endedAt ?? last.shift.startedAt)}
+            </Text>
+            <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+              {formatInteger(last.summary.rideCount)} yolcu
+              {last.summary.distanceKm != null
+                ? ` · ${formatInteger(last.summary.distanceKm)} km` : ''}
+            </Text>
+          </View>
+          <View style={styles.lastAmount}>
+            <AmountText value={last.summary.profit.cashProfit} size="heading" tone="signed" />
+            <Text style={[typeScale.caption, { color: colors.textFaint }]}>cebe kalan</Text>
+          </View>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -161,7 +274,29 @@ const styles = StyleSheet.create({
   liveActions: { paddingBottom: space.xl, gap: space.md },
   pair: { flexDirection: 'row', gap: space.md },
   half: { flex: 1 },
-  closed: {
-    flex: 1, paddingHorizontal: space.xl, alignItems: 'center', gap: space.lg,
+  closed: { flex: 1, paddingHorizontal: space.xl, paddingBottom: space.xl, gap: space.lg },
+  closedHead: { gap: space.md, alignItems: 'flex-start' },
+  vehicle: {
+    flexDirection: 'row', alignItems: 'center', gap: space.sm, maxWidth: '100%',
+    borderWidth: 1, borderRadius: radius.pill,
+    paddingHorizontal: space.md, paddingVertical: space.sm,
   },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.xl },
+  startWrap: {
+    width: START_SIZE, height: START_SIZE, alignItems: 'center', justifyContent: 'center',
+  },
+  ring: {
+    position: 'absolute', width: START_SIZE, height: START_SIZE, borderRadius: START_SIZE / 2,
+  },
+  start: {
+    width: START_SIZE, height: START_SIZE, borderRadius: START_SIZE / 2,
+    alignItems: 'center', justifyContent: 'center', gap: space.xs,
+  },
+  hint: { textAlign: 'center', maxWidth: 280 },
+  last: {
+    flexDirection: 'row', alignItems: 'center', gap: space.md,
+    borderWidth: 1, borderRadius: radius.lg, padding: space.lg,
+  },
+  lastText: { flex: 1, gap: 2 },
+  lastAmount: { alignItems: 'flex-end', gap: 2 },
 });
