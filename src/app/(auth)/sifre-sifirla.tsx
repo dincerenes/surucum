@@ -62,7 +62,7 @@ export default function SifreSifirlaScreen() {
         {sent ? (
           <>
             <Notice tone="success">
-              {`${email.trim()} adresine sıfırlama bağlantısı gönderildi.`}
+              {`${email.trim()} adresine sıfırlama bağlantısı gönderildi. Bağlantıyı bu telefonda aç; uygulama yeni şifreni soracak.`}
             </Notice>
             <Button
               label="Giriş ekranına dön"

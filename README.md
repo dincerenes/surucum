@@ -293,9 +293,13 @@ Yayın öncesi kalanlar:
 - **Gerçek SMTP** bağlanması ve e-posta doğrulamasının geri açılması. Şu an
   `mailer_autoconfirm` açık ve şifre sıfırlama, üretim için desteklenmeyen
   yerleşik posta servisine bağlı.
-- **Şifre sıfırlama uygulamada tamamlanamıyor.** E-posta gidiyor ama yeni
-  parolayı alan bir ekran ya da dönüş yolu (derin bağlantı veya e-postadaki
-  kod) yok.
+- **Şifre sıfırlama bağlantısının adresi** Supabase panelinde izinli
+  dönüş adreslerine eklenmeli: `surucum://sifre-yenile` (Authentication →
+  URL Configuration → Redirect URLs). Eklenmezse e-postadaki bağlantı
+  uygulamaya dönmez. Uygulama tarafı hazır: bağlantı `sifre-yenile`
+  ekranını açıyor, kod PKCE ile oturuma çevriliyor ve yeni şifre orada
+  yazılıyor. Kod, bağlantının istendiği telefonda saklı; başka cihazda
+  açılan bağlantı "artık geçerli değil" der.
 - **Uygulama içi hesap silme** — iki mağazanın da şartı.
 - **Gizlilik politikası:** taslak `docs/gizlilik-politikasi.md`. Hukukçudan
   geçmesi, herkese açık bir https adresinde yayımlanması ve kayıt ekranı ile

@@ -1,6 +1,6 @@
 {
   "_aciklama": "Buluttaki (Postgres) sütun adları. server_updated_at HARİÇ — o yalnızca sunucuda var, artımlı çekmenin imleci. Bu dosya schema-parity.test.ts tarafından yerel SQLite şemasıyla karşılaştırılıyor: iki taraf birebir aynı olmak zorunda, çünkü senkron satırları hiçbir eşleme yapmadan olduğu gibi gönderiyor.",
-  "_kaynak": "information_schema.columns — proje rbguvcvouuapiwxhecjn, 27 Ağustos 2026",
+  "_kaynak": "information_schema.columns — proje rbguvcvouuapiwxhecjn, 23 Eylül 2026",
   "_bool_sutunlar": "SQLite bunları 0/1 tam sayı tutuyor, Postgres boolean bekliyor; senkron gönderirken çeviriyor.",
   "bool": {
     "earning_sources": [
@@ -123,7 +123,6 @@
       "target_net_kurus": "bigint"
     }
   },
-  "_bekleyen": "shifts.wear_per_km_kurus ve fuel_logs.shift_id supabase/migrations/PENDING_shift_wear_snapshot.sql ve PENDING_fuel_log_shift.sql ile geliyor. O dosyalar uygulanana kadar bu iki sütun bulutta YOK; uygulama bu sürümden önce güncellenmemeli.",
   "tables": {
     "app_settings": [
       "id",

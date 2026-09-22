@@ -44,6 +44,9 @@ export function getSupabase(): SupabaseClient | null {
       // React Native'de URL üzerinden oturum yakalama diye bir şey yok;
       // açık bırakılırsa her açılışta gereksiz iş yapar.
       detectSessionInUrl: false,
+      // E-posta kurtarma bağlantısındaki tek kullanımlık kod uygulamada
+      // exchangeCodeForSession ile çevrilir; jeton URL'ye konmaz.
+      flowType: 'pkce',
     },
   });
 

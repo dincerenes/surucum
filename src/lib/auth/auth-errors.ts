@@ -14,6 +14,9 @@ interface MaybeAuthError {
   name?: string;
 }
 
+const RESET_LINK_INVALID =
+  'Bu bağlantı artık geçerli değil. Bağlantıyı istediğin telefonda aç ya da yeni bir bağlantı iste.';
+
 const BY_CODE: Record<string, string> = {
   invalid_credentials: 'E-posta veya şifre hatalı.',
   email_not_confirmed: 'E-posta adresini doğrulaman gerekiyor. Gelen kutunu kontrol et.',
@@ -30,6 +33,12 @@ const BY_CODE: Record<string, string> = {
   user_not_found: 'Bu e-posta ile kayıtlı bir hesap bulunamadı.',
   session_expired: 'Oturumun sona erdi. Tekrar giriş yap.',
   signup_disabled: 'Şu anda yeni kayıt alınmıyor.',
+  // Şifre sıfırlama bağlantısı: süresi dolmuş, bir kez kullanılmış ya da
+  // başka bir telefonda istenmiş (kod doğrulayıcısı istendiği cihazda duruyor).
+  flow_state_not_found: RESET_LINK_INVALID,
+  flow_state_expired: RESET_LINK_INVALID,
+  otp_expired: RESET_LINK_INVALID,
+  bad_code_verifier: RESET_LINK_INVALID,
 };
 
 const BY_MESSAGE: [RegExp, string][] = [
@@ -48,6 +57,7 @@ const BY_MESSAGE: [RegExp, string][] = [
   [/network request failed|fetch failed|network error/i,
    'İnternet bağlantısı kurulamadı. Bağlantını kontrol et.'],
   [/token has expired|jwt expired/i, 'Oturumun sona erdi. Tekrar giriş yap.'],
+  [/code verifier|flow state/i, RESET_LINK_INVALID],
 ];
 
 export function translateAuthError(error: unknown): string {
