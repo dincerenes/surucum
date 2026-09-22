@@ -5,6 +5,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { normalizeDisplayName } from '@/lib/profile';
 import { getSupabase, isCloudConfigured } from '@/lib/supabase';
 import { translateAuthError, validatePassword } from './auth-errors';
 
@@ -32,7 +33,8 @@ interface AuthState {
 }
 
 interface AuthActions {
-  signUp(email: string, password: string): Promise<AuthResult>;
+  /** `name` hesabın metadata'sına yazılıyor; ilk kurulumda ayarlara geçer. */
+  signUp(email: string, password: string, name?: string): Promise<AuthResult>;
   signIn(email: string, password: string): Promise<AuthResult>;
   signOut(): Promise<void>;
   sendPasswordReset(email: string): Promise<AuthResult>;
@@ -121,13 +123,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string): Promise<AuthResult> => {
+  const signUp = useCallback(async (
+    email: string, password: string, name?: string,
+  ): Promise<AuthResult> => {
     const supabase = getSupabase();
     if (!supabase) return CLOUD_UNAVAILABLE;
 
+    /**
+     * Ad hesabın METADATA'sına gidiyor, ayar satırına değil: e-posta
+     * doğrulaması istenirse oturum yok ve yerel veritabanına yazacak bir
+     * hesap da yok. Kurulum bitince `completeOnboarding` onu ayara taşıyor.
+     */
+    const displayName = normalizeDisplayName(name);
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      options: displayName ? { data: { display_name: displayName } } : undefined,
     });
     if (error) return { ok: false, error: translateAuthError(error) };
 

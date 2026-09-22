@@ -23,6 +23,21 @@ export const appSettings = sqliteTable('app_settings', {
 
   /** Kullanıcı ilk kurulum akışını tamamladı mı? */
   onboardingCompletedAt: integer(),
+
+  /**
+   * Sürücünün adı — Anasayfa'daki selamlama. Kayıt olurken sorulup ilk
+   * kurulumda buraya yazılıyor; boşsa selamlama adsız ("Günaydın").
+   */
+  displayName: text(),
+
+  /** Çalıştığı şehir (81 ilden biri). Profil'de gösteriliyor. */
+  city: text(),
+
+  /**
+   * Profil resmi. Boşsa adın baş harfli hazır avatar çiziliyor. Seçilen
+   * hazır avatarın anahtarı ya da yüklenen fotoğrafın yolu (Profil fazı).
+   */
+  avatar: text(),
 });
 
 /** Kazanç hedefi. */

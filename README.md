@@ -219,7 +219,8 @@ src/
     schema/       Kanonik şema — drizzle-kit'in de tek kaynağı
     repo/         Yazma ve okuma yolu; ham insert/update yazılmıyor
   lib/            Saf aritmetik: money, business-date, profit, day-summary,
-                  shift, fuel-cost, stats, goal — hepsi veritabanı bilmez
+                  shift, fuel-cost, stats, goal, home, profile — hepsi
+                  veritabanı bilmez
   sync/           Gönderim, artımlı çekme, imleç, zamanlayıcı
   theme/          Belirteçler ve tema sağlayıcısı
 supabase/         Postgres migration'ları, RLS politikaları, tetikleyiciler
@@ -249,6 +250,25 @@ test ediliyor.
 Alt sekmeler: **Anasayfa · Kayıtlar · Sürüş · İstatistik · Profil.** "Sürüş"
 ayrı bir sekme çünkü açık vardiya bir *durum* değil, bir *yer* — sürücü gün
 boyu oraya dönüp sefer ekliyor.
+
+**Anasayfa kartlardan oluşuyor** (eski "gün defteri" düzeni kaldırıldı;
+vardiya vardiya döküm vardiya detayında): saate göre selamlama ve ilk ad,
+avatar (fotoğraf yoksa baş harf; dokununca Profil), bayat kalmış açık
+vardiya uyarısı, **Günlük kazancın** (açık vardiyada yolcu/ciro/süre ve
+Yolcu ekle, kapalıyken bugünün toplamı ve başlat; hedef girilmişse hedef
+çubuğu), **Aylık ortalama** (çalışılan gün başına cebe kalan; yolcu, km,
+saat ve ciro gün başına — km yalnızca km'si girilmiş günlerden),
+**Aracın bu ay ne kadar eridi** (yıpranma ve km), **Son 7 gün** (günlük
+cebe kalan; kaydı olmayan gün boş çubuk olarak duruyor, yutulmuyor).
+Aritmetik `src/lib/home.ts` ve `profile.ts`'te, okuma
+`src/db/repo/home.ts` (`getHomeOverview`).
+
+Ad, şehir ve avatar `app_settings` satırında (`display_name`, `city`,
+`avatar`; üçü de boş olabilir, senkronlanıyor). Kayıt ekranındaki
+isteğe bağlı **Adın** alanı ayara değil hesabın metadata'sına
+(`display_name`) yazılıyor: e-posta doğrulaması açıkken kayıttan sonra
+oturum ve yerel veritabanı yok. `completeOnboarding` adı kurulum bitince
+ayara bir kez taşıyor, ayarda zaten ad varsa dokunmuyor.
 
 ---
 
@@ -305,18 +325,17 @@ Bunlar tahmin değil, yaşanmış hataların karşılığı:
 **Faz 1 (iskelet)**, **Faz 2 (kayıt)** ve **Faz 3 (raporlar)** tamamlandı.
 **Faz 4 (yayın hazırlığı)** sürüyor.
 
+Sürücünün raporu üzerine yeniden düzenleme: Anasayfa kart düzenine geçti
+(bkz. Yapı). Profil alanları (`drizzle/0016_profile_fields.sql`,
+`supabase/migrations/20260922235107_profile_fields.sql`) buluta uygulandı.
+Sırada Profil ekranı; İstatistik kartları ve verimlilik puanı sonraya
+bırakıldı.
+
 Yayın öncesi kalanlar:
 
 - **Gerçek SMTP** bağlanması ve e-posta doğrulamasının geri açılması. Şu an
   `mailer_autoconfirm` açık ve şifre sıfırlama, üretim için desteklenmeyen
   yerleşik posta servisine bağlı.
-- **Şifre sıfırlama bağlantısının adresi** Supabase panelinde izinli
-  dönüş adreslerine eklenmeli: `surucum://sifre-yenile` (Authentication →
-  URL Configuration → Redirect URLs). Eklenmezse e-postadaki bağlantı
-  uygulamaya dönmez. Uygulama tarafı hazır: bağlantı `sifre-yenile`
-  ekranını açıyor, kod PKCE ile oturuma çevriliyor ve yeni şifre orada
-  yazılıyor. Kod, bağlantının istendiği telefonda saklı; başka cihazda
-  açılan bağlantı "artık geçerli değil" der.
 - **Uygulama içi hesap silme** — iki mağazanın da şartı.
 - **Gizlilik politikası:** taslak `docs/gizlilik-politikasi.md`. Hukukçudan
   geçmesi, herkese açık bir https adresinde yayımlanması ve kayıt ekranı ile

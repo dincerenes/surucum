@@ -26,3 +26,4 @@ export { StatTile, StatGrid } from './stat-tile';
 export { PeriodSummaryCard, periodRowsData } from './period-summary-card';
 export { ShiftCard } from './shift-card';
 export { ShiftRequired } from './shift-required';
+export { Avatar } from './avatar';

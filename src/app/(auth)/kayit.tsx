@@ -11,6 +11,7 @@ import { Notice } from '@/components/ui/notice';
 import { TextLink } from '@/components/ui/text-link';
 import { useAuth } from '@/lib/auth/auth-context';
 import { MIN_PASSWORD_LENGTH, validateEmail, validatePassword } from '@/lib/auth/auth-errors';
+import { MAX_DISPLAY_NAME } from '@/lib/profile';
 import { space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 export default function KayitScreen() {
@@ -19,6 +20,7 @@ export default function KayitScreen() {
   const router = useRouter();
   const { signUp } = useAuth();
 
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -41,7 +43,7 @@ export default function KayitScreen() {
     if (e || p || c) return;
 
     setBusy(true);
-    const result = await signUp(email, password);
+    const result = await signUp(email, password, name);
     setBusy(false);
 
     if (!result.ok) {
@@ -90,6 +92,20 @@ export default function KayitScreen() {
         {formError ? <Notice tone="error">{formError}</Notice> : null}
 
         <View style={styles.form}>
+          {/* İsteğe bağlı: Anasayfa'daki selamlama için. Boş geçen adsız selamlanır. */}
+          <Field
+            label="Adın"
+            value={name}
+            onChangeText={setName}
+            placeholder="Örn. Enes"
+            hint="Anasayfada seni adınla selamlarız. İstersen boş bırak."
+            autoComplete="name"
+            textContentType="givenName"
+            autoCapitalize="words"
+            maxLength={MAX_DISPLAY_NAME}
+            editable={!busy}
+          />
+
           <Field
             label="E-posta"
             value={email}

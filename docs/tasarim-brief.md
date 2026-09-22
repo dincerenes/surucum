@@ -287,8 +287,10 @@ Aşağıdakiler ikinci turda düzeltilecek.
 - **Beş sekme**: Anasayfa · Kayıtlar · **Sürüş** (orta, yuvarlak) · İstatistik · Profil.
   Brief'te dört sekme yazıyordu; "Sürüş"ün ayrı sekme olması daha iyi bir karar.
   Açık vardiya bir *durum* değil, bir *yer*.
-- **Anasayfa `1c`'nin "gün defteri" düzeniyle olacak** — kart tabanlı `1a` değil.
-  Çıkarma işleminin görünür olması ve "HENÜZ ÖDEMEDİĞİNİZ" başlığı korunacak.
+- ~~Anasayfa `1c`'nin "gün defteri" düzeniyle olacak~~ — **23 Eylül 2026'da değişti:**
+  sürücünün raporu üzerine Anasayfa KART düzenine geçti (selamlama, Günlük kazancın,
+  Aylık ortalama, Aracın bu ay eridi, Son 7 gün). Çıkarma işleminin görünür dökümü
+  vardiya detayında duruyor.
 - **`1e` tam ekran canlı mod** Sürüş sekmesinin içeriği olacak.
 - Palet, boşluk ölçeği, 52px dokunma hedefi aynen kalacak.
 

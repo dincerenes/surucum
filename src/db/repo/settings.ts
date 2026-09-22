@@ -14,6 +14,7 @@ import {
   type UnixMs, alive, assertOwnedIfSet, softDeleteRow, stampNew, updateOwned, withOutbox,
 } from './_base';
 import { DEFAULT_CUTOFF_HOUR } from '@/lib/business-date';
+import { blankToNull, normalizeDisplayName } from '@/lib/profile';
 import { mergeSettingsRows } from '@/lib/settings-merge';
 
 /**
@@ -83,6 +84,9 @@ export function consolidateSettings(userId: string, now: UnixMs = Date.now()): v
     defaultEarningSourceId: r.defaultEarningSourceId,
     regionCode: r.regionCode,
     onboardingCompletedAt: r.onboardingCompletedAt ?? null,
+    displayName: r.displayName ?? null,
+    city: r.city ?? null,
+    avatar: r.avatar ?? null,
   })));
   if (!merge) return;
 
@@ -113,6 +117,10 @@ export interface SettingsPatch {
   defaultEarningSourceId?: string | null;
   regionCode?: string;
   onboardingCompletedAt?: UnixMs | null;
+  /** Boş ya da yalnızca boşluksa silinir (`null`). */
+  displayName?: string | null;
+  city?: string | null;
+  avatar?: string | null;
 }
 
 /**
@@ -140,12 +148,29 @@ export function updateSettings(
     ...(patch.regionCode !== undefined ? { regionCode: patch.regionCode } : {}),
     ...(patch.onboardingCompletedAt !== undefined
       ? { onboardingCompletedAt: patch.onboardingCompletedAt } : {}),
+    ...(patch.displayName !== undefined
+      ? { displayName: normalizeDisplayName(patch.displayName) } : {}),
+    ...(patch.city !== undefined ? { city: blankToNull(patch.city) } : {}),
+    ...(patch.avatar !== undefined ? { avatar: blankToNull(patch.avatar) } : {}),
   }, now);
 }
 
-/** İlk kurulumun tamamlandığını damgalar. */
-export function completeOnboarding(userId: string, now: UnixMs = Date.now()): void {
-  updateSettings(userId, { onboardingCompletedAt: now }, now);
+/**
+ * İlk kurulumun tamamlandığını damgalar.
+ *
+ * Kayıt olurken yazılan ad (hesabın `user_metadata`'sı) burada ayarlara
+ * geçiyor — YALNIZCA ayarda ad yoksa. Kurulum hesap başına bir kez
+ * bitiyor; ad sonra Profil'den silinirse geri gelmesin diye kopyalama
+ * her açılışta değil, burada yapılıyor.
+ */
+export function completeOnboarding(
+  userId: string, signupName?: string | null, now: UnixMs = Date.now(),
+): void {
+  const hasName = getSettings(userId)?.displayName != null;
+  updateSettings(userId, {
+    onboardingCompletedAt: now,
+    ...(!hasName && signupName ? { displayName: signupName } : {}),
+  }, now);
 }
 
 export function isOnboardingComplete(userId: string): boolean {

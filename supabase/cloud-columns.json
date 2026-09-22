@@ -134,7 +134,10 @@
       "default_vehicle_id",
       "region_code",
       "default_earning_source_id",
-      "onboarding_completed_at"
+      "onboarding_completed_at",
+      "display_name",
+      "city",
+      "avatar"
     ],
     "earning_sources": [
       "id",

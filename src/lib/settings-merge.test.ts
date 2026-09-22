@@ -15,6 +15,9 @@ function row(over: Partial<MergeableSettings> = {}): MergeableSettings {
     defaultEarningSourceId: null,
     regionCode: 'TR',
     onboardingCompletedAt: null,
+    displayName: null,
+    city: null,
+    avatar: null,
     ...over,
   };
 }
@@ -70,6 +73,16 @@ describe('ayar satırlarının birleştirilmesi', () => {
       row({ id: 'yeni', createdAt: 2000, onboardingCompletedAt: 5555 }),
     ])!;
     assert.equal(m.patch.onboardingCompletedAt, 5555);
+  });
+
+  it('ad ve şehir en taze DOLU satırdan gelir', () => {
+    const m = mergeSettingsRows([
+      row({ id: 'eski', createdAt: 1000, updatedAt: 1000, displayName: 'Enes', city: 'İzmir' }),
+      // Yeni cihazda açılan boş satır adı silmemeli; şehri değiştiren satır kazanır.
+      row({ id: 'yeni', createdAt: 2000, updatedAt: 9000, displayName: null, city: 'Ankara' }),
+    ])!;
+    assert.equal(m.patch.displayName, undefined);
+    assert.equal(m.patch.city, 'Ankara');
   });
 
   it('değişiklik yoksa yama boş kalır', () => {

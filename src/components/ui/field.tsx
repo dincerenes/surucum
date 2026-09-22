@@ -20,12 +20,13 @@ interface Props {
   returnKeyType?: TextInputProps['returnKeyType'];
   onSubmitEditing?: () => void;
   editable?: boolean;
+  maxLength?: number;
 }
 
 export function Field({
   label, value, onChangeText, placeholder, error, hint,
   secure = false, keyboardType, autoComplete, textContentType,
-  autoCapitalize = 'none', returnKeyType, onSubmitEditing, editable = true,
+  autoCapitalize = 'none', returnKeyType, onSubmitEditing, editable = true, maxLength,
 }: Props) {
   const { colors } = useTheme();
   const [revealed, setRevealed] = useState(false);
@@ -58,6 +59,7 @@ export function Field({
           textContentType={textContentType}
           autoCapitalize={autoCapitalize}
           autoCorrect={false}
+          maxLength={maxLength}
           returnKeyType={returnKeyType}
           onSubmitEditing={onSubmitEditing}
           editable={editable}

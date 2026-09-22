@@ -17,3 +17,4 @@ export * from './goals';
 export * from './prefs';
 export * from './summary';
 export * from './records';
+export * from './home';

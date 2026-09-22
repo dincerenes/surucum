@@ -53,7 +53,8 @@ export default function DetailStep() {
       initialOdometerKm: parseWholeKm(odometer),
     });
     updateSettings(user.id, { defaultVehicleId: vehicle.id });
-    completeOnboarding(user.id);
+    const signupName = user.user_metadata?.display_name;
+    completeOnboarding(user.id, typeof signupName === 'string' ? signupName : null);
     requestSync();
     router.replace('/');
   }

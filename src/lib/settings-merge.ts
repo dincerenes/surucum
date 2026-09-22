@@ -26,6 +26,9 @@ export interface MergeableSettings {
   defaultEarningSourceId: string | null;
   regionCode: string;
   onboardingCompletedAt: number | null;
+  displayName: string | null;
+  city: string | null;
+  avatar: string | null;
 }
 
 export interface SettingsMerge<T> {
@@ -94,6 +97,12 @@ export function mergeSettingsRows<T extends MergeableSettings>(
   const region = firstNonNull('regionCode') as string | undefined;
   if (region != null && region !== survivor.regionCode) {
     patch.regionCode = region;
+  }
+
+  // Profil alanları da aynı kural: en taze DOLU değer.
+  for (const key of ['displayName', 'city', 'avatar'] as const) {
+    const value = firstNonNull(key) as string | undefined;
+    if (value != null && value !== survivor[key]) patch[key] = value;
   }
 
   /**
