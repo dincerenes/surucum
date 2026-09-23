@@ -28,3 +28,5 @@ export { ShiftCard } from './shift-card';
 export { ShiftRequired } from './shift-required';
 export { Avatar, AVATAR_ICONS } from './avatar';
 export { BrandBadge } from './brand-badge';
+export { ScoreRing, useScoreColor } from './score-ring';
+export { Donut, type DonutSlice } from './donut';

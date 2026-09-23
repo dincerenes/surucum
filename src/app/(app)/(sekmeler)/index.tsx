@@ -3,13 +3,17 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  AmountText, Avatar, Button, Card, GoalBar, StatGrid, StatTile,
+  AmountText, Avatar, Button, Card, GoalBar, ScoreRing, StatGrid, StatTile, useScoreColor,
 } from '@/components/ui';
-import { getCutoffHour, getHomeOverview, getSettings } from '@/db/repo';
+import {
+  type HomeScore, getCutoffHour, getHomeOverview, getHomeScore, getSettings,
+} from '@/db/repo';
 import { useDbValue } from '@/db/use-db';
 import {
-  formatBusinessDate, formatClock, monthName, toBusinessDate, todayBusinessDate, weekdayIndex,
+  type BusinessDate, formatBusinessDate, formatClock, monthName, toBusinessDate, todayBusinessDate,
+  weekdayIndex,
 } from '@/lib/business-date';
+import { SCORE_BAND_LABELS, scoreBand } from '@/lib/efficiency';
 import { type DailyBar, barRatio } from '@/lib/home';
 import { type Kurus, ZERO, formatInteger, formatKurus, sum } from '@/lib/money';
 import { firstName, greetingFor } from '@/lib/profile';
@@ -47,6 +51,7 @@ export default function HomeScreen() {
       name: settings?.displayName ?? null,
       avatar: settings?.avatar ?? null,
       overview: getHomeOverview(userId, today, at),
+      score: getHomeScore(userId, today, at),
     };
   }, [userId]);
 
@@ -86,6 +91,7 @@ export default function HomeScreen() {
 
       {data ? (
         <>
+          <ScoreCard score={data.score} today={data.today} />
           <MonthCard overview={data.overview} month={Number(data.today.slice(5, 7))} />
           <BestDayCard overview={data.overview} />
           <WeekCard bars={data.overview.week} />
@@ -212,6 +218,64 @@ function TodayCard() {
           <GoalBar goal={goal} />
         </View>
       ) : null}
+    </Pressable>
+  );
+}
+
+/**
+ * "Verimlilik puanı" — SON PUANLANMIŞ günün halkası.
+ *
+ * Puan sürücünün kendi normal gününe göre (`src/lib/efficiency.ts`).
+ * Açık vardiyalı gün puanlanmıyor — süre vardiya bitince soruluyor —
+ * o yüzden halka bugünü değil son kapanmış günü gösterebilir; tarih
+ * her zaman yazıyor. Dokununca İstatistik'teki analiz.
+ */
+function ScoreCard({ score, today }: { score: HomeScore; today: BusinessDate }) {
+  const { colors } = useTheme();
+  const colorFor = useScoreColor();
+  const latest = score.latest;
+
+  const when = latest == null
+    ? null
+    : latest.date === today ? 'bugün' : formatBusinessDate(latest.date, 'weekday');
+
+  return (
+    <Pressable
+      onPress={() => router.push('/istatistik')}
+      accessibilityRole="button"
+      accessibilityLabel="Verimlilik puanı, İstatistik'i aç"
+    >
+      <Card title="Verimlilik puanı" meta={when ?? undefined}
+        icon={{ ios: 'gauge.with.dots.needle.67percent', android: 'speed' }}>
+        <View style={styles.scoreRow}>
+          <ScoreRing score={latest?.score ?? null} size={76} />
+          <View style={styles.scoreText}>
+            {latest ? (
+              <>
+                <Text style={[typeScale.heading, { color: colorFor(latest.score) }]}>
+                  {SCORE_BAND_LABELS[scoreBand(latest.score)]}
+                </Text>
+                <Text style={[typeScale.body, { color: colors.textSoft }]}>
+                  {`${formatKurus(latest.perHour, { decimals: false })}/saat · normalin `
+                    + `${formatKurus(latest.baseline.perHour, { decimals: false })}/saat`}
+                </Text>
+                {score.average != null ? (
+                  <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+                    {`Son 30 gün ortalaman: ${score.average}`}
+                  </Text>
+                ) : null}
+              </>
+            ) : (
+              <Text style={[typeScale.body, { color: colors.textSoft }]}>
+                {score.daysUntilScore > 0
+                  ? `Vardiyasını kapattığın ${score.daysUntilScore} çalışma günü daha sonra `
+                    + 'puanın hesaplanacak. Puan seni kendi normal gününle karşılaştırır.'
+                  : 'Son 30 günde puanlanan gün yok. Puan vardiya kapanınca hesaplanır.'}
+              </Text>
+            )}
+          </View>
+        </View>
+      </Card>
     </Pressable>
   );
 }
@@ -391,6 +455,8 @@ const styles = StyleSheet.create({
   heroFacts: { flexDirection: 'row', gap: space.sm },
   heroFact: { flex: 1, borderRadius: radius.md, padding: space.md, gap: 2 },
   goalWrap: { borderRadius: radius.md, padding: space.md },
+  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: space.lg },
+  scoreText: { flex: 1, gap: 2 },
   chart: {
     flexDirection: 'row', justifyContent: 'space-between', gap: space.xs,
     minHeight: HIT_SIZE,

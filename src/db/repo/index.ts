@@ -18,5 +18,6 @@ export * from './prefs';
 export * from './summary';
 export * from './records';
 export * from './home';
+export * from './insights';
 export * from './account';
 export * from './setup';

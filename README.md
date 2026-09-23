@@ -291,6 +291,23 @@ cebe kalan; kaydı olmayan gün boş çubuk olarak duruyor, yutulmuyor).
 Aritmetik `src/lib/home.ts` ve `profile.ts`'te, okuma
 `src/db/repo/home.ts` (`getHomeOverview`).
 
+**Verimlilik puanı** (0–100, `src/lib/efficiency.ts`) sürücünün KENDİ
+geçmişine göre (23 Eylül 2026 kararı; başka sürücülerle karşılaştırma
+yok): günün saat başına cebe kalanı, önceki 30 günün ortancasına
+bölünüyor; km biliniyorsa km başına oranla 60/40 harmanlanıyor. Oran 1 →
+50 puan, 2 → 100, zarar → 0. Açık vardiyalı gün puanlanmıyor (süre
+vardiya bitince soruluyor); ölçü için önceki 30 günde en az 5 kapanmış
+gün gerekiyor. Anasayfa'da son puanlanmış günün halkası duruyor.
+
+**İstatistik kartları** (sıra kararlaştırıldı): dönem özeti (önceki
+dönemle fark ve kazanç seyri içinde), verimlilik analizi, zaman
+verimliliği, sıcak saatler, en verimli gün, yolcu analizi, km analizi,
+gider dağılımı. Aritmetik `src/lib/insights.ts`, okuma
+`src/db/repo/insights.ts` (`getStatsOverview`), çizim
+`src/components/stats/stat-cards.tsx`; halka ve pasta grafik
+`react-native-svg` ile. Platform ve ödeme şekline göre dağılım yok: yolcu
+girilirken ikisi de sorulmuyor.
+
 Ad, şehir ve avatar `app_settings` satırında (`display_name`, `city`,
 `avatar`; üçü de boş olabilir, senkronlanıyor). Kayıt ekranındaki
 isteğe bağlı **Adın** alanı ayara değil hesabın metadata'sına
@@ -366,8 +383,7 @@ silme.
   okuyamaz). Okumak için Supabase paneli → Table Editor → `feedback`.
 - **Hesap silme** `supabase/functions/delete-account` (yayında, JWT
   doğrulamalı): kullanıcı silinince bütün tabloları cascade ile gidiyor;
-  ardından cihazdaki kayıtlar `wipeLocalUserData` ile temizleniyor. Fotoğraf yükleme, bildirimler ve hukuki metinler sonraya; İstatistik
-kartları ve verimlilik puanı birlikte konuşulacak.
+  ardından cihazdaki kayıtlar `wipeLocalUserData` ile temizleniyor. Fotoğraf yükleme ve bildirimler sonraya.
 
 Yayın öncesi kalanlar:
 
