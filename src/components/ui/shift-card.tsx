@@ -70,10 +70,11 @@ export function ShiftCard({ shift, summary, currentYear }: Props) {
             {date}
           </Text>
           <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-            {formatClock(shift.startedAt)}
-            {open ? ' – şimdi' : ` – ${formatClock(shift.endedAt!)}`}
-            {' · '}
-            {formatDuration(summary.durationMinutes)}
+            {/* Açık vardiyada süre yok — saat vardiya bitince soruluyor. */}
+            {open
+              ? `açılış ${formatClock(shift.startedAt)}`
+              : `${formatClock(shift.startedAt)} – ${formatClock(shift.endedAt!)} · ${
+                formatDuration(summary.durationMinutes)}`}
           </Text>
         </View>
 

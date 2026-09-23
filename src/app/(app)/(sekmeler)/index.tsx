@@ -8,12 +8,12 @@ import {
 import { getCutoffHour, getHomeOverview, getSettings } from '@/db/repo';
 import { useDbValue } from '@/db/use-db';
 import {
-  formatBusinessDate, monthName, todayBusinessDate, weekdayIndex,
+  formatBusinessDate, formatClock, monthName, toBusinessDate, todayBusinessDate, weekdayIndex,
 } from '@/lib/business-date';
 import { type DailyBar, barRatio } from '@/lib/home';
 import { type Kurus, ZERO, formatInteger, formatKurus, sum } from '@/lib/money';
 import { firstName, greetingFor } from '@/lib/profile';
-import { formatDuration, isShiftStale } from '@/lib/shift';
+import { earningsPerRide, formatDuration, isShiftStale } from '@/lib/shift';
 import { upperTr } from '@/lib/text';
 import { useDriver } from '@/lib/use-driver';
 import { useNow } from '@/lib/use-now';
@@ -78,9 +78,9 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      {openShift && stale ? <StaleShiftCard startedAt={openShift.startedAt} now={now} /> : null}
+      {openShift && stale ? <StaleShiftCard startedAt={openShift.startedAt} /> : null}
 
-      <TodayCard now={now} />
+      <TodayCard />
 
       {data ? (
         <>
@@ -96,22 +96,20 @@ export default function HomeScreen() {
 /**
  * Açık unutulmuş vardiya — kartların üstünde, sarı.
  *
- * Kapanmayan vardiya saatleri ve gün başına ortalamaları şişiriyor.
- * Yalnızca uyarmak yetmez: düğme bitirme sihirbazını açıyor, orada bitiş
- * saati düzeltilebiliyor.
+ * Kapanmayan vardiyanın yolcuları hiçbir kapanmış günün hesabına girmiyor.
+ * Yalnızca uyarmak yetmez: düğme bitirme sihirbazını açıyor.
  */
-function StaleShiftCard({ startedAt, now }: { startedAt: number; now: number }) {
+function StaleShiftCard({ startedAt }: { startedAt: number }) {
   const { colors } = useTheme();
-  const hours = Math.floor((now - startedAt) / 3_600_000);
 
   return (
     <View style={[styles.stale, { backgroundColor: colors.warningSoft }]}>
       <Text style={[typeScale.heading, { color: colors.warning }]}>
-        Vardiyan {formatInteger(hours)} saattir açık
+        Vardiyan uzun süredir açık
       </Text>
       <Text style={[typeScale.body, { color: colors.warning }]}>
-        Bitirmeyi unuttuysan şimdi kapat. Bitiş saatini düzeltebilirsin; yoksa
-        süre ve ortalamalar şişer.
+        {`Açılış: ${formatBusinessDate(toBusinessDate(startedAt), 'weekday')} ${
+          formatClock(startedAt)}. Bitirmeyi unuttuysan şimdi kapat.`}
       </Text>
       <Button label="Vardiyayı bitir" variant="secondary"
         onPress={() => router.push('/vardiya-bitir')} />
@@ -127,24 +125,26 @@ function StaleShiftCard({ startedAt, now }: { startedAt: number; now: number }) 
  * düğmeler olunca hangisinin "asıl" yer olduğu bulanıklaşıyordu. Karta
  * dokunmak Sürüş'ü açıyor.
  *
- * Vardiya AÇIKKEN canlı: bu vardiyanın cirosu, yolcusu, süresi. Büyük
+ * Vardiya AÇIKKEN canlı: bu vardiyanın cirosu ve yolcusu. Büyük
  * sayı CİRO — komisyon ve yakıt vardiya biterken soruluyor, bilinmeyen
  * kesintiyi düşülmüş gibi göstermek sayıya güveni bitirir.
  * Vardiya KAPALIYKEN bugünün cebe kalanı.
  */
-function TodayCard({ now }: { now: number }) {
+function TodayCard() {
   const { colors } = useTheme();
   const { openShift, shiftRides, shiftGross, goal, summary } = useDriver();
   const on = colors.accentText;
 
   const worked = summary?.hasActivity ?? false;
-  const minutes = openShift
-    ? Math.max(0, Math.floor((now - openShift.startedAt) / 60_000)) : 0;
-
+  // Süre YOK: çalışılan saat vardiya bitince soruluyor, açıkken sayaç işlemiyor.
+  const perRide = earningsPerRide(shiftGross, shiftRides.length);
   const facts: { value: string; label: string }[] = openShift
     ? [
       { value: formatInteger(shiftRides.length), label: 'yolcu' },
-      { value: formatDuration(minutes), label: 'süre' },
+      {
+        value: perRide == null ? '—' : formatKurus(perRide, { decimals: false }),
+        label: 'yolcu başı',
+      },
     ]
     : worked && summary
       ? [

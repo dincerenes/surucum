@@ -17,7 +17,7 @@ import { type BusinessDate, todayBusinessDate } from '@/lib/business-date';
 import type { DaySummary } from '@/lib/day-summary';
 import { type GoalProgress, calculateGoalProgress } from '@/lib/goal';
 import { type Kurus, ZERO, add } from '@/lib/money';
-import { isShiftStale, resolveShiftDuration } from '@/lib/shift';
+import { isShiftStale } from '@/lib/shift';
 import type { Ride, Shift } from '@/db/schema/earnings';
 import type { Vehicle } from '@/db/schema/vehicles';
 import { resolveWorkingVehicle } from '@/lib/vehicle-resolve';
@@ -39,8 +39,6 @@ export interface DriverState {
   openShift: Shift | null;
   /** Açık vardiya eşiği aştı mı? Arayüz sormak zorunda. */
   shiftIsStale: boolean;
-  /** Açık vardiyanın şu ana kadarki süresi, dakika. */
-  openShiftMinutes: number;
   /**
    * Ekranda gösterilen iş günü.
    *
@@ -76,7 +74,7 @@ export interface DriverState {
 const EMPTY: DriverState = {
   userId: null, vehicle: null, nextVehicle: null, vehicleDiverged: false,
   needsSetup: true, openShift: null,
-  shiftIsStale: false, openShiftMinutes: 0,
+  shiftIsStale: false,
   today: todayBusinessDate(), summary: null, rides: [],
   shiftRides: [], shiftGross: ZERO, goal: null,
 };
@@ -125,9 +123,6 @@ export function useDriver(): DriverState {
       needsSetup: next == null,
       openShift,
       shiftIsStale: openShift ? isShiftStale(openShift, now) : false,
-      openShiftMinutes: openShift
-        ? resolveShiftDuration({ ...openShift, distanceKm: openShift.distanceKm }, now).minutes
-        : 0,
       today: activeDate,
       summary,
       rides: listRidesOnDate(userId, activeDate),

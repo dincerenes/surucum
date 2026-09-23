@@ -32,10 +32,9 @@ describe('resolveShiftDuration', () => {
     assert.equal(d.isEstimated, true);
   });
 
-  it('açık vardiyada şu ana kadarki süre — canlı sayaç', () => {
+  it('açık vardiyanın süresi YOK — canlı sayaç yok, saat bitince soruluyor', () => {
     const d = resolveShiftDuration(timing(), T0 + 3 * H + 15 * M);
-    assert.equal(d.minutes, 195);
-    assert.equal(d.isEstimated, true);
+    assert.equal(d.minutes, 0);
   });
 
   it('sıfır ve negatif yazılan süre yok sayılır, damgaya düşülür', () => {

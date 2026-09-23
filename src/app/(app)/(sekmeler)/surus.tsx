@@ -46,7 +46,6 @@ export default function DriveScreen() {
     requestSync();
   }} />;
 
-  const minutes = state.openShiftMinutes;
   const rides = state.shiftRides;
   const gross = state.shiftGross;
   /**
@@ -73,18 +72,15 @@ export default function DriveScreen() {
         <Text style={[styles.eyebrow, { color: colors.positive }]}>CANLI VARDİYA</Text>
       </View>
 
-      <Text style={[styles.clock, { color: colors.text }]}>
-        {Math.floor(minutes / 60)}:{String(minutes % 60).padStart(2, '0')}
-      </Text>
-      <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-        saat : dakika · direksiyonda
-      </Text>
-
+      {/*
+        Süre sayacı YOK: çalışılan saat vardiya bitince soruluyor. Ekranın
+        büyük sayısı bu vardiyanın cirosu.
+      */}
       <View style={styles.cash}>
         <Text style={[styles.eyebrow, { color: colors.textFaint }]}>BU VARDİYANIN CİROSU</Text>
-        <AmountText value={gross} size="display" />
+        <AmountText value={gross} size="display" style={styles.bigCash} />
         <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-          komisyon ve yakıt vardiya sonunda düşülür
+          {`açılış ${formatClock(openShift.startedAt)} · komisyon ve yakıt vardiya sonunda düşülür`}
         </Text>
       </View>
 
@@ -265,8 +261,8 @@ const styles = StyleSheet.create({
   liveHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   dot: { width: 8, height: 8, borderRadius: 4 },
   eyebrow: { ...typeScale.label, letterSpacing: 1 },
-  clock: { fontSize: 72, fontWeight: '700', letterSpacing: -2, fontVariant: ['tabular-nums'] },
-  cash: { marginTop: space.xl, gap: space.xs },
+  cash: { marginTop: space.lg, gap: space.xs },
+  bigCash: { fontSize: 56, lineHeight: 64, letterSpacing: -1.5 },
   stats: { flexDirection: 'row', gap: space.sm, marginTop: space.lg },
   feed: { flex: 1, marginTop: space.lg },
   feedBody: { paddingBottom: space.lg },

@@ -30,7 +30,7 @@ export const STALE_SHIFT_HOURS = 16;
 
 export interface ShiftTiming {
   startedAt: UnixMs;
-  /** Boşsa vardiya açıktır — sürücü şu an direksiyonda. */
+  /** Boşsa vardiya açıktır. */
   endedAt: UnixMs | null;
   /** Sürücünün yazdığı fiilî süre. Damgalardan çıkan farkı EZER. */
   workedMinutes: number | null;
@@ -54,20 +54,25 @@ export interface ShiftDuration {
  * Vardiyanın süresi.
  *
  * Öncelik sırası:
- * 1. Sürücünün yazdığı `workedMinutes` — mola düşülmüş, gerçek
- * 2. `endedAt − startedAt` — kapalı vardiyanın damga farkı
- * 3. `now − startedAt` — açık vardiyanın canlı sayacı
+ * 1. Sürücünün vardiya sonunda yazdığı `workedMinutes` — mola düşülmüş, gerçek
+ * 2. `endedAt − startedAt` — soruyu boş geçtiyse kapalı vardiyanın damga farkı
+ *
+ * AÇIK VARDİYANIN SÜRESİ YOK (sıfır). Çalışılan saat vardiya bitince
+ * soruluyor; açıkken işleyen bir sayaç sürücünün istemediği bir mantık:
+ * mola, bekleme ve özel işler sayaca giriyor, ekrandaki süre gerçeği
+ * söylemiyordu. Açık vardiya saat başına oranlara da girmez.
  */
 export function resolveShiftDuration(
-  shift: ShiftTiming, now: UnixMs,
+  shift: ShiftTiming, _now?: UnixMs,
 ): ShiftDuration {
   const entered = shift.workedMinutes;
   if (entered != null && Number.isFinite(entered) && entered > 0) {
     return { minutes: Math.floor(entered), isEstimated: false };
   }
 
-  const end = shift.endedAt ?? now;
-  const span = end - shift.startedAt;
+  if (shift.endedAt == null) return { minutes: 0, isEstimated: true };
+
+  const span = shift.endedAt - shift.startedAt;
   if (!Number.isFinite(span) || span <= 0) {
     return { minutes: 0, isEstimated: true };
   }
