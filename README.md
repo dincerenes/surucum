@@ -296,8 +296,8 @@ geçmişine göre (23 Eylül 2026 kararı; başka sürücülerle karşılaştır
 yok): günün saat başına cebe kalanı, önceki 30 günün ortancasına
 bölünüyor; km biliniyorsa km başına oranla 60/40 harmanlanıyor. Oran 1 →
 50 puan, 2 → 100, zarar → 0. Açık vardiyalı gün puanlanmıyor (süre
-vardiya bitince soruluyor); ölçü için önceki 30 günde en az 5 kapanmış
-gün gerekiyor. Anasayfa'da son puanlanmış günün halkası duruyor.
+vardiya bitince soruluyor). Bekleme yok: önceki günü olmayan ilk gün
+kendi ölçüsü (50). Anasayfa'da son puanlanmış günün halkası duruyor.
 
 **İstatistik kartları** (sıra kararlaştırıldı): dönem özeti (önceki
 dönemle fark ve kazanç seyri içinde), verimlilik analizi, zaman
@@ -305,8 +305,10 @@ verimliliği, sıcak saatler, en verimli gün, yolcu analizi, km analizi,
 gider dağılımı. Aritmetik `src/lib/insights.ts`, okuma
 `src/db/repo/insights.ts` (`getStatsOverview`), çizim
 `src/components/stats/stat-cards.tsx`; halka ve pasta grafik
-`react-native-svg` ile. Platform ve ödeme şekline göre dağılım yok: yolcu
-girilirken ikisi de sorulmuyor.
+`react-native-svg` ile. Kartlar kayıt yokken de sıfırla görünüyor;
+"5 gün kaldı" gibi bekleme yazısı yok (sürücünün kararı: kullanmaya
+başlamadan neyin geleceğini görsün). Platform ve ödeme şekline göre
+dağılım yok: yolcu girilirken ikisi de sorulmuyor.
 
 Ad, şehir ve avatar `app_settings` satırında (`display_name`, `city`,
 `avatar`; üçü de boş olabilir, senkronlanıyor). Kayıt ekranındaki

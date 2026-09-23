@@ -151,8 +151,6 @@ export function kmStats(days: readonly DayEntry[]): KmStats {
 // Sıcak saatler
 // ---------------------------------------------------------------------------
 
-/** Sıcak saatlerin ekranda anlam taşıması için gereken en az yolcu. */
-export const MIN_RIDES_FOR_HOURS = 20;
 /** "En yoğun saatlerin" penceresinin genişliği. */
 export const HOT_WINDOW_HOURS = 3;
 

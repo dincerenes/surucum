@@ -16,12 +16,15 @@
  * - Oran 1 ise puan 50: "normal günün". 1,4 → 70, 2 → 100 (tavan),
  *   0,6 → 30. Zarar edilen gün 0.
  *
- * PUANLANMAYAN GÜN
- * - Açık vardiyası olan gün: açık vardiyanın süresi yok (vardiya bitince
- *   soruluyor), yolcuları ise sayılıyor — saat başına oran şişer.
- * - Önceki 30 günde puanlanabilir en az `MIN_BASELINE_DAYS` gün yoksa:
- *   iki günlük geçmişe "normalin" demek sürücüye bilmediğimiz bir şeyi
- *   biliyormuş gibi söylemek olur.
+ * BEKLEME YOK (sürücünün kararı, 23 Eylül 2026): puan ilk kapanan
+ * günden itibaren görünüyor. Önceki günü olmayan ilk gün kendi ölçüsü —
+ * 50, "normal günün". Geçmiş biriktikçe ölçü oturuyor; ilk günlerin
+ * puanı oynak, bu bilerek kabul edildi: sürücü kartı boş beklemek
+ * yerine dolu görmek istiyor.
+ *
+ * PUANLANMAYAN GÜN: açık vardiyası olan gün. Açık vardiyanın süresi yok
+ * (vardiya bitince soruluyor), yolcuları ise sayılıyor — saat başına oran
+ * şişer.
  *
  * Veritabanı bilmez; gün özetlerini alır.
  */
@@ -32,8 +35,6 @@ import type { DayEntry } from './stats.ts';
 
 /** Ölçünün geriye baktığı gün sayısı. */
 export const BASELINE_WINDOW_DAYS = 30;
-/** Ölçü için gereken en az puanlanabilir gün. */
-export const MIN_BASELINE_DAYS = 5;
 
 const HOUR_WEIGHT = 0.6;
 const KM_WEIGHT = 0.4;
@@ -66,31 +67,30 @@ export interface Baseline {
   dayCount: number;
   /** Normal gününün saat başına cebe kalanı (ortanca). */
   perHour: Kurus;
-  /** Normal gününün km başına cebe kalanı. Yeterli km yoksa `null`. */
+  /** Normal gününün km başına cebe kalanı. Km yoksa `null`. */
   perKm: Kurus | null;
 }
 
 /**
  * `date`'ten ÖNCEKİ 30 günün ölçüsü. O günün kendisi dahil değil: bir
- * günü kendisiyle karşılaştırmak onu hep "normale" çeker.
+ * günü kendisiyle karşılaştırmak onu hep "normale" çeker. Önceki gün
+ * yoksa `null` — o gün kendi ölçüsü olur (`scoreDay`).
  *
- * Ortanca sıfır ya da negatifse ölçü yok: zararlı bir "normal"e bölmek
- * işareti ters çevirir, kötü günü iyi gösterir.
+ * Ortanca sıfır ya da negatif olabilir (geçmiş hep zararlı);
+ * `scoreDay` bunu ayrıca ele alıyor.
  */
 export function baselineFor(
   entries: readonly DayEntry[], date: BusinessDate,
 ): Baseline | null {
   const from = addDays(date, -BASELINE_WINDOW_DAYS);
   const window = entries.filter((e) => e.date >= from && e.date < date && isScorable(e));
-  if (window.length < MIN_BASELINE_DAYS) return null;
+  if (window.length === 0) return null;
 
-  const perHour = median(window.map((e) => e.summary.perHour!));
-  if (perHour == null || perHour <= 0) return null;
-
+  const perHour = median(window.map((e) => e.summary.perHour!))!;
   const kms = window
     .map((e) => e.summary.perKm)
     .filter((v): v is Kurus => v != null);
-  const perKm = kms.length >= MIN_BASELINE_DAYS ? median(kms) : null;
+  const perKm = median(kms);
 
   return {
     dayCount: window.length,
@@ -116,22 +116,40 @@ export interface DayScore {
   usedKm: boolean;
 }
 
-/** Tek günün puanı. Puanlanamıyorsa `null`. */
+/**
+ * Tek günün puanı. Puanlanamıyorsa (açık vardiya) `null`.
+ *
+ * Ölçü yoksa (ilk gün) gün kendi ölçüsü: 50.
+ */
 export function scoreDay(entry: DayEntry, baseline: Baseline | null): DayScore | null {
-  if (!baseline || !isScorable(entry)) return null;
+  if (!isScorable(entry)) return null;
   const s = entry.summary;
-  const hourRatio = s.perHour! / baseline.perHour;
-  const usedKm = s.perKm != null && baseline.perKm != null;
-  const ratio = usedKm
-    ? HOUR_WEIGHT * hourRatio + KM_WEIGHT * (s.perKm! / baseline.perKm!)
-    : hourRatio;
+  const base: Baseline = baseline ?? {
+    dayCount: 0,
+    perHour: s.perHour!,
+    perKm: s.perKm != null && s.perKm > 0 ? s.perKm : null,
+  };
+  const usedKm = s.perKm != null && base.perKm != null;
+  const result = (score: number): DayScore => ({
+    date: entry.date, score, perHour: s.perHour!, perKm: s.perKm, baseline: base, usedKm,
+  });
 
   /**
    * Zarar edilen gün her durumda 0: km oranı pozitif kalıp saat oranının
    * eksisini örtmesin.
    */
-  const score = s.profit.cashProfit <= 0 ? 0 : ratioToScore(ratio);
-  return { date: entry.date, score, perHour: s.perHour!, perKm: s.perKm, baseline, usedKm };
+  if (s.profit.cashProfit <= 0) return result(0);
+  /**
+   * Geçmiş hep zararlıysa oran anlamsız (negatife bölmek işareti ters
+   * çevirir); kâra geçen gün normalinin açıkça üstünde — tavan.
+   */
+  if (base.perHour <= 0) return result(100);
+
+  const hourRatio = s.perHour! / base.perHour;
+  const ratio = usedKm
+    ? HOUR_WEIGHT * hourRatio + KM_WEIGHT * (s.perKm! / base.perKm!)
+    : hourRatio;
+  return result(ratioToScore(ratio));
 }
 
 /**
@@ -173,14 +191,3 @@ export const SCORE_BAND_LABELS: Record<ScoreBand, string> = {
   low: 'Normalin altında',
   poor: 'Zayıf',
 };
-
-/**
- * Puan henüz yoksa kaç puanlanabilir gün daha gerekiyor — "puanın 3 gün
- * sonra hesaplanacak". Son 30 güne bakılıyor, bugün dahil.
- */
-export function daysUntilScore(entries: readonly DayEntry[], today: BusinessDate): number {
-  const from = addDays(today, -BASELINE_WINDOW_DAYS);
-  const have = entries.filter((e) => e.date >= from && e.date <= today && isScorable(e)).length;
-  /** Ölçü 5 gün + puanlanacak 1 gün. */
-  return Math.max(0, MIN_BASELINE_DAYS + 1 - have);
-}

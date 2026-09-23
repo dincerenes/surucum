@@ -1,8 +1,10 @@
 /**
  * İstatistik kartları — ekran `src/app/(app)/(sekmeler)/istatistik.tsx`.
  *
- * Her kart tek bir soruya cevap veriyor ve verisi yetmediğinde susuyor:
- * "henüz yeterli kayıt yok" yanlış bir sayıdan iyidir. Hesapların hepsi
+ * Kartlar HER ZAMAN görünüyor, kayıt yokken sıfırla (sürücünün kararı,
+ * 23 Eylül 2026): "5 gün kaldı", "20 yolcu kaldı" gibi bekleme yazıları
+ * yok. Sürücü uygulamayı kullanmaya başlamadan neyin geleceğini görüyor;
+ * ilk yolcudan itibaren sayılar doluyor. Hesapların hepsi
  * `src/lib/insights.ts` ve `efficiency.ts` içinde; burada yalnızca çizim.
  */
 
@@ -16,7 +18,7 @@ import {
   type BusinessDate, MONTHS_TR, WEEKDAYS_TR, formatBusinessDate, weekdayIndex,
 } from '@/lib/business-date';
 import { SCORE_BAND_LABELS, scoreBand } from '@/lib/efficiency';
-import { MIN_RIDES_FOR_HOURS, trendRatio } from '@/lib/insights';
+import { trendRatio } from '@/lib/insights';
 import { type Kurus, formatDecimal, formatInteger, formatKurus } from '@/lib/money';
 import { PERIOD_LABELS, PREVIOUS_PERIOD_LABELS, type PeriodKey } from '@/lib/period';
 import { formatDuration } from '@/lib/shift';
@@ -24,23 +26,24 @@ import { percentChange } from '@/lib/stats';
 import { accentStep, radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 /**
- * "Hangi gün daha kazançlı" için gereken en az gün. Tek günlük veriyle
- * "Cumartesi en kazançlı günün" demek bilmediğimiz bir şeyi söylemek.
+ * Boş değer SIFIR yazılıyor, tire değil (sürücünün kararı, 23 Eylül
+ * 2026): kartlar ilk kayıttan önce de dolu duruyor, sürücü neyin
+ * geleceğini görüyor.
  */
-const MIN_DAYS_FOR_WEEKDAY = 5;
-
-const money = (v: Kurus | null) => (v == null ? '—' : formatKurus(v, { decimals: false }));
+const money0 = (v: Kurus | null | undefined) => formatKurus(v ?? 0, { decimals: false });
 /** Km başına tutarlar küçük: 5,90 ₺'yi 6 ₺ diye yuvarlamak farkı siler. */
-const moneyFine = (v: Kurus | null) => (v == null ? '—' : formatKurus(v));
+const moneyFine0 = (v: Kurus | null | undefined) => formatKurus(v ?? 0);
+const decimal0 = (v: number | null) => (v == null || v === 0 ? '0' : formatDecimal(v));
+
+/**
+ * Kısa gün adları. Adın ilk harflerini kesmek Cuma ile Cumartesi'yi
+ * ikisini de "Cum" yapıyordu.
+ */
+const WEEKDAY_SHORT = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 
 function Note({ children }: { children: React.ReactNode }) {
   const { colors } = useTheme();
   return <Text style={[typeScale.caption, { color: colors.textFaint }]}>{children}</Text>;
-}
-
-function Waiting({ children }: { children: React.ReactNode }) {
-  const { colors } = useTheme();
-  return <Text style={[typeScale.body, { color: colors.textSoft }]}>{children}</Text>;
 }
 
 // ---------------------------------------------------------------------------
@@ -66,10 +69,10 @@ export function PeriodCard({ data, period }: { data: StatsOverview; period: Peri
     >
       <ProfitRows data={periodRowsData(t)} />
 
-      {period !== 'all' && prev && prev.workedDayCount > 0 ? (
+      {period !== 'all' && prev ? (
         <View style={[styles.compare, { backgroundColor: colors.surfaceSunken }]}>
           <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-            {PREVIOUS_PERIOD_LABELS[period]}: {formatKurus(prev.cashProfit, { decimals: false })} cebe kalan
+            {PREVIOUS_PERIOD_LABELS[period]}: {money0(prev.cashProfit)} cebe kalan
           </Text>
           {change != null ? (
             <Text style={[typeScale.bodyStrong, { color: change >= 0 ? colors.positive : colors.negative }]}>
@@ -89,12 +92,12 @@ const TREND_HEIGHT = 72;
 function Trend({ data, period }: { data: StatsOverview; period: PeriodKey }) {
   const { colors } = useTheme();
   const { unit, bars } = data.trend;
-  if (bars.length < 2) return null;
+  if (bars.length === 0) return null;
 
   const label = (key: string) => (unit === 'month'
     ? MONTHS_TR[Number(key.slice(5, 7)) - 1].slice(0, 3)
     : period === 'week'
-      ? WEEKDAYS_TR[weekdayIndex(key as BusinessDate)].slice(0, 2)
+      ? WEEKDAY_SHORT[weekdayIndex(key as BusinessDate)]
       : String(Number(key.slice(8, 10))));
 
   /**
@@ -145,6 +148,8 @@ function Trend({ data, period }: { data: StatsOverview; period: PeriodKey }) {
 // ---------------------------------------------------------------------------
 
 const SCORE_BAR_HEIGHT = 48;
+/** Hiç puan yokken çizilen boş çubuk sayısı — kartın iskeleti görünsün. */
+const EMPTY_SCORE_BARS = 7;
 
 export function EfficiencyCard({ data }: { data: StatsOverview }) {
   const { colors } = useTheme();
@@ -155,52 +160,43 @@ export function EfficiencyCard({ data }: { data: StatsOverview }) {
 
   return (
     <Card title="Verimlilik analizi" icon={{ ios: 'gauge.with.dots.needle.67percent', android: 'speed' }}>
-      {avg == null ? (
-        <Waiting>
-          {data.daysUntilScore > 0
-            ? `Puanın, vardiyasını kapattığın ${data.daysUntilScore} çalışma günü daha sonra hesaplanacak. `
-              + 'Puan seni kendi normal gününle karşılaştırıyor; önce normalini öğrenmem gerekiyor.'
-            : 'Bu dönemde puanlanan gün yok. Puan, vardiyası kapanmış günlere veriliyor.'}
-        </Waiting>
-      ) : (
-        <>
-          <View style={styles.scoreHead}>
-            <ScoreRing score={avg} size={84} />
-            <View style={styles.scoreText}>
-              <Text style={[typeScale.heading, { color: colorFor(avg) }]}>
-                {SCORE_BAND_LABELS[scoreBand(avg)]}
-              </Text>
-              <Text style={[typeScale.body, { color: colors.textSoft }]}>
-                {`${formatInteger(data.scores.length)} günün ortalama puanı`}
-              </Text>
-              {latest ? (
-                <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-                  {`Normal günün: ${money(latest.baseline.perHour)}/saat`
-                    + (latest.baseline.perKm != null ? ` · ${moneyFine(latest.baseline.perKm)}/km` : '')}
-                </Text>
-              ) : null}
-            </View>
-          </View>
+      <View style={styles.scoreHead}>
+        <ScoreRing score={avg ?? 0} size={84} />
+        <View style={styles.scoreText}>
+          <Text style={[typeScale.heading, { color: avg == null ? colors.textFaint : colorFor(avg) }]}>
+            {avg == null ? 'Henüz puanlanan gün yok' : SCORE_BAND_LABELS[scoreBand(avg)]}
+          </Text>
+          <Text style={[typeScale.body, { color: colors.textSoft }]}>
+            {`${formatInteger(data.scores.length)} günün ortalama puanı`}
+          </Text>
+          <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+            {`Normal günün: ${money0(latest?.baseline.perHour)}/saat`
+              + ` · ${moneyFine0(latest?.baseline.perKm)}/km`}
+          </Text>
+        </View>
+      </View>
 
-          {shown.length > 1 ? (
-            <View style={[styles.scoreBars, { gap: shown.length > 12 ? 2 : space.xs }]}>
-              {shown.map((s) => (
-                <View key={s.date} style={[styles.scoreTrack, { backgroundColor: colors.surfaceSunken }]}>
-                  <View style={{
-                    height: Math.max(3, (s.score / 100) * SCORE_BAR_HEIGHT),
-                    backgroundColor: colorFor(s.score),
-                    borderRadius: 3,
-                  }} />
-                </View>
-              ))}
+      <View style={[styles.scoreBars, { gap: shown.length > 12 ? 2 : space.xs }]}>
+        {shown.length > 0
+          ? shown.map((s) => (
+            <View key={s.date} style={[styles.scoreTrack, { backgroundColor: colors.surfaceSunken }]}>
+              <View style={{
+                height: Math.max(3, (s.score / 100) * SCORE_BAR_HEIGHT),
+                backgroundColor: colorFor(s.score),
+                borderRadius: 3,
+              }} />
             </View>
-          ) : null}
-        </>
-      )}
+          ))
+          : Array.from({ length: EMPTY_SCORE_BARS }, (_, i) => (
+            <View key={i} style={[styles.scoreTrack, { backgroundColor: colors.surfaceSunken }]} />
+          ))}
+      </View>
+
       <Note>
-        {'50 puan senin normal günün: son 30 gündeki saat başına (ve km girildiyse km '
-          + 'başına) cebe kalanının ortancası. 70 üstü normalinden iyi, 30 altı zayıf bir gün. '
-          + 'Başka sürücülerle karşılaştırılmıyorsun.'}
+        {'50 puan senin normal günün: önceki 30 gündeki saat başına (ve km girildiyse km '
+          + 'başına) cebe kalanının ortancası. İlk günün kendi ölçün. 70 üstü normalinden iyi, '
+          + '30 altı zayıf bir gün. Puan vardiya kapanınca hesaplanır; başka sürücülerle '
+          + 'karşılaştırılmıyorsun.'}
       </Note>
     </Card>
   );
@@ -214,30 +210,15 @@ export function TimeCard({ data }: { data: StatsOverview }) {
   const t = data.time;
   return (
     <Card title="Zaman verimliliği" icon={{ ios: 'clock.fill', android: 'schedule' }}>
-      {t.dayCount === 0 ? (
-        <Waiting>Vardiyanı kapatıp çalıştığın süreyi girince saat başına kazancın burada görünecek.</Waiting>
-      ) : (
-        <>
-          <StatGrid>
-            <StatTile value={money(t.perHour)} label="saat başına cebe kalan" />
-            <StatTile value={formatDuration(t.totalMinutes)} label="toplam çalışma" />
-            <StatTile
-              value={t.minutesPerShift == null ? '—' : formatDuration(t.minutesPerShift)}
-              label="ortalama vardiya"
-            />
-            <StatTile
-              value={t.ridesPerHour == null ? '—' : formatDecimal(t.ridesPerHour)}
-              label="saatte yolcu"
-            />
-            <StatTile
-              value={t.minutesPerRide == null ? '—' : formatDuration(t.minutesPerRide)}
-              label="yolcu başına süre"
-            />
-            <StatTile value={formatInteger(t.closedShiftCount)} label="kapanan vardiya" />
-          </StatGrid>
-          <Note>Açık vardiya hesaba girmiyor: süresi vardiya bitince soruluyor.</Note>
-        </>
-      )}
+      <StatGrid>
+        <StatTile value={money0(t.perHour)} label="saat başına cebe kalan" />
+        <StatTile value={formatDuration(t.totalMinutes)} label="toplam çalışma" />
+        <StatTile value={formatDuration(t.minutesPerShift ?? 0)} label="ortalama vardiya" />
+        <StatTile value={decimal0(t.ridesPerHour)} label="saatte yolcu" />
+        <StatTile value={formatDuration(t.minutesPerRide ?? 0)} label="yolcu başına süre" />
+        <StatTile value={formatInteger(t.closedShiftCount)} label="kapanan vardiya" />
+      </StatGrid>
+      <Note>Açık vardiya hesaba girmiyor: süresi vardiya bitince soruluyor.</Note>
     </Card>
   );
 }
@@ -252,50 +233,38 @@ const pad = (h: number) => String(h).padStart(2, '0');
 export function HotHoursCard({ data }: { data: StatsOverview }) {
   const { colors } = useTheme();
   const hot = data.hot;
-  const enough = data.hourRideCount >= MIN_RIDES_FOR_HOURS;
   const inHot = (h: number) => hot != null
     && ((h - hot.startHour + 24) % 24) < ((hot.endHour - hot.startHour + 24) % 24 || 24);
 
   return (
     <Card title="Sıcak saatler" icon={{ ios: 'flame.fill', android: 'local_fire_department' }}>
-      {!enough ? (
-        <Waiting>
-          {`Yolcuların hangi saatlerde yoğunlaştığını ${MIN_RIDES_FOR_HOURS} yolcudan sonra `
-            + `göstereceğim. ${MIN_RIDES_FOR_HOURS - data.hourRideCount} yolcu kaldı.`}
-        </Waiting>
-      ) : (
-        <>
-          {hot ? (
-            <Text style={[typeScale.body, { color: colors.textSoft }]}>
-              En yoğun saatlerin{' '}
-              <Text style={{ color: colors.text, fontWeight: '700' }}>
-                {pad(hot.startHour)}:00–{pad(hot.endHour)}:00
-              </Text>
-              {` — yolcularının %${Math.round(hot.share * 100)}'i bu 3 saatte.`}
-            </Text>
-          ) : null}
-          <View style={styles.hours}>
-            {data.hours.map((b) => (
-              <View key={b.hour} style={styles.hourCol}>
-                <View style={[styles.hourTrack, { backgroundColor: colors.surfaceSunken }]}>
-                  <View style={{
-                    height: b.rideCount > 0 ? Math.max(3, b.ratio * HOUR_BAR_HEIGHT) : 0,
-                    backgroundColor: inHot(b.hour) ? colors.warning : colors.accentScale[3],
-                    borderRadius: 2,
-                  }} />
-                </View>
-              </View>
-            ))}
+      <Text style={[typeScale.body, { color: colors.textSoft }]}>
+        En yoğun saatlerin{' '}
+        <Text style={{ color: colors.text, fontWeight: '700' }}>
+          {hot ? `${pad(hot.startHour)}:00–${pad(hot.endHour)}:00` : '—'}
+        </Text>
+        {hot ? ` — yolcularının %${Math.round(hot.share * 100)}'i bu 3 saatte.` : ''}
+      </Text>
+      <View style={styles.hours}>
+        {data.hours.map((b) => (
+          <View key={b.hour} style={styles.hourCol}>
+            <View style={[styles.hourTrack, { backgroundColor: colors.surfaceSunken }]}>
+              <View style={{
+                height: b.rideCount > 0 ? Math.max(3, b.ratio * HOUR_BAR_HEIGHT) : 0,
+                backgroundColor: inHot(b.hour) ? colors.warning : colors.accentScale[3],
+                borderRadius: 2,
+              }} />
+            </View>
           </View>
-          <View style={styles.hourTicks}>
-            {[0, 6, 12, 18].map((h) => (
-              <Text key={h} style={[styles.tick, { color: colors.textFaint }]}>{pad(h)}</Text>
-            ))}
-            <Text style={[styles.tick, { color: colors.textFaint }]}>24</Text>
-          </View>
-          <Note>Saat, yolcuyu girdiğin an. Yolcuyu inerken girersen saat ona göre kayar.</Note>
-        </>
-      )}
+        ))}
+      </View>
+      <View style={styles.hourTicks}>
+        {[0, 6, 12, 18].map((h) => (
+          <Text key={h} style={[styles.tick, { color: colors.textFaint }]}>{pad(h)}</Text>
+        ))}
+        <Text style={[styles.tick, { color: colors.textFaint }]}>24</Text>
+      </View>
+      <Note>Saat, yolcuyu girdiğin an. Yolcuyu inerken girersen saat ona göre kayar.</Note>
     </Card>
   );
 }
@@ -313,7 +282,6 @@ export function BestDayCard({ data }: { data: StatsOverview }) {
   const { colors } = useTheme();
   const colorFor = useScoreColor();
   const stats = data.weekdays;
-  const dayCount = data.totals.workedDayCount;
   const top = data.scores.reduce<(typeof data.scores)[number] | null>(
     (acc, s) => (acc == null || s.score > acc.score || (s.score === acc.score && s.date > acc.date) ? s : acc),
     null,
@@ -324,49 +292,43 @@ export function BestDayCard({ data }: { data: StatsOverview }) {
 
   return (
     <Card title="En verimli gün" icon={{ ios: 'trophy.fill', android: 'emoji_events' }}>
-      {top ? (
-        <View style={styles.topDay}>
-          <View style={{ flex: 1 }}>
-            <Text style={[typeScale.bodyStrong, { color: colors.text }]}>
-              {formatBusinessDate(top.date, 'weekday')}
-            </Text>
-            <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-              {`dönemin en yüksek puanı · ${money(top.perHour)}/saat`}
-            </Text>
-          </View>
-          <Text style={[typeScale.title, { color: colorFor(top.score) }]}>{top.score}</Text>
+      <View style={styles.topDay}>
+        <View style={{ flex: 1 }}>
+          <Text style={[typeScale.bodyStrong, { color: colors.text }]}>
+            {top ? formatBusinessDate(top.date, 'weekday') : '—'}
+          </Text>
+          <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+            {`dönemin en yüksek puanı · ${money0(top?.perHour)}/saat`}
+          </Text>
         </View>
-      ) : null}
+        <Text style={[typeScale.title, { color: top ? colorFor(top.score) : colors.textFaint }]}>
+          {top?.score ?? 0}
+        </Text>
+      </View>
 
-      {dayCount < MIN_DAYS_FOR_WEEKDAY ? (
-        <Waiting>
-          {`Birkaç gün daha kayıt girince hangi günlerin daha iyi geçtiğini göstereceğim. `
-            + `${MIN_DAYS_FOR_WEEKDAY - dayCount} gün kaldı.`}
-        </Waiting>
-      ) : (
-        <>
-          <View style={styles.strip}>
-            {stats.map((s) => (
-              <View key={s.index} style={styles.stripCol}>
-                <View style={[styles.stripCell, {
-                  backgroundColor: s.dayCount === 0 ? colors.surfaceSunken : accentStep(colors, s.ratio),
-                }]} />
-                <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-                  {WEEKDAYS_TR[s.index].slice(0, 3)}
-                </Text>
-              </View>
-            ))}
-          </View>
-          {best?.average != null && best.average > 0 ? (
-            <Text style={[typeScale.body, { color: colors.textSoft }]}>
-              En kazançlı günün <Text style={{ color: colors.text }}>{WEEKDAYS_TR[best.index]}</Text>
-              {' '}— ortalama {money(best.average)} cebe kalıyor.
+      <View style={styles.strip}>
+        {stats.map((s) => (
+          <View key={s.index} style={styles.stripCol}>
+            <View style={[styles.stripCell, {
+              backgroundColor: s.dayCount === 0 ? colors.surfaceSunken : accentStep(colors, s.ratio),
+            }]} />
+            <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+              {WEEKDAY_SHORT[s.index]}
             </Text>
-          ) : (
-            <Waiting>Bu dönemde hiçbir gün kâra geçmemiş.</Waiting>
-          )}
-        </>
-      )}
+          </View>
+        ))}
+      </View>
+
+      <Text style={[typeScale.body, { color: colors.textSoft }]}>
+        En kazançlı günün{' '}
+        <Text style={{ color: colors.text }}>
+          {best?.average != null && best.average > 0 ? WEEKDAYS_TR[best.index] : '—'}
+        </Text>
+        {best?.average != null && best.average > 0
+          ? ` — ortalama ${money0(best.average)} cebe kalıyor.`
+          : ''}
+      </Text>
+      <Note>Toplam değil ortalama karşılaştırılıyor: çok çalışılan gün kendiliğinden öne çıkmasın.</Note>
     </Card>
   );
 }
@@ -380,25 +342,19 @@ export function RidesCard({ data }: { data: StatsOverview }) {
   const r = data.rides;
   return (
     <Card title="Yolcu analizi" icon={{ ios: 'person.2.fill', android: 'group' }}>
-      {r.rideCount === 0 ? (
-        <Waiting>Bu dönemde yolcu girilmemiş.</Waiting>
-      ) : (
-        <>
-          <StatGrid>
-            <StatTile value={formatInteger(r.rideCount)} label="toplam yolcu" />
-            <StatTile value={r.ridesPerDay == null ? '—' : formatDecimal(r.ridesPerDay)} label="yolcu / gün" />
-            <StatTile value={money(r.revenuePerRide)} label="yolcu başı ciro" />
-            <StatTile value={money(r.cashPerRide)} label="yolcu başı cebe kalan" />
-          </StatGrid>
-          {r.busiestDay ? (
-            <Text style={[typeScale.body, { color: colors.textSoft }]}>
-              En yoğun günün{' '}
-              <Text style={{ color: colors.text }}>{formatBusinessDate(r.busiestDay.date, 'weekday')}</Text>
-              {` — ${formatInteger(r.busiestDay.rideCount)} yolcu.`}
-            </Text>
-          ) : null}
-        </>
-      )}
+      <StatGrid>
+        <StatTile value={formatInteger(r.rideCount)} label="toplam yolcu" />
+        <StatTile value={decimal0(r.ridesPerDay)} label="yolcu / gün" />
+        <StatTile value={money0(r.revenuePerRide)} label="yolcu başı ciro" />
+        <StatTile value={money0(r.cashPerRide)} label="yolcu başı cebe kalan" />
+      </StatGrid>
+      <Text style={[typeScale.body, { color: colors.textSoft }]}>
+        En yoğun günün{' '}
+        <Text style={{ color: colors.text }}>
+          {r.busiestDay ? formatBusinessDate(r.busiestDay.date, 'weekday') : '—'}
+        </Text>
+        {r.busiestDay ? ` — ${formatInteger(r.busiestDay.rideCount)} yolcu.` : ''}
+      </Text>
     </Card>
   );
 }
@@ -411,30 +367,19 @@ export function KmCard({ data }: { data: StatsOverview }) {
   const k = data.km;
   return (
     <Card title="Km analizi" icon={{ ios: 'road.lanes', android: 'route' }}>
-      {k.totalKm == null ? (
-        <Waiting>
-          Vardiyayı bitirirken kilometreyi girersen km başına kazancın ve maliyetin burada görünecek.
-        </Waiting>
-      ) : (
-        <>
-          <StatGrid>
-            <StatTile value={`${formatInteger(k.totalKm)} km`} label="toplam" />
-            <StatTile value={k.kmPerDay == null ? '—' : `${formatInteger(k.kmPerDay)} km`} label="gün başına" />
-            <StatTile value={moneyFine(k.revenuePerKm)} label="km başı ciro" />
-            <StatTile value={moneyFine(k.costPerKm)} label="km başı yakıt + yıpranma" />
-            <StatTile value={moneyFine(k.cashPerKm)} label="km başı cebe kalan" />
-            <StatTile
-              value={k.kmPerRide == null ? '—' : `${formatDecimal(k.kmPerRide)} km`}
-              label="yolcu başına"
-            />
-          </StatGrid>
-          {k.skippedDayCount > 0 ? (
-            <Note>
-              {`${formatInteger(k.skippedDayCount)} günün kilometresi eksik girildiği için hesaba katılmadı.`}
-            </Note>
-          ) : null}
-        </>
-      )}
+      <StatGrid>
+        <StatTile value={`${formatInteger(k.totalKm ?? 0)} km`} label="toplam" />
+        <StatTile value={`${formatInteger(k.kmPerDay ?? 0)} km`} label="gün başına" />
+        <StatTile value={moneyFine0(k.revenuePerKm)} label="km başı ciro" />
+        <StatTile value={moneyFine0(k.costPerKm)} label="km başı yakıt + yıpranma" />
+        <StatTile value={moneyFine0(k.cashPerKm)} label="km başı cebe kalan" />
+        <StatTile value={`${decimal0(k.kmPerRide)} km`} label="yolcu başına" />
+      </StatGrid>
+      {k.skippedDayCount > 0 ? (
+        <Note>
+          {`${formatInteger(k.skippedDayCount)} günün kilometresi eksik girildiği için hesaba katılmadı.`}
+        </Note>
+      ) : null}
     </Card>
   );
 }
@@ -443,18 +388,20 @@ export function KmCard({ data }: { data: StatsOverview }) {
 // 8. Gider dağılımı
 // ---------------------------------------------------------------------------
 
+/** Hiç gider yokken açıklamada duran satırlar — neyin dağılacağı görünsün. */
+const EMPTY_COST_SLICES = ['Komisyon', 'Yakıt', 'Yıpranma payı', 'Giderler']
+  .map((label) => ({ key: label, label, amount: 0, share: 0 }));
+
 export function CostsCard({ data }: { data: StatsOverview }) {
   const c = data.costs;
   return (
     <Card title="Gider dağılımı" icon={{ ios: 'chart.pie.fill', android: 'pie_chart' }}>
-      {c.slices.length === 0 ? (
-        <Waiting>Bu dönemde gider, yakıt ya da komisyon girilmemiş.</Waiting>
-      ) : (
-        <>
-          <Donut slices={c.slices} total={c.total} centerLabel="toplam" />
-          <Note>Yıpranma payı cepten çıkmıyor ama aracın değerinden gidiyor; gerçek kâr bunu düşüyor.</Note>
-        </>
-      )}
+      <Donut
+        slices={c.slices.length > 0 ? c.slices : EMPTY_COST_SLICES}
+        total={c.total}
+        centerLabel="toplam"
+      />
+      <Note>Yıpranma payı cepten çıkmıyor ama aracın değerinden gidiyor; gerçek kâr bunu düşüyor.</Note>
     </Card>
   );
 }

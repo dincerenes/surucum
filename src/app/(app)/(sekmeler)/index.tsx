@@ -228,7 +228,8 @@ function TodayCard() {
  * Puan sürücünün kendi normal gününe göre (`src/lib/efficiency.ts`).
  * Açık vardiyalı gün puanlanmıyor — süre vardiya bitince soruluyor —
  * o yüzden halka bugünü değil son kapanmış günü gösterebilir; tarih
- * her zaman yazıyor. Dokununca İstatistik'teki analiz.
+ * her zaman yazıyor. Hiç puan yokken sıfırla duruyor. Dokununca
+ * İstatistik'teki analiz.
  */
 function ScoreCard({ score, today }: { score: HomeScore; today: BusinessDate }) {
   const { colors } = useTheme();
@@ -248,31 +249,21 @@ function ScoreCard({ score, today }: { score: HomeScore; today: BusinessDate }) 
       <Card title="Verimlilik puanı" meta={when ?? undefined}
         icon={{ ios: 'gauge.with.dots.needle.67percent', android: 'speed' }}>
         <View style={styles.scoreRow}>
-          <ScoreRing score={latest?.score ?? null} size={76} />
+          <ScoreRing score={latest?.score ?? 0} size={76} />
           <View style={styles.scoreText}>
-            {latest ? (
-              <>
-                <Text style={[typeScale.heading, { color: colorFor(latest.score) }]}>
-                  {SCORE_BAND_LABELS[scoreBand(latest.score)]}
-                </Text>
-                <Text style={[typeScale.body, { color: colors.textSoft }]}>
-                  {`${formatKurus(latest.perHour, { decimals: false })}/saat · normalin `
-                    + `${formatKurus(latest.baseline.perHour, { decimals: false })}/saat`}
-                </Text>
-                {score.average != null ? (
-                  <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-                    {`Son 30 gün ortalaman: ${score.average}`}
-                  </Text>
-                ) : null}
-              </>
-            ) : (
-              <Text style={[typeScale.body, { color: colors.textSoft }]}>
-                {score.daysUntilScore > 0
-                  ? `Vardiyasını kapattığın ${score.daysUntilScore} çalışma günü daha sonra `
-                    + 'puanın hesaplanacak. Puan seni kendi normal gününle karşılaştırır.'
-                  : 'Son 30 günde puanlanan gün yok. Puan vardiya kapanınca hesaplanır.'}
-              </Text>
-            )}
+            {/* Puan yokken de sıfırla duruyor; bekleme yazısı yok (sürücünün kararı). */}
+            <Text style={[typeScale.heading, {
+              color: latest ? colorFor(latest.score) : colors.textFaint,
+            }]}>
+              {latest ? SCORE_BAND_LABELS[scoreBand(latest.score)] : 'Henüz puanlanan gün yok'}
+            </Text>
+            <Text style={[typeScale.body, { color: colors.textSoft }]}>
+              {`${formatKurus(latest?.perHour ?? 0, { decimals: false })} / saat cebe kalan`}
+            </Text>
+            <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+              {`Normalin ${formatKurus(latest?.baseline.perHour ?? 0, { decimals: false })} / saat`
+                + ` · 30 gün ortalaman ${score.average ?? 0}`}
+            </Text>
           </View>
         </View>
       </Card>

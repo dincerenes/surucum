@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import { type BusinessDate, addDays } from './business-date.ts';
 import type { DaySummary } from './day-summary.ts';
 import {
-  averageScore, baselineFor, daysUntilScore, median, ratioToScore, scoreBand, scoreDay, scoreDays,
+  averageScore, baselineFor, median, ratioToScore, scoreBand, scoreDay, scoreDays,
 } from './efficiency.ts';
 import type { Kurus } from './money.ts';
 import type { DayEntry } from './stats.ts';
@@ -61,9 +61,11 @@ describe('oran → puan', () => {
 });
 
 describe('ölçü', () => {
-  it('5 günden az geçmişte ölçü yok', () => {
-    const entries = history('2026-09-22', 4, 30000);
-    assert.equal(baselineFor(entries, d('2026-09-23')), null);
+  it('önceki gün yoksa ölçü yok, tek gün yeterli', () => {
+    assert.equal(baselineFor([], d('2026-09-23')), null);
+    const b = baselineFor(history('2026-09-22', 1, 30000), d('2026-09-23'))!;
+    assert.equal(b.dayCount, 1);
+    assert.equal(b.perHour, 30000);
   });
 
   it('günün kendisi ölçüye girmiyor', () => {
@@ -79,8 +81,9 @@ describe('ölçü', () => {
   });
 
   it('açık vardiyalı gün ölçüye girmiyor', () => {
-    const entries = [...history('2026-09-22', 4, 30000), day('2026-09-18', 99999, { open: 1 })];
-    assert.equal(baselineFor(entries, d('2026-09-23')), null);
+    const entries = [...history('2026-09-22', 2, 30000), day('2026-09-18', 99999, { open: 1 })];
+    assert.equal(baselineFor(entries, d('2026-09-23'))!.dayCount, 2);
+    assert.equal(baselineFor(entries, d('2026-09-23'))!.perHour, 30000);
   });
 
   it('ortanca uç günü yutuyor', () => {
@@ -88,9 +91,10 @@ describe('ölçü', () => {
     assert.equal(baselineFor(entries, d('2026-09-23'))!.perHour, 30000);
   });
 
-  it('zararlı "normal"e bölünmüyor', () => {
-    const entries = history('2026-09-22', 6, -1000);
-    assert.equal(baselineFor(entries, d('2026-09-23')), null);
+  it('geçmiş hep zararlıysa kâra geçen gün tavan', () => {
+    const entries = history('2026-09-22', 3, -1000);
+    const today = day('2026-09-23', 20000);
+    assert.equal(scoreDay(today, baselineFor(entries, today.date))!.score, 100);
   });
 });
 
@@ -122,6 +126,19 @@ describe('günün puanı', () => {
     assert.equal(scoreDay(today, baselineFor(past, today.date))!.score, 0);
   });
 
+  it('ilk gün kendi ölçüsü: 50', () => {
+    const first = day('2026-09-23', 45000, { perKm: 1500 });
+    const s = scoreDay(first, baselineFor([first], first.date))!;
+    assert.equal(s.score, 50);
+    assert.equal(s.baseline.dayCount, 0);
+    assert.equal(s.baseline.perHour, 45000);
+  });
+
+  it('ilk gün zararlıysa 0', () => {
+    const first = day('2026-09-23', -3000, { cash: -100 });
+    assert.equal(scoreDay(first, null)!.score, 0);
+  });
+
   it('açık vardiyalı gün puanlanmıyor', () => {
     const today = day('2026-09-23', 90000, { open: 1 });
     assert.equal(scoreDay(today, baselineFor(past, today.date)), null);
@@ -140,9 +157,13 @@ describe('aralığın puanları', () => {
     assert.equal(averageScore([]), null);
   });
 
-  it('puana kaç gün kaldı', () => {
-    assert.equal(daysUntilScore([], d('2026-09-23')), 6);
-    assert.equal(daysUntilScore(history('2026-09-23', 4, 30000), d('2026-09-23')), 2);
-    assert.equal(daysUntilScore(history('2026-09-23', 9, 30000), d('2026-09-23')), 0);
+  it('ilk günden itibaren her gün puanlanıyor', () => {
+    // 1'i kendi ölçüsü (50); 2'si 1'ine göre 1,5 kat (75);
+    // 3'ü ilk ikisinin ortancasına (37.500) göre 0,4 kat (20).
+    const entries = [day('2026-09-01', 30000), day('2026-09-02', 45000), day('2026-09-03', 15000)];
+    assert.deepEqual(
+      scoreDays(entries, d('2026-09-01'), d('2026-09-03')).map((s) => s.score),
+      [50, 75, 20],
+    );
   });
 });

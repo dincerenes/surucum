@@ -12,7 +12,7 @@ import { type UnixMs, alive } from './_base';
 import { getFirstRecordDate, listDaySummaries } from './summary';
 import { type BusinessDate, addDays } from '@/lib/business-date';
 import {
-  BASELINE_WINDOW_DAYS, type DayScore, averageScore, daysUntilScore, scoreDays,
+  BASELINE_WINDOW_DAYS, type DayScore, averageScore, scoreDays,
 } from '@/lib/efficiency';
 import {
   type CategoryAmount, type CostSlice, type HotWindow, type HourBucket, type KmStats,
@@ -34,8 +34,6 @@ export interface StatsOverview {
   trend: { unit: 'day' | 'month'; bars: TrendBar[] };
   scores: DayScore[];
   averageScore: number | null;
-  /** Puan için kaç çalışma günü daha gerekiyor (bugüne göre). */
-  daysUntilScore: number;
   time: TimeStats;
   hours: HourBucket[];
   hot: HotWindow | null;
@@ -74,7 +72,6 @@ export function getStatsOverview(
     trend: trendBars(days, from, to),
     scores,
     averageScore: averageScore(scores),
-    daysUntilScore: daysUntilScore(all, today),
     time: timeStats(days),
     hours,
     hot: hotWindow(hours),
@@ -91,7 +88,6 @@ export interface HomeScore {
   latest: DayScore | null;
   /** Son 30 günün ortalama puanı. */
   average: number | null;
-  daysUntilScore: number;
 }
 
 /**
@@ -110,7 +106,6 @@ export function getHomeScore(
   return {
     latest: scores[scores.length - 1] ?? null,
     average: averageScore(scores),
-    daysUntilScore: daysUntilScore(all, today),
   };
 }
 

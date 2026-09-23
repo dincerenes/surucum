@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -10,8 +10,8 @@ import { useDbValue } from '@/db/use-db';
 import { getCutoffHour, getStatsOverview } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
 import { todayBusinessDate } from '@/lib/business-date';
-import { PERIOD_LABELS, type PeriodKey } from '@/lib/period';
-import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
+import type { PeriodKey } from '@/lib/period';
+import { space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 /**
  * İstatistik — "nerede kazanıp nerede kaybediyorum".
@@ -51,9 +51,11 @@ export default function StatsScreen() {
 
       <PeriodFilterBar value={period} onChange={setPeriod} />
 
-      {data == null || data.totals.dayCount === 0 ? (
-        <EmptyPeriod period={period} />
-      ) : (
+      {/*
+        * Kayıt olmasa da kartlar sıfırla görünüyor (sürücünün kararı):
+        * sürücü kullanmaya başlamadan neyin geleceğini görsün.
+        */}
+      {data ? (
         <>
           <PeriodCard data={data} period={period} />
           <EfficiencyCard data={data} />
@@ -64,31 +66,11 @@ export default function StatsScreen() {
           <KmCard data={data} />
           <CostsCard data={data} />
         </>
-      )}
+      ) : null}
     </ScrollView>
-  );
-}
-
-function EmptyPeriod({ period }: { period: PeriodKey }) {
-  const { colors } = useTheme();
-  return (
-    <View style={[styles.empty, { borderColor: colors.border }]}>
-      <Text style={[typeScale.heading, { color: colors.text }]}>
-        {PERIOD_LABELS[period]} için kayıt yok
-      </Text>
-      <Text style={[typeScale.body, { color: colors.textSoft }]}>
-        Vardiya açıp yolcu girdikçe burası dolacak: verimlilik puanın, en
-        yoğun saatlerin, saat ve kilometre başına eline geçen, giderlerinin
-        dağılımı.
-      </Text>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
   page: { paddingHorizontal: space.xl, paddingBottom: space.xxxl, gap: space.lg },
-  empty: {
-    borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.lg,
-    padding: space.xl, gap: space.sm,
-  },
 });
