@@ -4,7 +4,9 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AboveKeyboard, AmountInput, Button, Chip, ChipGrid } from '@/components/ui';
-import { completeOnboarding, createVehicle, updateSettings } from '@/db/repo';
+import {
+  completeOnboarding, createVehicle, listActiveVehicles, updateSettings,
+} from '@/db/repo';
 import { FUEL_TYPE_LABELS, type FuelType } from '@/db/schema/_shared';
 import { useAuth } from '@/lib/auth/auth-context';
 import { toggleFuelSelection } from '@/lib/fuel-selection';
@@ -42,6 +44,12 @@ export default function DetailStep() {
 
   function devam() {
     if (!user?.id || !valid) return;
+
+    // Araç bu arada buluttan indiyse yenisi açılmaz — çift araç olmasın.
+    if (listActiveVehicles(user.id).length > 0) {
+      router.replace('/');
+      return;
+    }
 
     const vehicle = createVehicle(user.id, {
       label,

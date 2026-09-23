@@ -145,6 +145,14 @@ export function requestSync(): void {
   }, DEBOUNCE_MS);
 }
 
+/**
+ * Hemen ve zorlayarak bir tur — sürücü "Tekrar dene"ye bastığında.
+ * `runSync`'i doğrudan çağırmak dinleyicileri atlardı; ekran sonucu görmezdi.
+ */
+export function syncNow(): void {
+  fire({ force: true });
+}
+
 /** Tur sonuçlarını dinler — arayüzdeki "senkronlanmadı" rozeti için. */
 export function onSyncResult(listener: Listener): () => void {
   listeners.push(listener);

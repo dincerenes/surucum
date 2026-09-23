@@ -1,8 +1,12 @@
 import { Redirect, Stack } from 'expo-router';
+import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
+import { Button } from '@/components/ui';
 import { useAuth } from '@/lib/auth/auth-context';
+import { resolveSetupGate } from '@/lib/setup-gate';
 import { useDriver } from '@/lib/use-driver';
+import { syncNow } from '@/sync/scheduler';
 import { useSync } from '@/sync/use-sync';
 import { space, useTheme } from '@/theme/use-theme';
 
@@ -18,9 +22,16 @@ export default function AppLayout() {
   const { colors } = useTheme();
 
   /** Senkron zamanlayıcısı oturum açıkken çalışır, çıkışta ya da hesap değişince durur. */
-  useSync(session?.user.id ?? null);
+  const sync = useSync(session?.user.id ?? null);
 
   const { needsSetup } = useDriver();
+  const [skipWait, setSkipWait] = useState(false);
+  const gate = resolveSetupGate({
+    hasVehicle: !needsSetup,
+    syncedOnce: sync.lastSuccessAt != null,
+    syncFailed: sync.lastError != null,
+    skipWait,
+  });
 
   if (restoring) {
     return (
@@ -73,8 +84,39 @@ export default function AppLayout() {
   /**
    * Araç yoksa uygulama kullanılamaz: vardiya bir araca bağlanıyor,
    * yıpranma payı ondan geliyor. Kurulum atlanabilir bir adım değil.
+   *
+   * Ama "cihazda araç yok" ≠ "hesapta araç yok": önce bulut soruluyor
+   * (bkz. `lib/setup-gate.ts`). Sormadan kuruluma atmak her yeni
+   * kurulumda aynı aracı bir kez daha açtırıyordu.
    */
-  if (needsSetup) return <Redirect href="/arac" />;
+  if (gate === 'setup') return <Redirect href="/arac" />;
+
+  if (gate === 'waiting' || gate === 'sync_failed') {
+    const failed = gate === 'sync_failed';
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        {failed ? null : <ActivityIndicator color={colors.accent} />}
+        <Text style={[styles.title, { color: colors.text }]}>
+          {failed ? 'Kayıtların indirilemedi' : 'Hesabın hazırlanıyor'}
+        </Text>
+        <Text style={[styles.body, { color: colors.textSoft }]}>
+          {failed
+            ? 'İnternet bağlantını kontrol edip tekrar dene. Daha önce araç eklediysen buluttan gelmesini beklemek, aynı aracı yeniden eklemekten iyidir.'
+            : 'Araçların ve kayıtların buluttan indiriliyor. Bu birkaç saniye sürer.'}
+        </Text>
+        {failed ? (
+          <View style={styles.actions}>
+            <Button label="Tekrar dene" onPress={syncNow} />
+            <Button
+              label="Yeni hesabım, kuruluma geç"
+              variant="ghost"
+              onPress={() => setSkipWait(true)}
+            />
+          </View>
+        ) : null}
+      </View>
+    );
+  }
 
   return (
     <Stack
@@ -116,4 +158,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
   body: { fontSize: 16, textAlign: 'center', lineHeight: 22 },
   hint: { fontSize: 12, textAlign: 'center' },
+  actions: { alignSelf: 'stretch', gap: space.sm, marginTop: space.lg },
 });
