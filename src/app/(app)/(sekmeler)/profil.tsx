@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View,
+  Alert, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -21,9 +21,6 @@ import { getSyncStatus } from '@/sync/state';
 import {
   AVATAR_COLORS, HIT_SIZE, palette, radius, space, type as typeScale, useTheme,
 } from '@/theme/use-theme';
-
-/** "Geri bildirim gönder" bu adrese e-posta açıyor. */
-const SUPPORT_EMAIL = 'dincerenes466@gmail.com';
 
 /**
  * Profil — hesap, araçlar, tercihler, destek.
@@ -101,13 +98,6 @@ export default function ProfileScreen() {
     const result = await deleteAccount();
     setDeleting(false);
     if (!result.ok) Alert.alert('Hesap silinemedi', result.error);
-  }
-
-  function geriBildirim() {
-    const subject = encodeURIComponent('Sürücüm geri bildirim');
-    Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${subject}`).catch(() => {
-      Alert.alert('E-posta açılamadı', `Bize ${SUPPORT_EMAIL} adresinden yazabilirsin.`);
-    });
   }
 
   const backup = info?.pending
@@ -226,8 +216,8 @@ export default function ProfileScreen() {
         <Row
           icon={{ ios: 'envelope.fill', android: 'mail' }}
           label="Geri bildirim gönder"
-          detail="Hata, istek, öneri — doğrudan bize yaz"
-          onPress={geriBildirim}
+          detail="Hata, istek, öneri — uygulamadan doğrudan bize yaz"
+          onPress={() => router.push('/geri-bildirim')}
           first
         />
         <Row

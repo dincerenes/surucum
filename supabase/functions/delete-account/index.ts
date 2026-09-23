@@ -10,7 +10,7 @@
  * tablolarının hepsi `auth.users(id)`'ye `on delete cascade` ile bağlı
  * (supabase/migrations/*.sql tarandı): app_settings, vehicles,
  * vehicle_fuel_types, earning_sources, expense_categories, shifts, rides,
- * expenses, recurring_expenses, fuel_logs, goals, admin_users. Kullanıcı
+ * expenses, recurring_expenses, fuel_logs, goals, feedback, admin_users. Kullanıcı
  * tabloları arasında yabancı anahtar yok; zincir tek adım.
  *
  * Cascade OLMAYANLAR — hepsi `on delete set null`, bilinçli olarak

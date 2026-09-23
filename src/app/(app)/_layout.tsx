@@ -92,6 +92,7 @@ export default function AppLayout() {
       <Stack.Screen name="hedef" />
       <Stack.Screen name="profil-duzenle" />
       <Stack.Screen name="sss" />
+      <Stack.Screen name="geri-bildirim" />
       <Stack.Screen name="araclar" />
       <Stack.Screen name="arsiv" />
       <Stack.Screen name="arsiv-ay" />

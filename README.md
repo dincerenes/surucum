@@ -331,8 +331,15 @@ Sürücünün raporu üzerine yeniden düzenleme: Anasayfa kart düzenine geçti
 `supabase/migrations/20260922235107_profile_fields.sql`) buluta uygulandı.
 Profil tek sayfada: kimlik (hazır avatar, ad, şehir, "Profili düzenle"),
 Araçlarım, günlük hedef (`hedef.tsx`, eski Ayarlar), tema önizlemeleri,
-Destek (geri bildirim e-postası, SSS taslağı `sss.tsx`), çıkış ve hesap
-silme. Fotoğraf yükleme, bildirimler ve hukuki metinler sonraya; İstatistik
+Destek (uygulama içi geri bildirim, SSS taslağı `sss.tsx`), çıkış ve hesap
+silme.
+
+- **Geri bildirim** e-posta adresi göstermeden buluttaki `feedback`
+  tablosuna yazılıyor (`src/lib/feedback.ts`; yalnızca ekleme, sürücü
+  okuyamaz). Okumak için Supabase paneli → Table Editor → `feedback`.
+- **Hesap silme** `supabase/functions/delete-account` (yayında, JWT
+  doğrulamalı): kullanıcı silinince bütün tabloları cascade ile gidiyor;
+  ardından cihazdaki kayıtlar `wipeLocalUserData` ile temizleniyor. Fotoğraf yükleme, bildirimler ve hukuki metinler sonraya; İstatistik
 kartları ve verimlilik puanı birlikte konuşulacak.
 
 Yayın öncesi kalanlar:
@@ -340,10 +347,6 @@ Yayın öncesi kalanlar:
 - **Gerçek SMTP** bağlanması ve e-posta doğrulamasının geri açılması. Şu an
   `mailer_autoconfirm` açık ve şifre sıfırlama, üretim için desteklenmeyen
   yerleşik posta servisine bağlı.
-- **Hesap silme fonksiyonunun yayınlanması** — uygulama tarafı hazır
-  (Profil → Hesabımı sil → `supabase/functions/delete-account`), fonksiyon
-  `supabase functions deploy delete-account` ile buluta yüklenmeli.
-  Yüklenmeden düğme "Hesap silinemedi" der, hiçbir şeyi silmez.
 - **Gizlilik politikası:** taslak `docs/gizlilik-politikasi.md`. Hukukçudan
   geçmesi, herkese açık bir https adresinde yayımlanması ve kayıt ekranı ile
   Profil'den bağlanması gerekiyor. Mağaza formları: `docs/magaza-formlari.md`.
