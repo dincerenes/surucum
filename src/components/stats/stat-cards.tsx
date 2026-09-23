@@ -4,7 +4,9 @@
  * Kartlar HER ZAMAN görünüyor, kayıt yokken sıfırla (sürücünün kararı,
  * 23 Eylül 2026): "5 gün kaldı", "20 yolcu kaldı" gibi bekleme yazıları
  * yok. Sürücü uygulamayı kullanmaya başlamadan neyin geleceğini görüyor;
- * ilk yolcudan itibaren sayılar doluyor. Hesapların hepsi
+ * ilk yolcudan itibaren sayılar doluyor. Kartların altında açıklama
+ * yazısı yok (sürücünün kararı); kuralların anlatımı hesap modüllerinde.
+ * Hesapların hepsi
  * `src/lib/insights.ts` ve `efficiency.ts` içinde; burada yalnızca çizim.
  */
 
@@ -192,12 +194,6 @@ export function EfficiencyCard({ data }: { data: StatsOverview }) {
           ))}
       </View>
 
-      <Note>
-        {'50 puan senin normal günün: önceki 30 gündeki saat başına (ve km girildiyse km '
-          + 'başına) cebe kalanının ortancası. İlk günün kendi ölçün. 70 üstü normalinden iyi, '
-          + '30 altı zayıf bir gün. Puan vardiya kapanınca hesaplanır; başka sürücülerle '
-          + 'karşılaştırılmıyorsun.'}
-      </Note>
     </Card>
   );
 }
@@ -218,7 +214,6 @@ export function TimeCard({ data }: { data: StatsOverview }) {
         <StatTile value={formatDuration(t.minutesPerRide ?? 0)} label="yolcu başına süre" />
         <StatTile value={formatInteger(t.closedShiftCount)} label="kapanan vardiya" />
       </StatGrid>
-      <Note>Açık vardiya hesaba girmiyor: süresi vardiya bitince soruluyor.</Note>
     </Card>
   );
 }
@@ -264,7 +259,6 @@ export function HotHoursCard({ data }: { data: StatsOverview }) {
         ))}
         <Text style={[styles.tick, { color: colors.textFaint }]}>24</Text>
       </View>
-      <Note>Saat, yolcuyu girdiğin an. Yolcuyu inerken girersen saat ona göre kayar.</Note>
     </Card>
   );
 }
@@ -328,7 +322,6 @@ export function BestDayCard({ data }: { data: StatsOverview }) {
           ? ` — ortalama ${money0(best.average)} cebe kalıyor.`
           : ''}
       </Text>
-      <Note>Toplam değil ortalama karşılaştırılıyor: çok çalışılan gün kendiliğinden öne çıkmasın.</Note>
     </Card>
   );
 }
@@ -375,11 +368,6 @@ export function KmCard({ data }: { data: StatsOverview }) {
         <StatTile value={moneyFine0(k.cashPerKm)} label="km başı cebe kalan" />
         <StatTile value={`${decimal0(k.kmPerRide)} km`} label="yolcu başına" />
       </StatGrid>
-      {k.skippedDayCount > 0 ? (
-        <Note>
-          {`${formatInteger(k.skippedDayCount)} günün kilometresi eksik girildiği için hesaba katılmadı.`}
-        </Note>
-      ) : null}
     </Card>
   );
 }
@@ -401,7 +389,6 @@ export function CostsCard({ data }: { data: StatsOverview }) {
         total={c.total}
         centerLabel="toplam"
       />
-      <Note>Yıpranma payı cepten çıkmıyor ama aracın değerinden gidiyor; gerçek kâr bunu düşüyor.</Note>
     </Card>
   );
 }
