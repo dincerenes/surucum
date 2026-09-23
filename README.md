@@ -371,9 +371,11 @@ kartları ve verimlilik puanı birlikte konuşulacak.
 
 Yayın öncesi kalanlar:
 
-- **Gerçek SMTP** bağlanması ve e-posta doğrulamasının geri açılması. Şu an
-  `mailer_autoconfirm` açık ve şifre sıfırlama, üretim için desteklenmeyen
-  yerleşik posta servisine bağlı.
+- **E-posta doğrulaması** kapalı (`mailer_autoconfirm` açık): yeni hesap
+  e-postası doğrulanmadan açılıyor. Gönderim hazır — Gmail SMTP
+  (`surucumappdestek@gmail.com`), Türkçe şablonlar `docs/eposta-sablonlari.md`
+  (23 Eylül 2026'da denendi). Şablon değişikliği birkaç dakika sonra
+  yansıyor.
 - **Gizlilik politikası:** https://dincerenes.github.io/surucum-yasal/
   (hesap silme: `hesap-silme.html`). Kaynak metin
   `docs/gizlilik-politikasi.md`; sayfalar ayrı, herkese açık

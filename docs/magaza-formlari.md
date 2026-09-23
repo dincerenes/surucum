@@ -27,7 +27,7 @@ Kısa özet: **izleme yok, reklam yok, analitik yok, cihaz konumu yok,
 - [x] **Hesap silme web adresi** — uygulamaya erişimi olmayan kullanıcı
       için talep sayfası. Play bunu ayrı bir alan olarak istiyor.
       https://dincerenes.github.io/surucum-yasal/hesap-silme.html
-- [ ] Gerçek SMTP bağlı (Gmail, surucumappdestek@gmail.com); sağlayıcı
+- [x] Gerçek SMTP bağlı (Gmail, surucumappdestek@gmail.com); sağlayıcı
       politikada adıyla yazılı.
 
 ---
