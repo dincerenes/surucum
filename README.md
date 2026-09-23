@@ -371,8 +371,9 @@ kartları ve verimlilik puanı birlikte konuşulacak.
 
 Yayın öncesi kalanlar:
 
-- **E-posta doğrulaması** kapalı (`mailer_autoconfirm` açık): yeni hesap
-  e-postası doğrulanmadan açılıyor. Gönderim hazır — Gmail SMTP
+- **E-posta doğrulaması** bilerek kapalı (`mailer_autoconfirm` açık,
+  23 Eylül 2026 kararı: kayıt kısa kalsın): yeni hesap e-postası
+  doğrulanmadan açılıyor. Gönderim hazır — Gmail SMTP
   (`surucumappdestek@gmail.com`), Türkçe şablonlar `docs/eposta-sablonlari.md`
   (23 Eylül 2026'da denendi). Şablon değişikliği birkaç dakika sonra
   yansıyor.
@@ -380,7 +381,11 @@ Yayın öncesi kalanlar:
   (hesap silme: `hesap-silme.html`). Kaynak metin
   `docs/gizlilik-politikasi.md`; sayfalar ayrı, herkese açık
   `dincerenes/surucum-yasal` deposunda — metin değişince orası da
-  güncellenir. Kayıt ekranından ve Profil'den bağlantı var (`src/lib/legal.ts`).
+  güncellenir: `python3 tools/yasal-site.py <site-klasörü>`. Kullanım
+  koşulları `docs/kullanim-kosullari.md`, KVKK sayfası politikanın B bölümü.
+  Kayıtta onay kutusu zorunlu; kabul edilen sürüm ve zaman hesabın
+  metadata'sında (`terms_version`, `terms_accepted_at`). Profil → Hukuki'de
+  üç metnin bağlantısı var (`src/lib/legal.ts`).
   Yurt dışına aktarımın dayanağı hukukçuya sorulacak. Mağaza formları:
   `docs/magaza-formlari.md`.
 - **Android hiç derlenmedi** — geliştirme makinesinde Android SDK yok.

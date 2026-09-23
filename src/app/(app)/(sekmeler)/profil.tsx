@@ -14,7 +14,9 @@ import {
   listActiveVehicles, listVehicleFuelTypes,
 } from '@/db/repo';
 import { FUEL_TYPE_LABELS } from '@/db/schema/_shared';
-import { openPrivacyPolicy } from '@/lib/legal';
+import {
+  KVKK_URL, PRIVACY_POLICY_URL, TERMS_URL, openLegalPage,
+} from '@/lib/legal';
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatKurus } from '@/lib/money';
 import { useDriver } from '@/lib/use-driver';
@@ -32,8 +34,8 @@ import {
  * sırasıyla: kim olduğun, neyle çalıştığın, uygulamanın nasıl göründüğü,
  * yardım. Hesaptan çıkış ve hesabı silme en altta, kazara dokunulmasın.
  *
- * Gizlilik politikası "Destek"in altında, tarayıcıda açılıyor (mağazalar
- * uygulama içinden bağlantı istiyor).
+ * Hukuki metinler (kullanım koşulları, gizlilik, KVKK) kendi kartında,
+ * tarayıcıda açılıyor (mağazalar uygulama içinden bağlantı istiyor).
  */
 export default function ProfileScreen() {
   const { colors } = useTheme();
@@ -226,11 +228,27 @@ export default function ProfileScreen() {
           detail="Ciro, cebe kalan, yıpranma payı…"
           onPress={() => router.push('/sss')}
         />
+      </Card>
+
+      <Card title="Hukuki" icon={{ ios: 'doc.text.fill', android: 'description' }}>
+        <Row
+          icon={{ ios: 'doc.plaintext.fill', android: 'article' }}
+          label="Kullanım koşulları"
+          detail="Uygulamayı kullanırken geçerli kurallar"
+          onPress={() => openLegalPage(TERMS_URL)}
+          first
+        />
         <Row
           icon={{ ios: 'lock.shield.fill', android: 'shield' }}
           label="Gizlilik politikası"
           detail="Hangi verini neden tutuyoruz, nasıl silinir"
-          onPress={openPrivacyPolicy}
+          onPress={() => openLegalPage(PRIVACY_POLICY_URL)}
+        />
+        <Row
+          icon={{ ios: 'building.columns.fill', android: 'account_balance' }}
+          label="KVKK aydınlatma metni"
+          detail="Kişisel verilerin ve hakların"
+          onPress={() => openLegalPage(KVKK_URL)}
         />
       </Card>
 

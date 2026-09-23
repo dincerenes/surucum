@@ -65,6 +65,7 @@ takip ettiği bir mobil uygulamadır.
 | Parola | Giriş. Sunucuda yalnızca tek yönlü özeti (hash) saklanır; parolanın açık hâlini biz de göremeyiz |
 | Hesap kimliği (rastgele üretilmiş bir numara) | Kayıtlarını hesabına bağlamak |
 | Oturum anahtarları | Her açılışta yeniden giriş yapmaman için. Yalnızca telefonunda saklanır |
+| Kullanım koşullarını kabul ettiğin sürüm ve zaman | Kayıtta verdiğin onayın kaydını tutmak |
 | Giriş sırasında IP adresi, cihaz / tarayıcı bilgisi, giriş zamanı | Kimlik doğrulama hizmetinin güvenlik kayıtları (kötüye kullanımı ve yetkisiz girişi tespit etmek) |
 
 **3.2 Profil bilgileri** — senin girdiklerin
@@ -300,6 +301,6 @@ aktarılmaz.
 girişinle ve hesabın kullanımı sırasında otomatik olarak, elektronik
 ortamda toplanır.
 
-**7. Hakların:** KVKK md. 11'de sayılan haklarını (bkz. A-10)
+**7. Hakların:** KVKK md. 11'de sayılan haklarını (bkz. [Gizlilik Politikası, 10. bölüm](./))
 hesabına kayıtlı e-posta adresinden surucumappdestek@gmail.com adresine yazarak
 kullanabilirsin.

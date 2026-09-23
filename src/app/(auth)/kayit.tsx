@@ -1,19 +1,20 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View,
+  KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
+import { Icon } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
 import { TextLink } from '@/components/ui/text-link';
 import { useAuth } from '@/lib/auth/auth-context';
-import { openPrivacyPolicy } from '@/lib/legal';
+import { KVKK_URL, PRIVACY_POLICY_URL, TERMS_URL, openLegalPage } from '@/lib/legal';
 import { MIN_PASSWORD_LENGTH, validateEmail, validatePassword } from '@/lib/auth/auth-errors';
 import { MAX_DISPLAY_NAME } from '@/lib/profile';
-import { space, type as typeScale, useTheme } from '@/theme/use-theme';
+import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
 export default function KayitScreen() {
   const { colors } = useTheme();
@@ -29,6 +30,8 @@ export default function KayitScreen() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [accepted, setAccepted] = useState(false);
+  const [termsError, setTermsError] = useState<string | null>(null);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -36,12 +39,14 @@ export default function KayitScreen() {
     const e = validateEmail(email);
     const p = validatePassword(password);
     const c = password !== confirm ? 'Şifreler birbiriyle uyuşmuyor.' : null;
+    const t = accepted ? null : 'Hesap açmak için kullanım koşullarını kabul etmelisin.';
 
     setEmailError(e);
     setPasswordError(p);
     setConfirmError(c);
+    setTermsError(t);
     setFormError(null);
-    if (e || p || c) return;
+    if (e || p || c || t) return;
 
     setBusy(true);
     const result = await signUp(email, password, name);
@@ -146,18 +151,51 @@ export default function KayitScreen() {
             editable={!busy}
           />
 
-          <Button label="Hesap oluştur" onPress={submit} loading={busy} />
-          <Text style={[typeScale.caption, styles.legal, { color: colors.textFaint }]}>
-            {'Verilerinin nasıl işlendiğini '}
-            <Text
-              onPress={openPrivacyPolicy}
-              accessibilityRole="link"
-              style={{ color: colors.accent, fontWeight: '600' }}
+          {/*
+            Onay kutusu işaretli GELMİYOR: önceden işaretli kutu geçerli bir
+            onay sayılmıyor. Metinlere dokunmak kutuyu değiştirmiyor, sayfayı
+            açıyor.
+          */}
+          <View style={styles.consent}>
+            <Pressable
+              onPress={() => { setAccepted((v) => !v); setTermsError(null); }}
+              disabled={busy}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: accepted }}
+              accessibilityLabel="Kullanım Koşullarını kabul ediyorum"
+              hitSlop={space.sm}
+              style={[
+                styles.box,
+                {
+                  borderColor: termsError ? colors.negative : accepted ? colors.accent : colors.border,
+                  backgroundColor: accepted ? colors.accent : colors.surface,
+                },
+              ]}
             >
-              Gizlilik Politikası
+              {accepted ? (
+                <Icon name={{ ios: 'checkmark', android: 'check' }} size={16} color={colors.accentText} />
+              ) : null}
+            </Pressable>
+            <Text style={[typeScale.caption, styles.consentText, { color: colors.textSoft }]}>
+              <Text onPress={() => openLegalPage(TERMS_URL)} accessibilityRole="link" style={[styles.link, { color: colors.accent }]}>
+                Kullanım Koşulları
+              </Text>
+              {'\'nı okudum ve kabul ediyorum. Verilerimin '}
+              <Text onPress={() => openLegalPage(KVKK_URL)} accessibilityRole="link" style={[styles.link, { color: colors.accent }]}>
+                KVKK Aydınlatma Metni
+              </Text>
+              {' ve '}
+              <Text onPress={() => openLegalPage(PRIVACY_POLICY_URL)} accessibilityRole="link" style={[styles.link, { color: colors.accent }]}>
+                Gizlilik Politikası
+              </Text>
+              {'\'na göre işleneceğini okudum.'}
             </Text>
-            {'\'nda okuyabilirsin.'}
-          </Text>
+          </View>
+          {termsError ? (
+            <Text style={[typeScale.caption, { color: colors.negative }]}>{termsError}</Text>
+          ) : null}
+
+          <Button label="Hesap oluştur" onPress={submit} loading={busy} />
         </View>
 
         <View style={styles.signupRow}>
@@ -173,6 +211,13 @@ const styles = StyleSheet.create({
   page: { paddingHorizontal: space.xl, paddingBottom: space.xxxl, gap: space.xl },
   header: { gap: space.sm },
   form: { gap: space.lg },
-  legal: { textAlign: 'center' },
+  consent: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
+  box: {
+    width: 24, height: 24, marginTop: 2,
+    borderWidth: 2, borderRadius: radius.sm,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  consentText: { flex: 1 },
+  link: { fontWeight: '600' },
   signupRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
 });

@@ -8,6 +8,7 @@ import {
 import { wipeLocalUserData } from '@/db/repo';
 import { normalizeDisplayName } from '@/lib/profile';
 import { getSupabase, isCloudConfigured } from '@/lib/supabase';
+import { termsAcceptance } from '@/lib/legal';
 import { translateAuthError, validatePassword } from './auth-errors';
 
 /**
@@ -141,7 +142,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: displayName ? { data: { display_name: displayName } } : undefined,
+      // Kullanım koşulları onayı: kayıt ekranı onay kutusu işaretlenmeden
+      // buraya gelmiyor; hangi sürümün ne zaman kabul edildiği saklanıyor.
+      options: {
+        data: {
+          ...termsAcceptance(),
+          ...(displayName ? { display_name: displayName } : {}),
+        },
+      },
     });
     if (error) return { ok: false, error: translateAuthError(error) };
 
