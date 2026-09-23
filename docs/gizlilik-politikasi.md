@@ -19,16 +19,16 @@
 >   bu, projenin marka adı kuralıyla (kural platform çağrışımını
 >   yasaklamak için konmuştu) birlikte değerlendirilmeli.
 >
-> Mağazalar politikayı herkese açık bir **https** adresinde ister; bu
-> dosya o sayfanın kaynağıdır. Uygulama içinde kayıt ekranından ve
+> Yayındaki adres: https://dincerenes.github.io/surucum-yasal/ (kaynak depo `dincerenes/surucum-yasal`).
+> Bu dosya o sayfanın kaynağıdır; değişince sayfa da güncellenir. Uygulama içinde kayıt ekranından ve
 > Profil'den bu sayfaya bağlantı verilmelidir.
 >
 > Veri envanteri 23 Eylül 2026'daki koda göre çıkarıldı. Arayüze yeni
 > bir alan eklendiğinde (ör. plaka, not, fiş fotoğrafı) bu metin ve
 > `docs/magaza-formlari.md` birlikte güncellenmelidir.
 
-**Yürürlük tarihi:** [DOLDURULACAK: yayın tarihi]
-**Son güncelleme:** [DOLDURULACAK]
+**Yürürlük tarihi:** 23 Eylül 2026
+**Son güncelleme:** 23 Eylül 2026
 
 ---
 
@@ -40,7 +40,7 @@ Sürücüm, ticari sürücülerin kazancını, giderini ve aracının maliyetini
 takip ettiği bir mobil uygulamadır.
 
 - **Veri sorumlusu:** Muhammed Enes Dinçer (gerçek kişi)
-- **İletişim:** dincerenes466@gmail.com
+- **İletişim:** surucumappdestek@gmail.com
 
 ### 2. Kısaca
 
@@ -167,7 +167,7 @@ hizmeti yürütmek için şu alıcılar veriye erişebilir:
 | Alıcı | Ne için | Nerede |
 |---|---|---|
 | Supabase (veritabanı ve kimlik doğrulama altyapısı) | Hesabının ve kayıtlarının saklanması | Almanya (Frankfurt); şirket ABD merkezli |
-| E-posta gönderim hizmeti | Doğrulama ve şifre sıfırlama e-postaları | [DOLDURULACAK: sağlayıcı adı ve ülkesi — henüz seçilmedi] |
+| Google (Gmail) | Doğrulama ve şifre sıfırlama e-postalarının surucumappdestek@gmail.com adresinden gönderilmesi | ABD merkezli |
 | Yetkili personelimiz | Destek, hata ve veri bütünlüğü incelemesi | — |
 | Yetkili kamu kurumları | Yalnızca yasal zorunluluk hâlinde | — |
 
@@ -178,24 +178,23 @@ erişim, kimin hangi hesaba ve hangi kayıtlara baktığıyla birlikte
 **denetim kaydına** yazılır.
 
 **Yurt dışına aktarım:** Verilerin Avrupa Birliği içinde (Almanya)
-saklanması Türkiye dışına aktarım sayılır. Aktarım KVKK md. 9 kapsamında
-[DOLDURULACAK: hukukçu — dayanılan aktarım mekanizması] ile yapılır.
+saklanması ve e-postaların Google altyapısıyla gönderilmesi Türkiye dışına
+aktarım sayılır. Bu aktarım KVKK md. 9 kapsamında değerlendirilir; soruların
+için iletişim adresine yazabilirsin.
 
 ### 7. Ne kadar süre saklıyoruz
 
 - Hesabın açık olduğu sürece.
 - Uygulamada sildiğin bir kayıt önce "silindi" olarak işaretlenir, böylece
   diğer cihazlarından da kalkar; bu işaretli kopya hesabın silinene kadar
-  bulutta kalır. [DOLDURULACAK: işaretli kayıtların ayrıca kalıcı silinme
-  süresi belirlenecekse]
-- Hesabını sildiğinde kayıtların silme anında kalıcı olarak silinir. Sunucu yedeklerindeki kopyalar yedek
-  saklama süresi dolunca kendiliğinden silinir: [DOLDURULACAK: yedek
-  saklama süresi].
+  bulutta kalır; hesabın silinince onlar da kalıcı olarak silinir.
+- Hesabını sildiğinde kayıtların silme anında kalıcı olarak silinir. Sunucu yedeği tutuluyorsa
+  yedekteki kopyalar en geç 7 gün içinde kendiliğinden silinir.
 - Denetim kayıtları güvenlik ve hesap verebilirlik amacıyla
-  [DOLDURULACAK: süre] saklanır; bunlarda hesap kimliğin (rastgele
+  en fazla 1 yıl saklanır; bunlarda hesap kimliğin (rastgele
   numara) bulunur, kayıtlarının içeriği bulunmaz.
 - Kimlik doğrulama hizmetinin güvenlik kayıtları (IP, giriş zamanı)
-  [DOLDURULACAK: süre] saklanır.
+  en fazla 1 yıl saklanır.
 
 ### 8. Güvenlik
 
@@ -210,8 +209,8 @@ Kurul'a ve etkilenen kullanıcılara bildirim yapılır.
 - **Uygulama içinden:** Profil → **Hesabımı sil**. Onayından sonra
   hesabın ve bulutta saklanan tüm kayıtların (geri bildirimlerin dahil)
   silinir, telefonundaki veriler temizlenir. Bu işlem geri alınamaz.
-- **Uygulamaya erişimin yoksa:** [DOLDURULACAK: hesap silme talep sayfasının
-  https adresi] — Google Play bu adresi ayrıca ister.
+- **Uygulamaya erişimin yoksa:** https://dincerenes.github.io/surucum-yasal/hesap-silme.html adresindeki
+  adımları izle.
 - Uygulamayı telefondan kaldırmak yalnızca telefondaki kopyayı siler;
   bulut yedeği hesabın silinene kadar durur.
 
@@ -236,7 +235,7 @@ KVKK md. 11 uyarınca, kişisel verilerinle ilgili olarak:
 haklarına sahipsin. Kayıtlarının çoğunu uygulama içinden kendin
 görüntüleyebilir, düzeltebilir ve silebilirsin.
 
-**Başvuru:** hesabına kayıtlı e-posta adresinden dincerenes466@gmail.com adresine
+**Başvuru:** hesabına kayıtlı e-posta adresinden surucumappdestek@gmail.com adresine
 yazarak. Başvurular en geç **30 gün** içinde ücretsiz yanıtlanır
 (KVKK md. 13). Yanıttan memnun kalmazsan Kişisel Verileri Koruma
 Kurulu'na şikâyette bulunabilirsin.
@@ -257,7 +256,7 @@ değişiklikleri uygulama içinde duyururuz.
 
 6698 sayılı Kişisel Verilerin Korunması Kanunu'nun 10. maddesi uyarınca:
 
-**1. Veri sorumlusu:** Muhammed Enes Dinçer (gerçek kişi) — dincerenes466@gmail.com
+**1. Veri sorumlusu:** Muhammed Enes Dinçer (gerçek kişi) — surucumappdestek@gmail.com
 
 **2. İşlenen kişisel veriler**
 
@@ -290,13 +289,10 @@ taleplerinin ve hukuki yükümlülüklerin yerine getirilmesi.
 - (f) ilgili kişinin temel hak ve özgürlüklerine zarar vermemek kaydıyla
   veri sorumlusunun meşru menfaati — güvenlik ve denetim kayıtları.
 
-[DOLDURULACAK: hukukçu — yurt dışına aktarım için ayrıca dayanılan
-md. 9 mekanizması]
-
 **5. Aktarım:** Veriler, hizmetin sağlanması amacıyla veri işleyen
 sıfatıyla bulut altyapı sağlayıcısına (Supabase; sunucular Almanya,
-Frankfurt) ve e-posta gönderim hizmetine [DOLDURULACAK: sağlayıcı]
-aktarılır; yasal zorunluluk hâlinde yetkili kamu kurum ve kuruluşlarıyla
+Frankfurt) ve e-posta gönderim hizmetine (Google, Gmail)
+aktarılır; bu aktarımlar KVKK md. 9 kapsamında değerlendirilir; yasal zorunluluk hâlinde yetkili kamu kurum ve kuruluşlarıyla
 paylaşılabilir. Pazarlama ya da reklam amacıyla üçüncü kişilere
 aktarılmaz.
 
@@ -305,5 +301,5 @@ girişinle ve hesabın kullanımı sırasında otomatik olarak, elektronik
 ortamda toplanır.
 
 **7. Hakların:** KVKK md. 11'de sayılan haklarını (bkz. A-10)
-hesabına kayıtlı e-posta adresinden dincerenes466@gmail.com adresine yazarak
+hesabına kayıtlı e-posta adresinden surucumappdestek@gmail.com adresine yazarak
 kullanabilirsin.

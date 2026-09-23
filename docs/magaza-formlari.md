@@ -33,7 +33,7 @@ Kısa özet: **izleme yok, reklam yok, analitik yok, cihaz konumu yok,
 
 ## App Store Connect — App Privacy
 
-**Privacy Policy URL:** [DOLDURULACAK: politika adresi]
+**Privacy Policy URL:** https://dincerenes.github.io/surucum-yasal/
 
 **Do you or your third-party partners collect data from this app?** Yes
 
@@ -98,7 +98,7 @@ Notlar:
 
 **Do you provide a way for users to request that their data is deleted?**
 Yes — uygulama içinden (Profil → Hesabımı sil) ve web adresinden:
-[DOLDURULACAK: hesap silme talep adresi]
+https://dincerenes.github.io/surucum-yasal/hesap-silme.html
 
 ### Toplanan veriler
 
@@ -140,7 +140,7 @@ Notlar:
 
 ### Diğer Play alanları
 
-- **Privacy policy:** [DOLDURULACAK: politika adresi]
+- **Privacy policy:** https://dincerenes.github.io/surucum-yasal/
 - **Target audience:** 18 yaş ve üzeri (ticari araç kullanan yetişkinler).
 - **Ads:** Uygulamada reklam yok.
 - **App access:** giriş gerektiriyor → inceleme için test hesabı
