@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-  MAX_DISPLAY_NAME, blankToNull, firstName, greetingFor, initialOf, normalizeDisplayName,
+  MAX_DISPLAY_NAME, blankToNull, firstName, formatAvatar, greetingFor, initialOf,
+  normalizeDisplayName, parseAvatar,
 } from './profile.ts';
 
 describe('selamlama', () => {
@@ -39,5 +40,19 @@ describe('ad', () => {
     assert.equal(initialOf('ismail'), 'İ');
     assert.equal(initialOf('ırmak'), 'I');
     assert.equal(initialOf(''), null);
+  });
+});
+
+describe('hazır avatar', () => {
+  it('saklanan değer okunup geri yazılıyor', () => {
+    assert.deepEqual(parseAvatar('bolt-3'), { symbol: 'bolt', color: 3 });
+    assert.equal(formatAvatar({ symbol: 'bolt', color: 3 }), 'bolt-3');
+  });
+
+  it('boş ya da bozuk değer varsayılan avatar', () => {
+    for (const bad of [null, '', 'uzay-1', 'bolt-9', 'file:///x.jpg']) {
+      assert.deepEqual(parseAvatar(bad), { symbol: 'harf', color: null }, String(bad));
+    }
+    assert.equal(formatAvatar({ symbol: 'harf', color: null }), null);
   });
 });

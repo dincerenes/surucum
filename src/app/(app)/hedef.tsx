@@ -2,11 +2,9 @@ import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AmountInput, Button, Card, Chip, ChipRow, PageHeader } from '@/components/ui';
+import { AmountInput, Button, Card, PageHeader } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
-import {
-  THEME_LABELS, THEME_PREFERENCES, getActiveGoal, setGoal,
-} from '@/db/repo';
+import { getActiveGoal, setGoal } from '@/db/repo';
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatAmountForInput, parseAmount } from '@/lib/money';
 import { requestSync } from '@/sync/scheduler';
@@ -14,15 +12,15 @@ import { space, type as typeScale, useTheme } from '@/theme/use-theme';
 import { useState } from 'react';
 
 /**
- * Ayarlar — tema ve günlük hedef.
+ * Günlük hedef — İSTEĞE BAĞLI.
  *
- * İkisi farklı yerlerde duruyor ve bu bilinçli: tema CİHAZA ait (telefon
- * koyu, tablet açık olabilir), hedef ise sürücünün kendi kararı ve
- * geçmişi var. Gün kesme saati artık ayar değil (bkz.
- * `DEFAULT_CUTOFF_HOUR`).
+ * Eskiden kurulumun son adımıydı; sürücü "hedefi sonra, istersem
+ * koyarım" dedi. Profil'deki satırdan açılıyor. Hedef ciroya değil cebe
+ * kalana konur (bkz. `src/lib/goal.ts`). Tema Profil'e taşındı; gün
+ * kesme saati artık ayar değil (bkz. `DEFAULT_CUTOFF_HOUR`).
  */
-export default function SettingsScreen() {
-  const { colors, preference, setPreference } = useTheme();
+export default function GoalScreen() {
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const userId = user?.id ?? null;
@@ -51,25 +49,13 @@ export default function SettingsScreen() {
     >
       <PageHeader />
 
-      <Text style={[typeScale.display, { color: colors.text }]}>Ayarlar</Text>
+      <Text style={[typeScale.display, { color: colors.text }]}>Günlük hedef</Text>
+      <Text style={[typeScale.body, { color: colors.textSoft }]}>
+        Her gün cebinde kalmasını istediğin tutar. Anasayfada bir çubukla
+        ne kadar yaklaştığını görürsün.
+      </Text>
 
-      <Card title="Tema">
-        <ChipRow>
-          {THEME_PREFERENCES.map((t) => (
-            <Chip
-              key={t}
-              label={THEME_LABELS[t]}
-              selected={preference === t}
-              onPress={() => setPreference(t)}
-            />
-          ))}
-        </ChipRow>
-        <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-          Tema bu cihazda kalır, diğer cihazına geçmez.
-        </Text>
-      </Card>
-
-      <Card title="Günlük hedef">
+      <Card>
         <AmountInput
           label="Cebe kalan hedefi"
           value={goalValue}

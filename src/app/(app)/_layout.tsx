@@ -89,7 +89,9 @@ export default function AppLayout() {
       <Stack.Screen name="yakit" options={{ presentation: 'modal' }} />
       <Stack.Screen name="kayit" options={{ presentation: 'modal' }} />
       <Stack.Screen name="vardiya" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="ayarlar" />
+      <Stack.Screen name="hedef" />
+      <Stack.Screen name="profil-duzenle" />
+      <Stack.Screen name="sss" />
       <Stack.Screen name="araclar" />
       <Stack.Screen name="arsiv" />
       <Stack.Screen name="arsiv-ay" />

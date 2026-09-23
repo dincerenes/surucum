@@ -329,15 +329,21 @@ Bunlar tahmin değil, yaşanmış hataların karşılığı:
 Sürücünün raporu üzerine yeniden düzenleme: Anasayfa kart düzenine geçti
 (bkz. Yapı). Profil alanları (`drizzle/0016_profile_fields.sql`,
 `supabase/migrations/20260922235107_profile_fields.sql`) buluta uygulandı.
-Sırada Profil ekranı; İstatistik kartları ve verimlilik puanı sonraya
-bırakıldı.
+Profil tek sayfada: kimlik (hazır avatar, ad, şehir, "Profili düzenle"),
+Araçlarım, günlük hedef (`hedef.tsx`, eski Ayarlar), tema önizlemeleri,
+Destek (geri bildirim e-postası, SSS taslağı `sss.tsx`), çıkış ve hesap
+silme. Fotoğraf yükleme, bildirimler ve hukuki metinler sonraya; İstatistik
+kartları ve verimlilik puanı birlikte konuşulacak.
 
 Yayın öncesi kalanlar:
 
 - **Gerçek SMTP** bağlanması ve e-posta doğrulamasının geri açılması. Şu an
   `mailer_autoconfirm` açık ve şifre sıfırlama, üretim için desteklenmeyen
   yerleşik posta servisine bağlı.
-- **Uygulama içi hesap silme** — iki mağazanın da şartı.
+- **Hesap silme fonksiyonunun yayınlanması** — uygulama tarafı hazır
+  (Profil → Hesabımı sil → `supabase/functions/delete-account`), fonksiyon
+  `supabase functions deploy delete-account` ile buluta yüklenmeli.
+  Yüklenmeden düğme "Hesap silinemedi" der, hiçbir şeyi silmez.
 - **Gizlilik politikası:** taslak `docs/gizlilik-politikasi.md`. Hukukçudan
   geçmesi, herkese açık bir https adresinde yayımlanması ve kayıt ekranı ile
   Profil'den bağlanması gerekiyor. Mağaza formları: `docs/magaza-formlari.md`.

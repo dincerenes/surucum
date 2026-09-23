@@ -53,3 +53,39 @@ export function initialOf(displayName: string | null | undefined): string | null
   const clean = normalizeDisplayName(displayName);
   return clean ? upperTr(clean.charAt(0)) : null;
 }
+
+/**
+ * Hazır avatarlar — bir sembol ve bir renk.
+ *
+ * Saklanan değer `"<sembol>-<renk>"` (ör. `"bolt-3"`). `harf` sembolü
+ * adın baş harfi. Fotoğraf yükleme ayrı bir adım (depolama gerekiyor);
+ * o gelene kadar sürücü kendini bunlarla ifade ediyor.
+ */
+export const AVATAR_SYMBOLS = ['harf', 'car', 'taxi', 'star', 'bolt', 'crown', 'flame', 'leaf'] as const;
+export type AvatarSymbol = (typeof AVATAR_SYMBOLS)[number];
+
+/** Avatar zeminleri — beyaz sembolle iki temada da okunaklı, doygun renkler. */
+export const AVATAR_COLOR_COUNT = 6;
+
+export interface AvatarChoice {
+  symbol: AvatarSymbol;
+  /** 0..AVATAR_COLOR_COUNT-1. `null`: seçilmemiş, varsayılan görünüm. */
+  color: number | null;
+}
+
+/** Saklanan değeri okur. Boş ya da tanınmayan değer varsayılan avatar. */
+export function parseAvatar(value: string | null | undefined): AvatarChoice {
+  const match = /^([a-z]+)-(\d)$/.exec(value ?? '');
+  if (!match) return { symbol: 'harf', color: null };
+  const symbol = match[1] as AvatarSymbol;
+  const color = Number(match[2]);
+  if (!AVATAR_SYMBOLS.includes(symbol) || color >= AVATAR_COLOR_COUNT) {
+    return { symbol: 'harf', color: null };
+  }
+  return { symbol, color };
+}
+
+export function formatAvatar(choice: AvatarChoice): string | null {
+  if (choice.color == null) return null;
+  return `${choice.symbol}-${choice.color}`;
+}

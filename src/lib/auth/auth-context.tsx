@@ -1,10 +1,11 @@
-import type { Session, User } from '@supabase/supabase-js';
+import { FunctionsFetchError, type Session, type User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useState,
   type ReactNode,
 } from 'react';
 
+import { wipeLocalUserData } from '@/db/repo';
 import { normalizeDisplayName } from '@/lib/profile';
 import { getSupabase, isCloudConfigured } from '@/lib/supabase';
 import { translateAuthError, validatePassword } from './auth-errors';
@@ -40,6 +41,8 @@ interface AuthActions {
   sendPasswordReset(email: string): Promise<AuthResult>;
   updatePassword(password: string): Promise<AuthResult>;
   cancelRecovery(): void;
+  /** Hesabı bulutta ve bu cihazda KALICI olarak siler; ardından oturum kapanır. */
+  deleteAccount(): Promise<AuthResult>;
 }
 
 export type AuthResult =
@@ -165,6 +168,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, []);
 
+  /**
+   * Hesap silme — mağazaların istediği uygulama içi silme.
+   *
+   * Sıra önemli: ÖNCE bulut. Silme orada başarısız olursa cihazdaki
+   * veriye dokunulmuyor; sürücü hesabını da verisini de kaybetmeden
+   * tekrar deneyebilir.
+   *
+   * Bulut sildikten sonra ÖNCE çıkış, SONRA yerel temizlik: çıkış senkron
+   * bekçisini düşürüyor (bkz. `sync/guard.ts`). Tersi olsaydı o an süren
+   * bir tur, temizlenen hesabın hata kaydını ve imlecini geri yazabilirdi.
+   * Çıkışın hatası önemsiz — kullanıcı artık yok, oturum yine de siliniyor.
+   */
+  const deleteAccount = useCallback(async (): Promise<AuthResult> => {
+    const supabase = getSupabase();
+    if (!supabase) return CLOUD_UNAVAILABLE;
+    const userId = session?.user.id;
+    if (!userId) return { ok: false, error: 'Oturumun sona erdi. Tekrar giriş yap.' };
+
+    const failed: AuthResult = { ok: false, error: 'Hesap silinemedi, biraz sonra tekrar dene.' };
+    try {
+      const { data, error } = await supabase.functions.invoke<{ ok?: boolean }>(
+        'delete-account', { method: 'POST' },
+      );
+      if (error instanceof FunctionsFetchError) {
+        return { ok: false, error: 'İnternet bağlantısı yok, hesabın silinmedi.' };
+      }
+      if (error || data?.ok !== true) return failed;
+    } catch {
+      return failed;
+    }
+
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+    wipeLocalUserData(userId);
+    setSession(null);
+    return { ok: true };
+  }, [session]);
+
   const sendPasswordReset = useCallback(async (email: string): Promise<AuthResult> => {
     const supabase = getSupabase();
     if (!supabase) return CLOUD_UNAVAILABLE;
@@ -213,10 +253,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendPasswordReset,
       updatePassword,
       cancelRecovery,
+      deleteAccount,
     }),
     [
       session, restoring, cloudAvailable, recovery, recoveryReady, recoveryError,
       signUp, signIn, signOut, sendPasswordReset, updatePassword, cancelRecovery,
+      deleteAccount,
     ],
   );
 

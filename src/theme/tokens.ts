@@ -127,6 +127,14 @@ export function accentStep(
   return steps[index];
 }
 
+/**
+ * Hazır avatar zeminleri — beyaz sembolle iki temada da okunaklı.
+ * Sıra saklanan değerin parçası (`"bolt-3"`): DEĞİŞTİRME, yalnızca sona ekle.
+ */
+export const AVATAR_COLORS = [
+  '#2563EB', '#16A34A', '#EA580C', '#9333EA', '#DB2777', '#0891B2',
+] as const;
+
 /** 4'ün katları — ölçek tutarlı kalsın diye ara değer kullanılmıyor. */
 export const space = {
   xs: 4,

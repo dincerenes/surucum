@@ -41,9 +41,11 @@ export default function HomeScreen() {
     if (!userId) return null;
     const at = Date.now();
     const today = todayBusinessDate(getCutoffHour(userId), new Date(at));
+    const settings = getSettings(userId);
     return {
       today,
-      name: getSettings(userId)?.displayName ?? null,
+      name: settings?.displayName ?? null,
+      avatar: settings?.avatar ?? null,
       overview: getHomeOverview(userId, today, at),
     };
   }, [userId]);
@@ -74,7 +76,7 @@ export default function HomeScreen() {
           accessibilityLabel="Profil"
           hitSlop={space.sm}
         >
-          <Avatar name={data?.name} size={52} />
+          <Avatar name={data?.name} avatar={data?.avatar} size={52} />
         </Pressable>
       </View>
 
