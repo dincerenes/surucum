@@ -20,14 +20,15 @@ Kısa özet: **izleme yok, reklam yok, analitik yok, cihaz konumu yok,
 - [ ] **Gizlilik politikası https adresi** — `docs/gizlilik-politikasi.md`
       herkese açık bir sayfada yayında. `[DOLDURULACAK]` alanları
       doldurulmuş ve metin hukukçudan geçmiş.
-- [ ] **Uygulama içi bağlantı** — kayıt ekranında ve Profil'de politikaya
+- [x] **Uygulama içi bağlantı** — kayıt ekranında ve Profil'de politikaya
       bağlantı (App Store 5.1.1(i)).
 - [x] **Uygulama içi hesap silme** — Profil → Hesabımı sil çalışıyor
       (App Store 5.1.1(v); Play hesap silme politikası).
-- [ ] **Hesap silme web adresi** — uygulamaya erişimi olmayan kullanıcı
+- [x] **Hesap silme web adresi** — uygulamaya erişimi olmayan kullanıcı
       için talep sayfası. Play bunu ayrı bir alan olarak istiyor.
-- [ ] Gerçek SMTP bağlı; e-posta gönderim sağlayıcısı politikada adıyla
-      yazılı.
+      https://dincerenes.github.io/surucum-yasal/hesap-silme.html
+- [ ] Gerçek SMTP bağlı (Gmail, surucumappdestek@gmail.com); sağlayıcı
+      politikada adıyla yazılı.
 
 ---
 

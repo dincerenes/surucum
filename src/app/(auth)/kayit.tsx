@@ -10,6 +10,7 @@ import { Field } from '@/components/ui/field';
 import { Notice } from '@/components/ui/notice';
 import { TextLink } from '@/components/ui/text-link';
 import { useAuth } from '@/lib/auth/auth-context';
+import { openPrivacyPolicy } from '@/lib/legal';
 import { MIN_PASSWORD_LENGTH, validateEmail, validatePassword } from '@/lib/auth/auth-errors';
 import { MAX_DISPLAY_NAME } from '@/lib/profile';
 import { space, type as typeScale, useTheme } from '@/theme/use-theme';
@@ -146,6 +147,17 @@ export default function KayitScreen() {
           />
 
           <Button label="Hesap oluştur" onPress={submit} loading={busy} />
+          <Text style={[typeScale.caption, styles.legal, { color: colors.textFaint }]}>
+            {'Verilerinin nasıl işlendiğini '}
+            <Text
+              onPress={openPrivacyPolicy}
+              accessibilityRole="link"
+              style={{ color: colors.accent, fontWeight: '600' }}
+            >
+              Gizlilik Politikası
+            </Text>
+            {'\'nda okuyabilirsin.'}
+          </Text>
         </View>
 
         <View style={styles.signupRow}>
@@ -161,5 +173,6 @@ const styles = StyleSheet.create({
   page: { paddingHorizontal: space.xl, paddingBottom: space.xxxl, gap: space.xl },
   header: { gap: space.sm },
   form: { gap: space.lg },
+  legal: { textAlign: 'center' },
   signupRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
 });

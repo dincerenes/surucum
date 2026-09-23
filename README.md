@@ -374,9 +374,13 @@ Yayın öncesi kalanlar:
 - **Gerçek SMTP** bağlanması ve e-posta doğrulamasının geri açılması. Şu an
   `mailer_autoconfirm` açık ve şifre sıfırlama, üretim için desteklenmeyen
   yerleşik posta servisine bağlı.
-- **Gizlilik politikası:** taslak `docs/gizlilik-politikasi.md`. Hukukçudan
-  geçmesi, herkese açık bir https adresinde yayımlanması ve kayıt ekranı ile
-  Profil'den bağlanması gerekiyor. Mağaza formları: `docs/magaza-formlari.md`.
+- **Gizlilik politikası:** https://dincerenes.github.io/surucum-yasal/
+  (hesap silme: `hesap-silme.html`). Kaynak metin
+  `docs/gizlilik-politikasi.md`; sayfalar ayrı, herkese açık
+  `dincerenes/surucum-yasal` deposunda — metin değişince orası da
+  güncellenir. Kayıt ekranından ve Profil'den bağlantı var (`src/lib/legal.ts`).
+  Yurt dışına aktarımın dayanağı hukukçuya sorulacak. Mağaza formları:
+  `docs/magaza-formlari.md`.
 - **Android hiç derlenmedi** — geliştirme makinesinde Android SDK yok.
   `expo prebuild --platform android` temiz geçiyor.
 - **Uygulama adı** (16 Eylül'de kontrol edildi): iki mağazada da tam olarak

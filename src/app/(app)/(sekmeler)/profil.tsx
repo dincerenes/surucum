@@ -14,6 +14,7 @@ import {
   listActiveVehicles, listVehicleFuelTypes,
 } from '@/db/repo';
 import { FUEL_TYPE_LABELS } from '@/db/schema/_shared';
+import { openPrivacyPolicy } from '@/lib/legal';
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatKurus } from '@/lib/money';
 import { useDriver } from '@/lib/use-driver';
@@ -31,8 +32,8 @@ import {
  * sırasıyla: kim olduğun, neyle çalıştığın, uygulamanın nasıl göründüğü,
  * yardım. Hesaptan çıkış ve hesabı silme en altta, kazara dokunulmasın.
  *
- * Hukuki metinler (gizlilik, KVKK, kullanım koşulları) metinler hazır
- * olunca "Destek"in altına eklenecek.
+ * Gizlilik politikası "Destek"in altında, tarayıcıda açılıyor (mağazalar
+ * uygulama içinden bağlantı istiyor).
  */
 export default function ProfileScreen() {
   const { colors } = useTheme();
@@ -224,6 +225,12 @@ export default function ProfileScreen() {
           label="Sık sorulan sorular"
           detail="Ciro, cebe kalan, yıpranma payı…"
           onPress={() => router.push('/sss')}
+        />
+        <Row
+          icon={{ ios: 'lock.shield.fill', android: 'shield' }}
+          label="Gizlilik politikası"
+          detail="Hangi verini neden tutuyoruz, nasıl silinir"
+          onPress={openPrivacyPolicy}
         />
       </Card>
 
