@@ -6,6 +6,9 @@
 >
 > Hukukçuya ayrıca sorulacaklar:
 >
+> - Posta adresi: veri sorumlusu ev adresini yayımlamak istemiyor. Metin
+>   başvuruyu yalnızca kayıtlı e-posta üzerinden alıyor. Yazılı başvuru
+>   için KEP adresi ya da sanal ofis adresi gerekip gerekmediği.
 > - Yurt dışına aktarım (KVKK md. 9, 2024 değişikliği): verinin Almanya'da
 >   durması ve altyapı sağlayıcısının ABD merkezli olması için hangi
 >   güvence kullanılacak (standart sözleşme + Kurum'a bildirim vb.).
@@ -36,10 +39,8 @@
 Sürücüm, ticari sürücülerin kazancını, giderini ve aracının maliyetini
 takip ettiği bir mobil uygulamadır.
 
-- **Veri sorumlusu:** [DOLDURULACAK: gerçek kişi ise ad-soyad; şirket ise
-  ticaret unvanı, MERSİS / vergi numarası]
-- **Adres:** [DOLDURULACAK: tebligat adresi]
-- **İletişim:** [DOLDURULACAK: kişisel veri başvuruları için e-posta adresi]
+- **Veri sorumlusu:** Muhammed Enes Dinçer (gerçek kişi)
+- **İletişim:** dincerenes466@gmail.com
 
 ### 2. Kısaca
 
@@ -187,8 +188,7 @@ saklanması Türkiye dışına aktarım sayılır. Aktarım KVKK md. 9 kapsamın
   diğer cihazlarından da kalkar; bu işaretli kopya hesabın silinene kadar
   bulutta kalır. [DOLDURULACAK: işaretli kayıtların ayrıca kalıcı silinme
   süresi belirlenecekse]
-- Hesabını sildiğinde kayıtların [DOLDURULACAK: süre — planlanan akışta
-  silme anında] kalıcı olarak silinir. Sunucu yedeklerindeki kopyalar yedek
+- Hesabını sildiğinde kayıtların silme anında kalıcı olarak silinir. Sunucu yedeklerindeki kopyalar yedek
   saklama süresi dolunca kendiliğinden silinir: [DOLDURULACAK: yedek
   saklama süresi].
 - Denetim kayıtları güvenlik ve hesap verebilirlik amacıyla
@@ -236,8 +236,8 @@ KVKK md. 11 uyarınca, kişisel verilerinle ilgili olarak:
 haklarına sahipsin. Kayıtlarının çoğunu uygulama içinden kendin
 görüntüleyebilir, düzeltebilir ve silebilirsin.
 
-**Başvuru:** [DOLDURULACAK: e-posta adresi ve/veya posta adresi; KEP
-adresi varsa]. Başvurular en geç **30 gün** içinde ücretsiz yanıtlanır
+**Başvuru:** hesabına kayıtlı e-posta adresinden dincerenes466@gmail.com adresine
+yazarak. Başvurular en geç **30 gün** içinde ücretsiz yanıtlanır
 (KVKK md. 13). Yanıttan memnun kalmazsan Kişisel Verileri Koruma
 Kurulu'na şikâyette bulunabilirsin.
 
@@ -257,7 +257,7 @@ değişiklikleri uygulama içinde duyururuz.
 
 6698 sayılı Kişisel Verilerin Korunması Kanunu'nun 10. maddesi uyarınca:
 
-**1. Veri sorumlusu:** [DOLDURULACAK: ad-soyad / unvan, adres, iletişim]
+**1. Veri sorumlusu:** Muhammed Enes Dinçer (gerçek kişi) — dincerenes466@gmail.com
 
 **2. İşlenen kişisel veriler**
 
@@ -305,4 +305,5 @@ girişinle ve hesabın kullanımı sırasında otomatik olarak, elektronik
 ortamda toplanır.
 
 **7. Hakların:** KVKK md. 11'de sayılan haklarını (bkz. A-10)
-[DOLDURULACAK: başvuru adresi] üzerinden kullanabilirsin.
+hesabına kayıtlı e-posta adresinden dincerenes466@gmail.com adresine yazarak
+kullanabilirsin.
