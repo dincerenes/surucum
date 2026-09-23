@@ -141,22 +141,49 @@ ama hiçbir kartta görünmeyen kayıt olmasın diye. Ekranlarda "sefer" yerine
 **"yolcu"** yazıyor (her sefer bir yolcu); kodda ve veritabanında adı
 `rides`.
 
-### Yıpranma payı sorulmaz
+### Yıpranma payı sürücünün cevaplarından
 
-Kilometre başına yıpranma kullanıcıya sorulmuyor ve arayüzde düzenlenmiyor.
-Sürücü aracının kaç kilometrede ne kadar değer kaybettiğini bilmiyor; sorarsak
-ya boş bırakır ya rastgele bir sayı yazar, ikisi de raporu kirletir.
+Kilometre başına yıpranma payı kurulumda sorulan üç kalemden hesaplanıyor
+(`src/lib/wear.ts`):
 
-**Tek katsayı, kalem kalem değil**: amortisman, lastik, balata, bakım, MTV,
-sigorta hepsi bunun içinde. Değer **bilerek düşük** ve gerçek maliyeti tam
-karşılaması hedeflenmiyor — yüksek bir pay sürücünün kârını olduğundan kötü
-gösterir, sürücü sayıya inanmaz ve uygulamayı bırakır. Eksik tahmin, güven
-kaybından iyidir.
+- **Bakım**: bakım maliyeti ÷ kaç km'de bir yapıldığı.
+- **Lastik**: dört lastiğin maliyeti ÷ kaç km'de bir değiştiği.
+- **Değer kaybı**: aracın ikinci el değeri × %0,90 ÷ 10.000 km.
 
-Sahiplik biçimine göre atanıyor: kendi aracı ve kiralık plakada **250 kuruş/km**,
-kiralık araç ve işveren aracında **sıfır** — o maliyet zaten kira bedeliyle
+Örnek: 8.000 ₺ / 10.000 km + 16.000 ₺ / 40.000 km + 900.000 ₺'lik araç =
+0,80 + 0,40 + 0,81 = **2,01 ₺/km**. Değer kaybı oranı **bilerek düşük**
+(ilk öneri %2'ydi, sürücü yüksek buldu). Yüksek bir pay kârı olduğundan kötü
+gösterir ve sürücü sayıya inanmaz. Oran yayın sonrası gerçek veriyle ayarlanacak.
+
+Bilinmeyen kalem sıfır sayılmıyor, **varsayılandan** geliyor: bakım 0,60,
+lastik 0,40, değer kaybı 1,50 ₺/km. Hiçbir şey bilmeyen sürücünün payı eski
+sabit katsayıyla aynı: **250 kuruş/km**. Hesaplanan katsayı araçta ayrıca
+saklanıyor; formül değişirse geçmiş raporlar kaymıyor. Girdiler araç
+düzenlemede değiştirilince katsayı yeniden hesaplanıyor. Geçmiş vardiyalar
+eski katsayıda donduruluyor.
+
+Kiralık araç ve işveren aracında pay **sıfır**: o maliyet zaten kira bedeliyle
 sayılıyor, sıfırlanmazsa iki kez düşülür. Sahiplik kurulumda sorulmuyor
-(varsayılan "kendi aracım"); araç düzenlemede değiştiriliyor.
+(varsayılan "kendi aracım"); araç düzenlemede değiştiriliyor. Hasar kaydı ve
+vites saklanıyor ama şimdilik hesaba girmiyor.
+
+### Kurulum sihirbazı
+
+Yedi adım: ad soyad ve şehir → marka (logolu liste), model, yıl → yakıt ve
+vites → periyodik bakım → lastik → ikinci el değer, güncel km, hasar kaydı →
+özet ve "Başla". Kişisel bilgiler ilk adımda hemen kaydediliyor. Araç
+**yalnızca son adımda** yazılıyor; yarıda bırakılan kurulum yarım araç
+bırakmıyor. Bakım, lastik ve değer adımları "Bilmiyorum, atla" ile geçilebiliyor.
+
+**Kurulum yalnızca hesap gerçekten boşsa açılıyor** (`src/lib/setup-gate.ts`).
+Boş bir cihazda (yeni telefon, yeniden kurulum) önce bu hesabın ilk senkronu
+bekleniyor. Eskiden araçlar buluttan inmeden kurulum açılıyor, her girişte
+aynı araç bir kez daha ekleniyordu.
+
+Marka logoları [car-logos-dataset](https://github.com/filippofilip95/car-logos-dataset)
+paketinden alındı (MIT). Logolar markaların tescilli malı; yalnızca sürücünün
+kendi aracının markasını göstermek için kullanılıyor. Logosu olmayan markada
+(Togg) baş harf rozeti çıkıyor.
 
 ### Sabit gider tahakkuku yok (v1)
 

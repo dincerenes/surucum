@@ -1,99 +1,66 @@
-import { useState } from 'react';
 import { router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text } from 'react-native';
 
-import { Button, SelectField } from '@/components/ui';
+import { SetupStep } from '@/components/setup-step';
+import { BrandBadge, SelectField } from '@/components/ui';
+import { draftLabel, useSetupDraft } from '@/lib/setup-draft';
 import {
   OTHER_OPTION, VEHICLE_MAKES, modelYears, modelsFor,
 } from '@/lib/vehicle-catalog';
-import { space, type as typeScale, useTheme } from '@/theme/use-theme';
+import { type as typeScale, useTheme } from '@/theme/use-theme';
+
+const LISTED_MAKES = VEHICLE_MAKES.filter((m) => m !== OTHER_OPTION);
 
 /**
- * Kurulum 1/2 — araç kimliği.
+ * Kurulum 2 — araç: marka, model, yıl.
  *
- * Üçü de LİSTEDEN seçiliyor, elle yazılmıyor: aynı aracı "renault",
- * "Renault", "RENAULT" diye yazmak veriyi kirletir ve ileride araç
- * bazlı karşılaştırmayı imkânsız kılar. Ayrıca üç dokunuş, üç yazımdan
- * hızlı.
+ * Üçü de LİSTEDEN seçiliyor; markalar listede logolarıyla. Listede
+ * olmayan marka ya da model için listenin altında serbest giriş var —
+ * hiçbir sürücü listeye takılıp kurulumu bırakamamalı.
  *
- * Plaka SORULMUYOR. Hedef kitle kendi arabasıyla çalışıyor; plaka hiçbir
- * hesaba girmiyor ve gereksiz kişisel veri istemek güven kaybettiriyor.
+ * Plaka SORULMUYOR: hiçbir hesaba girmiyor, gereksiz kişisel veri.
  */
 export default function VehicleStep() {
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
-
-  const [make, setMake] = useState<string | null>(null);
-  const [model, setModel] = useState<string | null>(null);
-  const [year, setYear] = useState<string | null>(null);
+  const { draft, update } = useSetupDraft();
 
   /** Marka değişince model sıfırlanır — eski model yeni markaya ait değil. */
-  function pickMake(next: string) {
-    setMake(next);
-    setModel(null);
+  function pickMake(make: string) {
+    if (make !== draft.make) update({ make, model: null });
   }
 
-  const label = [make, model, year]
-    .filter((p) => p && p !== OTHER_OPTION)
-    .join(' ');
-  const valid = make != null && model != null;
+  const valid = draft.make != null && draft.model != null;
 
   return (
-    <View style={[styles.page, { paddingTop: insets.top + space.xxl }]}>
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <Text style={[typeScale.display, { color: colors.text }]}>
-          Hangi araçla çalışıyorsun?
-        </Text>
-        <Text style={[typeScale.body, { color: colors.textSoft }]}>
-          Kazanç ve gider bu araca yazılır. Sonradan araç ekleyip
-          aralarında geçebilirsin.
-        </Text>
-
-        <View style={styles.fields}>
-          <SelectField
-            label="Marka" value={make} onChange={pickMake}
-            options={VEHICLE_MAKES} placeholder="Marka seç"
-            searchable allowCustom
-          />
-          <SelectField
-            label="Model" value={model} onChange={setModel}
-            options={modelsFor(make)} placeholder="Önce marka seç"
-            disabled={make == null} allowCustom
-          />
-          <SelectField
-            label="Yıl" value={year} onChange={setYear}
-            options={modelYears()} placeholder="Yıl seç (isteğe bağlı)"
-            searchable
-          />
-        </View>
-
-        {label ? (
-          <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-            Araç <Text style={{ color: colors.text }}>{label}</Text> olarak adlandırılacak.
-          </Text>
-        ) : null}
-      </ScrollView>
-
-      <Button
-        label="Devam"
-        disabled={!valid}
-        onPress={() => router.push({
-          pathname: '/detay',
-          params: {
-            make: make ?? '',
-            model: model ?? '',
-            year: year ?? '',
-            label: label || 'Aracım',
-          },
-        })}
+    <SetupStep
+      step={2}
+      title="Hangi araçla çalışıyorsun?"
+      subtitle="Kazanç ve giderler bu araca yazılır. Sonradan araç ekleyip aralarında geçebilirsin."
+      primary={{ label: 'Devam', onPress: () => router.push('/yakit-vites'), disabled: !valid }}
+    >
+      <SelectField
+        label="Marka" value={draft.make} onChange={pickMake}
+        options={LISTED_MAKES} placeholder="Marka seç"
+        searchable allowCustom
+        renderIcon={(make) => <BrandBadge make={make} size={32} />}
       />
-    </View>
+      <SelectField
+        label="Model" value={draft.model} onChange={(model) => update({ model })}
+        options={modelsFor(draft.make)}
+        placeholder={draft.make ? 'Model seç' : 'Önce marka seç'}
+        disabled={!draft.make} allowCustom
+      />
+      <SelectField
+        label="Yıl" value={draft.year} onChange={(year) => update({ year })}
+        options={modelYears()} placeholder="Yıl seç (isteğe bağlı)"
+        searchable
+      />
+
+      {valid ? (
+        <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+          Araç <Text style={{ color: colors.text }}>{draftLabel(draft)}</Text> olarak adlandırılacak.
+        </Text>
+      ) : null}
+    </SetupStep>
   );
 }
-
-const styles = StyleSheet.create({
-  page: { flex: 1, paddingHorizontal: space.xl, paddingBottom: space.xl },
-  body: { gap: space.md, paddingBottom: space.xl },
-  fields: { gap: space.lg, marginTop: space.md },
-});

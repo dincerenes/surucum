@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import {
   FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
@@ -19,6 +19,8 @@ interface Props {
   searchable?: boolean;
   /** Listede olmayan için serbest giriş — kimse listeye takılıp kalmasın. */
   allowCustom?: boolean;
+  /** Seçeneğin solunda görsel — ör. marka logosu. Seçili değerde de çizilir. */
+  renderIcon?: (option: string) => ReactNode;
 }
 
 /**
@@ -34,7 +36,7 @@ interface Props {
  */
 export function SelectField({
   label, value, onChange, options, placeholder = 'Seç',
-  disabled = false, searchable = false, allowCustom = false,
+  disabled = false, searchable = false, allowCustom = false, renderIcon,
 }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -73,6 +75,7 @@ export function SelectField({
           },
         ]}
       >
+        {value && renderIcon ? renderIcon(value) : null}
         <Text
           style={[
             typeScale.body,
@@ -133,6 +136,7 @@ export function SelectField({
                   },
                 ]}
               >
+                {renderIcon ? renderIcon(item) : null}
                 <Text style={[typeScale.body, { color: colors.text, flex: 1 }]}>
                   {item}
                 </Text>
@@ -236,6 +240,7 @@ const styles = StyleSheet.create({
   option: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: space.md,
     minHeight: HIT_SIZE,
     paddingVertical: space.md,
     borderBottomWidth: 1,

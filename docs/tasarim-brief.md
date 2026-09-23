@@ -62,6 +62,10 @@ aslında o gün zarar etmiş olabilir. Tasarım bu farkı görünür kılmalı.
 
 ### 3. Km yıpranma payı kullanıcıya sorulmaz, düzenlenmez
 
+> **GÜNCEL (23 Eylül 2026):** Bu karar değişti. Pay artık kurulumda sorulan
+> bakım, lastik ve ikinci el değerden hesaplanıyor ve araç düzenlemede
+> değiştirilebiliyor. Bkz. README → "Yıpranma payı sürücünün cevaplarından".
+
 Amortisman + lastik + balata + bakım. Sistem atıyor, sürücü değiştiremez.
 
 Ekranda **düzenlenebilir alan olarak ASLA** çıkmaz. Gerçek kâr satırının altında
@@ -102,6 +106,9 @@ durumu olacak ama sekme çubuğu sonradan yeniden dizilmesin diye şimdi tasarla
 3. **Şifre sıfırlama** — e-posta
 
 ### B. İlk kurulum (kayıttan sonra, zorunlu, atlanamaz)
+
+> **GÜNCEL (23 Eylül 2026):** Kurulum yedi adımlı sihirbaza dönüştü. Bkz.
+> README → "Kurulum sihirbazı". Aşağıdaki liste ilk taslak.
 
 4. **Araç ekle** — araç adı, plaka (isteğe bağlı), **sahiplik biçimi** (4 seçenekli
    seçim: *Kendi aracım · Kiralık plaka · Kiralık araç · İşverenin aracı*),

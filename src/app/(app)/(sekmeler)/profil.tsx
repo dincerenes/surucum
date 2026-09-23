@@ -5,7 +5,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Avatar, Button, Card, Icon, type IconName } from '@/components/ui';
+import {
+  Avatar, BrandBadge, Button, Card, Icon, type IconName,
+} from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import {
   THEME_LABELS, THEME_PREFERENCES, type ThemePreference, getActiveGoal, getSettings,
@@ -14,12 +16,11 @@ import {
 import { FUEL_TYPE_LABELS } from '@/db/schema/_shared';
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatKurus } from '@/lib/money';
-import { upperTr } from '@/lib/text';
 import { useDriver } from '@/lib/use-driver';
 import { pendingCount } from '@/sync/push';
 import { getSyncStatus } from '@/sync/state';
 import {
-  AVATAR_COLORS, HIT_SIZE, palette, radius, space, type as typeScale, useTheme,
+  HIT_SIZE, palette, radius, space, type as typeScale, useTheme,
 } from '@/theme/use-theme';
 
 /**
@@ -170,9 +171,7 @@ export default function ProfileScreen() {
               opacity: pressed ? 0.7 : 1,
             }]}
           >
-            <View style={[styles.badge, { backgroundColor: AVATAR_COLORS[i % AVATAR_COLORS.length] }]}>
-              <Text style={styles.badgeText}>{upperTr(vehicle.label.charAt(0))}</Text>
-            </View>
+            <BrandBadge make={vehicle.make} size={40} />
             <View style={styles.flex}>
               <Text style={[typeScale.bodyStrong, { color: colors.text }]} numberOfLines={1}>
                 {vehicle.label}
@@ -344,10 +343,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: space.md,
     minHeight: HIT_SIZE, paddingVertical: space.sm,
   },
-  badge: {
-    width: 40, height: 40, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center',
-  },
-  badgeText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   flex: { flex: 1, gap: 2 },
   active: {
     ...typeScale.label, borderRadius: radius.pill, paddingHorizontal: space.sm, paddingVertical: 3,

@@ -1,6 +1,6 @@
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import {
-  DEFAULT_WEAR_PER_KM, FUEL_TYPES, OWNERSHIP_TYPES, kurus, syncColumns,
+  DEFAULT_WEAR_PER_KM, FUEL_TYPES, OWNERSHIP_TYPES, TRANSMISSION_TYPES, kurus, syncColumns,
 } from './_shared';
 
 /**
@@ -34,6 +34,24 @@ export const vehicles = sqliteTable(
      * ilerde güncellersek mevcut araçların geçmiş raporları kaymasın.
      */
     wearPerKmKurus: kurus().notNull().default(DEFAULT_WEAR_PER_KM.owned),
+
+    transmission: text({ enum: TRANSMISSION_TYPES }),
+
+    /**
+     * Yıpranma payının GİRDİLERİ — kurulumda sürücüye soruluyor ve
+     * `wearPerKmKurus` bunlardan hesaplanıyor (bkz. `lib/wear.ts`).
+     * Hepsi boş olabilir: bilmeyen sürücü atlıyor, o kalemin payı
+     * varsayılandan geliyor. Katsayı ayrıca SAKLANIYOR, her okumada
+     * yeniden hesaplanmıyor: formül ileride değişirse geçmiş kaymasın.
+     */
+    maintenanceIntervalKm: integer(),
+    maintenanceCostKurus: kurus(),
+    tireIntervalKm: integer(),
+    tireCostKurus: kurus(),
+    /** İkinci el piyasa değeri — değer kaybı payı bundan. */
+    marketValueKurus: kurus(),
+    /** Hasar kaydı var mı? `null`: sorulmadı. Şimdilik hesaba girmiyor. */
+    hasAccidentRecord: integer({ mode: 'boolean' }),
 
     isActive: integer({ mode: 'boolean' }).notNull().default(true),
     sortOrder: integer().notNull().default(0),

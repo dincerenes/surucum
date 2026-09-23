@@ -86,6 +86,15 @@ export const OWNERSHIP_LABELS: Record<OwnershipType, string> = {
   employer: 'İşverenin aracı',
 };
 
+/** Vites tipi. Hesaba girmiyor; araç kartında ve ileride tüketim karşılaştırmasında. */
+export const TRANSMISSION_TYPES = ['manual', 'automatic'] as const;
+export type TransmissionType = (typeof TRANSMISSION_TYPES)[number];
+
+export const TRANSMISSION_LABELS: Record<TransmissionType, string> = {
+  manual: 'Manuel',
+  automatic: 'Otomatik',
+};
+
 export const PAYMENT_METHODS = ['cash', 'card', 'app', 'other'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 

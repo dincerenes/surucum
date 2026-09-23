@@ -27,3 +27,4 @@ export { PeriodSummaryCard, periodRowsData } from './period-summary-card';
 export { ShiftCard } from './shift-card';
 export { ShiftRequired } from './shift-required';
 export { Avatar, AVATAR_ICONS } from './avatar';
+export { BrandBadge } from './brand-badge';

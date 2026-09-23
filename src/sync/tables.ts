@@ -45,7 +45,7 @@ export function isSyncTable(name: string): name is SyncTable {
  * `true` gelir, SQLite'a 1 yazılmalı.
  */
 export const BOOLEAN_COLUMNS: Readonly<Record<string, readonly string[]>> = {
-  vehicles: ['is_active'],
+  vehicles: ['is_active', 'has_accident_record'],
   vehicle_fuel_types: ['is_consumption_measured', 'is_primary'],
   earning_sources: ['is_active'],
   expense_categories: ['is_system', 'is_active'],

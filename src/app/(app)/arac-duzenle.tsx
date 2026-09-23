@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  AboveKeyboard, AmountInput, Button, Chip, ChipGrid, Field, PageHeader, SelectField,
+  AboveKeyboard, AmountInput, Button, Card, Chip, ChipGrid, Field, PageHeader,
+  SelectField,
 } from '@/components/ui';
 import { useDbValue } from '@/db/use-db';
 import {
@@ -13,13 +14,14 @@ import {
   updateSettings, updateVehicle,
 } from '@/db/repo';
 import {
-  FUEL_TYPE_LABELS, type FuelType, OWNERSHIP_LABELS, OWNERSHIP_TYPES,
-  type OwnershipType, defaultWearPerKm,
+  DEFAULT_WEAR_PER_KM, FUEL_TYPE_LABELS, type FuelType, OWNERSHIP_LABELS, OWNERSHIP_TYPES,
+  type OwnershipType, TRANSMISSION_LABELS, TRANSMISSION_TYPES, type TransmissionType,
 } from '@/db/schema/_shared';
 import { useAuth } from '@/lib/auth/auth-context';
-import { formatKurus } from '@/lib/money';
+import { formatAmountForInput, formatInteger, formatKurus, parseAmount } from '@/lib/money';
 import { toggleFuelSelection } from '@/lib/fuel-selection';
 import { OTHER_OPTION, VEHICLE_MAKES, modelYears, modelsFor } from '@/lib/vehicle-catalog';
+import { calculateWear, wearFor, type WearInputs } from '@/lib/wear';
 import { parseWholeKm } from '@/lib/whole-number';
 import { requestSync } from '@/sync/scheduler';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
@@ -71,6 +73,13 @@ export default function VehicleEditScreen() {
   const [ownership, setOwnership] = useState<OwnershipType | null>(null);
   const [fuels, setFuels] = useState<FuelType[] | null>(null);
   const [odometer, setOdometer] = useState<string | null>(null);
+  const [transmission, setTransmission] = useState<TransmissionType | null | undefined>(undefined);
+  const [maintenanceIntervalKm, setMaintenanceIntervalKm] = useState<string | null>(null);
+  const [maintenanceCost, setMaintenanceCost] = useState<string | null>(null);
+  const [tireIntervalKm, setTireIntervalKm] = useState<string | null>(null);
+  const [tireCost, setTireCost] = useState<string | null>(null);
+  const [marketValue, setMarketValue] = useState<string | null>(null);
+  const [hasAccidentRecord, setHasAccidentRecord] = useState<boolean | null | undefined>(undefined);
 
   const v = existing?.vehicle ?? null;
   const labelText = label ?? v?.label ?? '';
@@ -81,6 +90,16 @@ export default function VehicleEditScreen() {
   const fuelValue = fuels ?? existing?.fuels ?? ['gasoline' as FuelType];
   const odometerText = odometer
     ?? (v?.initialOdometerKm ? String(v.initialOdometerKm) : '');
+  const transmissionValue = transmission !== undefined ? transmission : v?.transmission ?? null;
+  const maintenanceIntervalKmText = maintenanceIntervalKm
+    ?? (v?.maintenanceIntervalKm ? formatInteger(v.maintenanceIntervalKm) : '');
+  const maintenanceCostText = maintenanceCost ?? formatAmountForInput(v?.maintenanceCostKurus);
+  const tireIntervalKmText = tireIntervalKm
+    ?? (v?.tireIntervalKm ? formatInteger(v.tireIntervalKm) : '');
+  const tireCostText = tireCost ?? formatAmountForInput(v?.tireCostKurus);
+  const marketValueText = marketValue ?? formatAmountForInput(v?.marketValueKurus);
+  const hasAccidentRecordValue = hasAccidentRecord !== undefined
+    ? hasAccidentRecord : v?.hasAccidentRecord ?? null;
 
   /** Ad boş bırakılırsa marka/model/yıldan türetiliyor. */
   const derived = [makeValue, modelValue, yearValue]
@@ -88,12 +107,32 @@ export default function VehicleEditScreen() {
   const finalLabel = labelText.trim() || derived || 'Aracım';
 
   /**
-   * Gösterilen katsayı, KAYDEDİLECEK olan: sahiplik değişmediyse aracın
-   * kendi değeri (eski bir araçta 300 olabilir), değiştiyse yeni sahipliğin
-   * katsayısı. Repo da tam olarak bunu yazıyor.
+   * Sahiplik değişse de değişmese de yıpranma payı EKRANDAKİ girdilerden
+   * canlı hesaplanıyor — sürücü bakım/lastik/değer kutucuklarını
+   * değiştirdikçe altta anında güncellensin diye. Kaydedilecek katsayı da
+   * tam olarak bu: repo aynı hesabı (`lib/wear.ts`) yapıyor.
    */
   const ownershipChanged = v != null && ownershipValue !== v.ownership;
-  const wear = v && !ownershipChanged ? v.wearPerKmKurus : defaultWearPerKm(ownershipValue);
+  const maintenanceIntervalKmValue = parseWholeKm(maintenanceIntervalKmText);
+  const maintenanceCostKurusValue = parseAmount(maintenanceCostText);
+  const tireIntervalKmValue = parseWholeKm(tireIntervalKmText);
+  const tireCostKurusValue = parseAmount(tireCostText);
+  const marketValueKurusValue = parseAmount(marketValueText);
+  const wearInputs = useMemo<WearInputs>(() => ({
+    maintenanceIntervalKm: maintenanceIntervalKmValue,
+    maintenanceCostKurus: maintenanceCostKurusValue,
+    tireIntervalKm: tireIntervalKmValue,
+    tireCostKurus: tireCostKurusValue,
+    marketValueKurus: marketValueKurusValue,
+  }), [
+    maintenanceIntervalKmValue, maintenanceCostKurusValue, tireIntervalKmValue,
+    tireCostKurusValue, marketValueKurusValue,
+  ]);
+  const wearBreakdown = useMemo(() => calculateWear(wearInputs), [wearInputs]);
+  const wearTotal = useMemo(
+    () => wearFor(ownershipValue, wearInputs), [ownershipValue, wearInputs],
+  );
+  const wearApplies = DEFAULT_WEAR_PER_KM[ownershipValue] !== 0;
   const valid = fuelValue.length > 0;
 
   function pickMake(next: string) {
@@ -132,6 +171,16 @@ export default function VehicleEditScreen() {
   function kaydetVe(applyWearToPastShifts: boolean) {
     if (!userId || !valid) return;
     const odometerKm = parseWholeKm(odometerText);
+    // Boş bırakılan kalem `null`: o kalemin payı varsayılandan hesaplanır.
+    const wearFields = {
+      transmission: transmissionValue,
+      maintenanceIntervalKm: maintenanceIntervalKmValue,
+      maintenanceCostKurus: maintenanceCostKurusValue,
+      tireIntervalKm: tireIntervalKmValue,
+      tireCostKurus: tireCostKurusValue,
+      marketValueKurus: marketValueKurusValue,
+      hasAccidentRecord: hasAccidentRecordValue,
+    };
 
     if (v) {
       const saved = updateVehicle(userId, v.id, {
@@ -142,6 +191,7 @@ export default function VehicleEditScreen() {
         // Yalnızca değiştiyse: katsayı sahiplik DEĞİŞİNCE yeniden atanıyor.
         ...(ownershipChanged ? { ownership: ownershipValue } : {}),
         initialOdometerKm: odometerKm,
+        ...wearFields,
       }, Date.now(), { applyWearToPastShifts });
       if (!saved) {
         Alert.alert('Araç bulunamadı', 'Bu araç silinmiş olabilir. Değişiklik kaydedilmedi.');
@@ -157,6 +207,7 @@ export default function VehicleEditScreen() {
         model: modelValue,
         modelYear: yearValue ? Number(yearValue) : null,
         initialOdometerKm: odometerKm,
+        ...wearFields,
       });
       /** Yeni eklenen araç aktif olur — sürücü onu kullanmak için ekledi. */
       updateSettings(userId, { defaultVehicleId: created.id });
@@ -306,21 +357,87 @@ export default function VehicleEditScreen() {
           unit="km" keyboard="number-pad" hint="Zorunlu değil."
         />
 
-        <View style={[styles.wear, { backgroundColor: colors.surfaceSunken }]}>
-          <View style={styles.wearRow}>
-            <Text style={[typeScale.body, { color: colors.textSoft }]}>Yıpranma payı</Text>
-            <Text style={[typeScale.bodyStrong, { color: colors.text }]}>
-              {wear > 0 ? `${formatKurus(wear)}/km` : 'yok'}
-            </Text>
-          </View>
-          <Text style={[typeScale.caption, { color: colors.textFaint }]}>
-            {wear > 0
-              ? 'Amortisman, lastik, bakım, sigorta ve vergiyi kapsayan tek '
-                + 'katsayı. Sahiplik biçiminden atanıyor, senden istenmiyor.'
-              : 'Kiralık araçta ve işveren aracında sıfır: aracın değer kaybı '
-                + 'senin cebinden çıkmıyor, kira bedeli zaten gider olarak giriliyor.'}
-          </Text>
+        <View style={styles.block}>
+          <Text style={[styles.label, { color: colors.textSoft }]}>VİTES</Text>
+          <ChipGrid>
+            {TRANSMISSION_TYPES.map((t) => (
+              <Chip
+                key={t}
+                label={TRANSMISSION_LABELS[t]}
+                selected={transmissionValue === t}
+                onPress={() => setTransmission(transmissionValue === t ? null : t)}
+              />
+            ))}
+          </ChipGrid>
         </View>
+
+        <Card title="Yıpranma hesabı">
+          <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+            Bilmediğin kalemi boş bırak, varsayılan kullanılır.
+          </Text>
+
+          <AmountInput
+            label="Periyodik bakım aralığı" value={maintenanceIntervalKmText}
+            onChangeText={setMaintenanceIntervalKm} unit="km" keyboard="number-pad"
+          />
+          <AmountInput
+            label="Bakım maliyeti" value={maintenanceCostText}
+            onChangeText={setMaintenanceCost} unit="₺"
+          />
+          <AmountInput
+            label="Lastik değişim aralığı" value={tireIntervalKmText}
+            onChangeText={setTireIntervalKm} unit="km" keyboard="number-pad"
+          />
+          <AmountInput
+            label="Lastik maliyeti" value={tireCostText}
+            onChangeText={setTireCost} unit="₺"
+          />
+          <AmountInput
+            label="Aracın ikinci el değeri" value={marketValueText}
+            onChangeText={setMarketValue} unit="₺"
+          />
+
+          <View style={styles.block}>
+            <Text style={[styles.label, { color: colors.textSoft }]}>HASAR KAYDI VAR MI?</Text>
+            <ChipGrid>
+              <Chip
+                label="Evet"
+                selected={hasAccidentRecordValue === true}
+                onPress={() => setHasAccidentRecord(hasAccidentRecordValue === true ? null : true)}
+              />
+              <Chip
+                label="Hayır"
+                selected={hasAccidentRecordValue === false}
+                onPress={() => setHasAccidentRecord(hasAccidentRecordValue === false ? null : false)}
+              />
+            </ChipGrid>
+          </View>
+
+          <View style={[styles.wear, { backgroundColor: colors.surfaceSunken }]}>
+            {wearApplies ? (
+              <>
+                <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+                  {[
+                    `Bakım ${formatKurus(Math.round(wearBreakdown.maintenance.perKm))}/km`
+                      + (wearBreakdown.maintenance.estimated ? ' (tahmini)' : ''),
+                    `Lastik ${formatKurus(Math.round(wearBreakdown.tires.perKm))}/km`
+                      + (wearBreakdown.tires.estimated ? ' (tahmini)' : ''),
+                    `Değer kaybı ${formatKurus(Math.round(wearBreakdown.depreciation.perKm))}/km`
+                      + (wearBreakdown.depreciation.estimated ? ' (tahmini)' : ''),
+                  ].join(' · ')}
+                </Text>
+                <Text style={[typeScale.bodyStrong, { color: colors.text }]}>
+                  {`Aracın her km'de ${formatKurus(wearTotal)} eriyor`}
+                </Text>
+              </>
+            ) : (
+              <Text style={[typeScale.caption, { color: colors.textFaint }]}>
+                Kiralık araçta ve işveren aracında sıfır: aracın değer kaybı
+                senin cebinden çıkmıyor, kira bedeli zaten gider olarak giriliyor.
+              </Text>
+            )}
+          </View>
+        </Card>
 
         <View style={styles.foot}>
           <Button label="Kaydet" onPress={kaydet} disabled={!valid} />
@@ -343,8 +460,5 @@ const styles = StyleSheet.create({
   block: { gap: space.sm },
   label: { ...typeScale.label, textTransform: 'uppercase' },
   wear: { borderRadius: radius.md, padding: space.md, gap: space.xs },
-  wearRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline',
-  },
   foot: { gap: space.sm, paddingTop: space.md },
 });

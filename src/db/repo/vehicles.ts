@@ -12,7 +12,7 @@ import {
 } from 'drizzle-orm';
 import { getDb } from '../client';
 import {
-  type FuelType, type OwnershipType, defaultWearPerKm,
+  type FuelType, type OwnershipType, type TransmissionType,
 } from '../schema/_shared';
 import { shifts, vehicleFuelTypes, vehicles } from '../schema';
 import type { Vehicle, VehicleFuelType } from '../schema/vehicles';
@@ -22,6 +22,8 @@ import {
 import { newId } from '@/lib/id';
 import { toWholePositive } from '@/lib/whole-number';
 import { resolveActiveVehicle } from '@/lib/vehicle-resolve';
+import { type WearInputs, wearFor } from '@/lib/wear';
+import type { Kurus } from '@/lib/money';
 
 /**
  * Seçili aracın çözümlemesi `lib/vehicle-resolve.ts`'te — saf ve test
@@ -40,12 +42,50 @@ export interface NewVehicleInput {
   modelYear?: number | null;
   initialOdometerKm?: number | null;
   notes?: string | null;
+  transmission?: TransmissionType | null;
+  /** Yıpranma girdileri — bkz. `lib/wear.ts`. Boş kalan kalem varsayılandan. */
+  maintenanceIntervalKm?: number | null;
+  maintenanceCostKurus?: Kurus | null;
+  tireIntervalKm?: number | null;
+  tireCostKurus?: Kurus | null;
+  marketValueKurus?: Kurus | null;
+  hasAccidentRecord?: boolean | null;
+}
+
+const WEAR_INPUT_KEYS = [
+  'maintenanceIntervalKm', 'maintenanceCostKurus', 'tireIntervalKm', 'tireCostKurus',
+  'marketValueKurus',
+] as const;
+
+/** Bulutta integer/bigint: ondalık ya da negatif gelirse burada düzeltilir. */
+interface WearColumns {
+  maintenanceIntervalKm: number | null;
+  maintenanceCostKurus: Kurus | null;
+  tireIntervalKm: number | null;
+  tireCostKurus: Kurus | null;
+  marketValueKurus: Kurus | null;
+}
+
+function wearColumns(input: WearInputs): WearColumns {
+  return {
+    maintenanceIntervalKm: toWholePositive(input.maintenanceIntervalKm),
+    maintenanceCostKurus: toKurusOrNull(input.maintenanceCostKurus),
+    tireIntervalKm: toWholePositive(input.tireIntervalKm),
+    tireCostKurus: toKurusOrNull(input.tireCostKurus),
+    marketValueKurus: toKurusOrNull(input.marketValueKurus),
+  };
+}
+
+function toKurusOrNull(n: number | null | undefined): Kurus | null {
+  if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return null;
+  return Math.round(n) as Kurus;
 }
 
 /**
  * Araç oluşturur ve yakıt tiplerini aynı işlemde yazar.
  *
- * Yıpranma payı sahiplik biçiminden ATANIR, kullanıcıya sorulmaz.
+ * Yıpranma payı sürücünün bakım, lastik ve araç değeri cevaplarından
+ * HESAPLANIR (`lib/wear.ts`); bilinmeyen kalem varsayılandan gelir.
  * Kiralık araçta ve işveren aracında sıfırdır — aracın değer kaybı
  * sürücünün cebinden çıkmıyor, o maliyet zaten kira bedeli olarak
  * sayılıyor. Sıfırlanmazsa aynı maliyet iki kez düşülür.
@@ -54,6 +94,7 @@ export function createVehicle(
   userId: string, input: NewVehicleInput, now: UnixMs = Date.now(),
 ): Vehicle {
   const stamp = stampNew(userId, now);
+  const wear = wearColumns(input);
 
   return getDb().transaction((tx) => {
     const row = tx.insert(vehicles).values({
@@ -66,8 +107,11 @@ export function createVehicle(
       modelYear: toWholePositive(input.modelYear),
       ownership: input.ownership,
       initialOdometerKm: toWholePositive(input.initialOdometerKm),
-      wearPerKmKurus: defaultWearPerKm(input.ownership),
+      wearPerKmKurus: wearFor(input.ownership, wear),
       notes: normalize(input.notes),
+      transmission: input.transmission ?? null,
+      ...wear,
+      hasAccidentRecord: input.hasAccidentRecord ?? null,
     }).returning().get();
 
     enqueue(tx, 'vehicles', stamp.id, 'upsert', now);
@@ -109,7 +153,8 @@ export interface UpdateVehicleOptions {
 /**
  * Aracı günceller.
  *
- * YIPRANMA KATSAYISI YALNIZCA SAHİPLİK GERÇEKTEN DEĞİŞİNCE yeniden atanır.
+ * YIPRANMA KATSAYISI YALNIZCA SAHİPLİK YA DA YIPRANMA GİRDİLERİ (bakım,
+ * lastik, değer) GERÇEKTEN DEĞİŞİNCE yeniden hesaplanır.
  * Eskiden ekran her kayıtta sahipliği gönderiyor, repo da koşulsuz
  * güncel sabiti yazıyordu: yalnızca adı değiştirilen 300 kuruşluk eski
  * bir aracın katsayısı 250'ye iniyordu. Sütunun var olma sebebi tam
@@ -131,9 +176,16 @@ export function updateVehicle(
 
   const ownershipChanged = patch.ownership !== undefined
     && patch.ownership !== current.ownership;
-  const nextWear = ownershipChanged
-    ? defaultWearPerKm(patch.ownership as OwnershipType)
+  const nextOwnership = (ownershipChanged ? patch.ownership : current.ownership) as OwnershipType;
+
+  const nextInputs = wearColumns(Object.fromEntries(WEAR_INPUT_KEYS.map((k) => [
+    k, patch[k] !== undefined ? patch[k] : current[k],
+  ])) as WearInputs);
+  const inputsChanged = WEAR_INPUT_KEYS.some((k) => nextInputs[k] !== current[k]);
+  const nextWear = ownershipChanged || inputsChanged
+    ? wearFor(nextOwnership, nextInputs)
     : current.wearPerKmKurus;
+  const wearChanged = nextWear !== current.wearPerKmKurus;
 
   return getDb().transaction((tx) => {
     const { changes } = tx.update(vehicles).set({
@@ -145,14 +197,22 @@ export function updateVehicle(
       ...(patch.initialOdometerKm !== undefined
         ? { initialOdometerKm: toWholePositive(patch.initialOdometerKm) } : {}),
       ...(patch.notes !== undefined ? { notes: normalize(patch.notes) } : {}),
-      ...(ownershipChanged
-        ? { ownership: patch.ownership, wearPerKmKurus: nextWear } : {}),
+      ...(patch.transmission !== undefined ? { transmission: patch.transmission } : {}),
+      ...(patch.hasAccidentRecord !== undefined
+        ? { hasAccidentRecord: patch.hasAccidentRecord } : {}),
+      ...(inputsChanged ? nextInputs : {}),
+      ...(ownershipChanged ? { ownership: patch.ownership } : {}),
+      ...(ownershipChanged || inputsChanged ? { wearPerKmKurus: nextWear } : {}),
       updatedAt: now,
     }).where(ownedById(vehicles, userId, id)).run() as unknown as { changes: number };
     if (changes === 0) return false;
     enqueue(tx, 'vehicles', id, 'upsert', now);
 
-    if (!ownershipChanged) return true;
+    /**
+     * Girdiler değişip katsayı değişmediyse geçmişe dokunacak bir şey yok.
+     * Sahiplik değişince eski davranış korunuyor (katsayı aynı olsa da).
+     */
+    if (!ownershipChanged && !wearChanged) return true;
 
     const apply = options.applyWearToPastShifts === true;
     const target = apply ? nextWear : current.wearPerKmKurus;
@@ -185,7 +245,7 @@ export function countShiftsAffectedByOwnership(
   const vehicle = getVehicle(userId, vehicleId);
   if (!vehicle || vehicle.ownership === ownership) return 0;
 
-  const next = defaultWearPerKm(ownership);
+  const next = wearFor(ownership, vehicle);
   return getDb().select({ n: count() }).from(shifts).where(and(
     alive(shifts, userId),
     eq(shifts.vehicleId, vehicleId),

@@ -1,6 +1,7 @@
 import { Redirect, Stack } from 'expo-router';
 
 import { useAuth } from '@/lib/auth/auth-context';
+import { SetupDraftProvider } from '@/lib/setup-draft';
 import { useDriver } from '@/lib/use-driver';
 import { useTheme } from '@/theme/use-theme';
 
@@ -23,12 +24,14 @@ export default function SetupLayout() {
   if (userId && !needsSetup) return <Redirect href="/" />;
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        gestureEnabled: false,
-        contentStyle: { backgroundColor: colors.background },
-      }}
-    />
+    <SetupDraftProvider>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          gestureEnabled: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
+    </SetupDraftProvider>
   );
 }

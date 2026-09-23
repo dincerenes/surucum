@@ -24,7 +24,8 @@
       "is_primary"
     ],
     "vehicles": [
-      "is_active"
+      "is_active",
+      "has_accident_record"
     ]
   },
   "_int_sutunlar": "Bulutta integer (int4, 32 bit) ya da bigint (int8) olan sütunlar; boolean olanlar yukarıda. SQLite ondalığı sessizce kabul ediyor, Postgres reddediyor ve gönderim tabloyu tek istekte yolladığı için tek bir ondalık değer o tablonun bütün yedeğini takıyor. schema-parity.test.ts yerel yazma yollarının bu sütunlara yalnızca tam sayı yazdığını sınıyor. Kaynak: supabase/migrations altındaki create/alter table tanımları (19 Eylül 2026); uzak şemayla information_schema.columns üzerinden doğrulanmalı.",
@@ -43,7 +44,12 @@
       "model_year": "integer",
       "initial_odometer_km": "integer",
       "wear_per_km_kurus": "bigint",
-      "sort_order": "integer"
+      "sort_order": "integer",
+      "maintenance_interval_km": "integer",
+      "maintenance_cost_kurus": "bigint",
+      "tire_interval_km": "integer",
+      "tire_cost_kurus": "bigint",
+      "market_value_kurus": "bigint"
     },
     "vehicle_fuel_types": {
       "created_at": "bigint",
@@ -297,7 +303,14 @@
       "is_active",
       "sort_order",
       "notes",
-      "wear_per_km_kurus"
+      "wear_per_km_kurus",
+      "transmission",
+      "maintenance_interval_km",
+      "maintenance_cost_kurus",
+      "tire_interval_km",
+      "tire_cost_kurus",
+      "market_value_kurus",
+      "has_accident_record"
     ]
   }
 }

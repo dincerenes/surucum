@@ -120,6 +120,13 @@
       "when": 1790120638891,
       "tag": "0016_profile_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1790162227975,
+      "tag": "0017_vehicle_wear_inputs",
+      "breakpoints": true
     }
   ]
 }

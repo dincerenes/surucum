@@ -89,7 +89,7 @@ export default function AppLayout() {
    * (bkz. `lib/setup-gate.ts`). Sormadan kuruluma atmak her yeni
    * kurulumda aynı aracı bir kez daha açtırıyordu.
    */
-  if (gate === 'setup') return <Redirect href="/arac" />;
+  if (gate === 'setup') return <Redirect href="/bilgiler" />;
 
   if (gate === 'waiting' || gate === 'sync_failed') {
     const failed = gate === 'sync_failed';
