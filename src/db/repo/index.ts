@@ -19,3 +19,4 @@ export * from './summary';
 export * from './records';
 export * from './home';
 export * from './account';
+export * from './setup';

@@ -20,7 +20,7 @@
 > dosya o sayfanın kaynağıdır. Uygulama içinde kayıt ekranından ve
 > Profil'den bu sayfaya bağlantı verilmelidir.
 >
-> Veri envanteri 19 Eylül 2026'daki koda göre çıkarıldı. Arayüze yeni
+> Veri envanteri 23 Eylül 2026'daki koda göre çıkarıldı. Arayüze yeni
 > bir alan eklendiğinde (ör. plaka, not, fiş fotoğrafı) bu metin ve
 > `docs/magaza-formlari.md` birlikte güncellenmelidir.
 
@@ -44,9 +44,10 @@ takip ettiği bir mobil uygulamadır.
 ### 2. Kısaca
 
 - Yalnızca uygulamanın çalışması için gereken veriyi topluyoruz: hesabın
-  için e-posta adresin, ve senin girdiğin iş kayıtları.
-- **Konumunu almıyoruz.** Rehbere, fotoğraflara, kameraya, mikrofona
-  erişmiyoruz.
+  için e-posta adresin, adın ve çalıştığın şehir, ve senin
+  girdiğin araç ve iş kayıtları.
+- **Konumunu almıyoruz** (çalıştığın şehri listeden sen seçiyorsun).
+  Rehbere, fotoğraflara, kameraya, mikrofona erişmiyoruz.
 - **Reklam yok, izleme yok, analitik yok.** Verini satmıyoruz, reklam
   için kullanmıyoruz, başka uygulamalardaki davranışını izlemiyoruz.
 - Kayıtların önce **telefonunda** tutulur; hesabına bağlı bir yedeği
@@ -65,34 +66,59 @@ takip ettiği bir mobil uygulamadır.
 | Oturum anahtarları | Her açılışta yeniden giriş yapmaman için. Yalnızca telefonunda saklanır |
 | Giriş sırasında IP adresi, cihaz / tarayıcı bilgisi, giriş zamanı | Kimlik doğrulama hizmetinin güvenlik kayıtları (kötüye kullanımı ve yetkisiz girişi tespit etmek) |
 
-**3.2 Araç bilgileri** — senin girdiklerin
+**3.2 Profil bilgileri** — senin girdiklerin
 
-Araç adı, marka, model, model yılı, kilometre (isteğe bağlı), sahiplik
-biçimi (kendi aracın, kiralık vb.), yakıt tipi, ortalama yakıt tüketimi ve
-son litre fiyatı. Kilometre başına yıpranma katsayısı uygulama tarafından
-sahiplik biçimine göre atanır.
+Ad ve şehir kurulumda sorulur; istediğin zaman Profil'den değiştirebilirsin.
+Kullanmak istediğin adı yazman yeterli, kimlik doğrulaması yapılmaz.
 
-**3.3 İş kayıtların** — senin girdiklerin
+| Veri | Neden |
+|---|---|
+| Ad soyad (ya da kullanmak istediğin ad) | Uygulamada seni adınla karşılamak |
+| Çalıştığın şehir | Profilinde göstermek. Listeden seçilir; telefonunun konumundan alınmaz |
+| Profil simgesi (hazır simge ve renk, isteğe bağlı) | Profilinde göstermek. Fotoğraf yüklenmez |
+
+**3.3 Araç bilgileri** — senin girdiklerin
+
+- Araç adı, marka, model, model yılı, vites tipi, yakıt tipi, sahiplik
+  biçimi (kendi aracın, kiralık vb.), ortalama yakıt tüketimi ve son litre
+  fiyatı.
+- Aracın güncel kilometresi, ikinci el piyasa değeri ve hasar kaydı olup
+  olmadığı (isteğe bağlı).
+- Periyodik bakımı ve lastik değişimini kaç kilometrede bir yaptırdığın ve
+  bunların maliyeti (isteğe bağlı).
+
+Kilometre başına yıpranma payı bu cevaplardan uygulama tarafından
+hesaplanır; boş bıraktığın kalem için ortalama bir tahmin kullanılır.
+
+**3.4 İş kayıtların** — senin girdiklerin
 
 - **Vardiya:** başlangıç ve bitiş zamanı, iş günü, yaptığın kilometre,
   çalıştığın süre, o gün uygulamaya ödediğin komisyon tutarı, ortalama
   tüketim ve yakıt fiyatı.
-- **Sefer:** tutar ve kayıt zamanı.
+- **Yolcu (sefer):** tutar ve kayıt zamanı.
 - **Gider:** tutar, kategori (yemek, otopark vb.) ve zaman.
 - **Yakıt dolumu:** ödenen tutar, litre fiyatı, litre ve zaman.
 - **Hedef:** belirlediğin kazanç hedefi.
-- **Ayarlar:** gün kesme saati gibi hesap ayarları.
+- **Ayarlar:** seçili araç gibi hesap ayarları.
 
 Bu kayıtlar **finansal niteliktedir** ve zaman bilgileri çalışma düzenini
 (hangi gün, hangi saatlerde çalıştığını) gösterir. Bu yüzden yalnızca
 aşağıdaki amaçlarla işlenir.
 
-**3.4 Yalnızca telefonunda kalanlar**
+**3.5 Geri bildirimlerin** — uygulama içinden gönderdiğin
 
-Tema tercihin (açık / koyu) ve senkronizasyonun teknik durumu (hangi
+Konu (hata, istek, öneri, diğer), yazdığın mesaj, uygulamanın sürümü ve
+telefonunun işletim sistemi ve sürümü (ör. "ios 26"). Sürüm bilgisi
+bildirdiğin hatayı bulabilmek için alınır. Geri bildirimlerini gönderdikten
+sonra uygulamada göremez ve değiştiremezsin; hesabın silinince onlar da
+silinir.
+
+**3.6 Yalnızca telefonunda kalanlar**
+
+Tema tercihin (sistem / açık / koyu) ve senkronizasyonun teknik durumu (hangi
 kaydın henüz yedeklenmediği gibi) telefonunda kalır, sunucuya gönderilmez.
 
-**3.5 Toplamadıklarımız**
+**3.7 Toplamadıklarımız**
 
 Konum, rehber, fotoğraf ve kamera, mikrofon, reklam kimliği, kullanım
 analitiği, çökme raporu. Uygulamada reklam ya da izleme amaçlı üçüncü
@@ -181,11 +207,9 @@ Kurul'a ve etkilenen kullanıcılara bildirim yapılır.
 
 ### 9. Hesabını ve verini silme
 
-- **Uygulama içinden:** Profil → **Hesabı sil**. Hesabın ve bulutta
-  saklanan tüm kayıtların silinir, telefonundaki veriler temizlenir.
-  *(Bu seçenek yakında eklenecek. Eklenene kadar
-  [DOLDURULACAK: iletişim e-postası] adresine hesabına kayıtlı e-posta
-  adresinden yazarak silme talep edebilirsin.)*
+- **Uygulama içinden:** Profil → **Hesabımı sil**. Onayından sonra
+  hesabın ve bulutta saklanan tüm kayıtların (geri bildirimlerin dahil)
+  silinir, telefonundaki veriler temizlenir. Bu işlem geri alınamaz.
 - **Uygulamaya erişimin yoksa:** [DOLDURULACAK: hesap silme talep sayfasının
   https adresi] — Google Play bu adresi ayrıca ister.
 - Uygulamayı telefondan kaldırmak yalnızca telefondaki kopyayı siler;
@@ -237,11 +261,15 @@ değişiklikleri uygulama içinde duyururuz.
 
 **2. İşlenen kişisel veriler**
 
-- Kimlik ve iletişim: e-posta adresi, hesap kimliği.
+- Kimlik ve iletişim: e-posta adresi, hesap kimliği, ad soyad.
 - Müşteri işlem ve finansal bilgiler: sefer tutarları, ödenen komisyon,
   gider ve yakıt tutarları, kazanç hedefi.
-- Araç bilgileri: araç adı, marka, model, model yılı, kilometre, sahiplik
-  biçimi, yakıt tipi ve tüketimi.
+- Araç bilgileri: araç adı, marka, model, model yılı, vites, kilometre,
+  sahiplik biçimi, yakıt tipi ve tüketimi, piyasa değeri, hasar kaydı,
+  bakım ve lastik aralıkları ile maliyetleri.
+- Profil bilgileri: çalışılan şehir ve (isteğe bağlı) profil simgesi.
+- Talep ve şikâyet bilgileri: uygulama içinden gönderilen geri bildirimler,
+  uygulama sürümü ve işletim sistemi bilgisi.
 - Çalışma bilgileri: vardiya başlangıç / bitiş zamanları, çalışılan süre
   ve kilometre.
 - İşlem güvenliği: parola özeti, oturum anahtarları, giriş sırasında IP

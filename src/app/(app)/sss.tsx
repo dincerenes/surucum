@@ -12,8 +12,12 @@ const SORULAR: { q: string; a: string }[] = [
     a: 'Ciro brüt kazancın. Cebe kalan; ciro − komisyon − yakıt − gider. Gerçek kâr ise cebe kalandan aracının km başına yıpranma payı da düşülünce çıkan sayı.',
   },
   {
-    q: 'Yıpranma payı nedir, neden sorulmuyor?',
-    a: 'Aracının kilometre başına değer kaybını temsil eden tek bir katsayı; amortisman, lastik, bakım, sigorta gibi kalemlerin hepsini içeriyor. Sana sorulmuyor çünkü bu rakamı kimse bilmiyor ve tahmin edilen sayı raporu güvenilmez kılıyor.',
+    q: 'Yıpranma payı nedir, nasıl hesaplanıyor?',
+    a: 'Aracının her kilometrede ne kadar eridiği: bakım, lastik ve değer kaybı. Kurulumda verdiğin cevaplardan hesaplanıyor. Bakım ve lastik için maliyet, kaç km\'de bir yapıldığına bölünüyor; değer kaybı aracının güncel değerinin her 10.000 km\'de %0,9\'u sayılıyor. Bilmediğin kalem için ortalama bir tahmin kullanılıyor ve "tahmini" diye işaretleniyor. Yakıt bu paya dahil değil, ayrıca hesaplanıyor.',
+  },
+  {
+    q: 'Bakım, lastik ya da araç değerini sonradan nasıl değiştiririm?',
+    a: 'Profil → Araçlarım\'dan aracını açıp "Yıpranma hesabı" bölümünü düzenle. Yeni pay bundan sonraki vardiyalara uygulanır; geçmiş vardiyaların kârı değişmez.',
   },
   {
     q: 'Neden kilometre vardiya bitince soruluyor?',

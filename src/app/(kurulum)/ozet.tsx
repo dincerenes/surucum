@@ -3,15 +3,12 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { SetupStep } from '@/components/setup-step';
 import { BrandBadge, Card } from '@/components/ui';
-import {
-  completeOnboarding, createVehicle, listActiveVehicles, updateSettings,
-} from '@/db/repo';
+import { finishSetup } from '@/db/repo';
 import { FUEL_TYPE_LABELS, TRANSMISSION_LABELS } from '@/db/schema/_shared';
 import { useAuth } from '@/lib/auth/auth-context';
 import { formatKurus } from '@/lib/money';
 import { draftLabel, draftWearInputs, useSetupDraft } from '@/lib/setup-draft';
 import { type WearPart, calculateWear } from '@/lib/wear';
-import { parseWholeKm } from '@/lib/whole-number';
 import { requestSync } from '@/sync/scheduler';
 import { space, type as typeScale, useTheme } from '@/theme/use-theme';
 
@@ -48,28 +45,8 @@ export default function SummaryStep() {
 
   function basla() {
     if (!user?.id) return;
-
-    // Araç bu arada buluttan indiyse yenisi açılmaz — çift araç olmasın.
-    if (listActiveVehicles(user.id).length > 0) {
-      router.replace('/');
-      return;
-    }
-
-    const vehicle = createVehicle(user.id, {
-      label,
-      ownership: 'owned',
-      fuelTypes: draft.fuels,
-      make: draft.make,
-      model: draft.model,
-      modelYear: draft.year ? Number(draft.year) : null,
-      initialOdometerKm: parseWholeKm(draft.odometer),
-      transmission: draft.transmission,
-      ...inputs,
-      hasAccidentRecord: draft.accident,
-    });
-    updateSettings(user.id, { defaultVehicleId: vehicle.id });
     const signupName = user.user_metadata?.display_name;
-    completeOnboarding(user.id, typeof signupName === 'string' ? signupName : null);
+    finishSetup(user.id, draft, typeof signupName === 'string' ? signupName : null);
     requestSync();
     router.replace('/');
   }
