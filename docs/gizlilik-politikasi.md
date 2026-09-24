@@ -76,7 +76,7 @@ Kullanmak istediğin adı yazman yeterli, kimlik doğrulaması yapılmaz.
 | Veri | Neden |
 |---|---|
 | Ad soyad (ya da kullanmak istediğin ad) | Uygulamada seni adınla karşılamak |
-| Çalıştığın şehir | Profilinde göstermek. Listeden seçilir; telefonunun konumundan alınmaz |
+| Çalıştığın şehir | Profilinde göstermek ve Pusula'da şehrinin tahmini yoğun saatlerini göstermek. Listeden seçilir; telefonunun konumundan alınmaz. Pusula bu seçimi yalnızca telefonunda kullanır |
 | Profil simgesi (hazır simge ve renk, isteğe bağlı) | Profilinde göstermek. Fotoğraf yüklenmez |
 
 **3.3 Araç bilgileri** — senin girdiklerin
@@ -132,12 +132,14 @@ sorulmaz.
 1. Hesabını oluşturmak ve seni tanımak (giriş, şifre sıfırlama).
 2. Kayıtlarından ciro, cebe kalan ve gerçek kâr hesaplarını ve
    raporlarını üretmek. Hesaplar telefonunda yapılır.
-3. Kayıtlarını yedeklemek, telefon değiştirdiğinde ya da uygulamayı
+3. Şehrine göre Pusula'daki tahmini yoğunluk bilgisini telefonunda
+   göstermek. Bu bilgi kayıtlarından hesaplanmaz, sunucuya gönderilmez.
+4. Kayıtlarını yedeklemek, telefon değiştirdiğinde ya da uygulamayı
    yeniden kurduğunda geri yüklemek, birden fazla cihazda aynı hesabı
    kullanmanı sağlamak.
-4. Hizmetin güvenliğini sağlamak, hataları ve veri bütünlüğü sorunlarını
+5. Hizmetin güvenliğini sağlamak, hataları ve veri bütünlüğü sorunlarını
    tespit edip düzeltmek, destek taleplerini yanıtlamak.
-5. Yasal yükümlülükleri yerine getirmek.
+6. Yasal yükümlülükleri yerine getirmek.
 
 Verini pazarlama, reklam, profil çıkarma ya da satış için kullanmayız.
 E-posta adresine yalnızca hesabınla ilgili zorunlu iletiler (doğrulama,
@@ -277,10 +279,12 @@ değişiklikleri uygulama içinde duyururuz.
   erişimlerine ilişkin denetim kayıtları.
 
 **3. İşleme amaçları:** üyelik ve hesap işlemlerinin yürütülmesi;
-uygulamanın sunduğu kazanç ve maliyet hesaplarının yapılması; verilerin
-yedeklenmesi, geri yüklenmesi ve cihazlar arasında eşitlenmesi; bilgi
-güvenliği süreçlerinin ve destek taleplerinin yürütülmesi; yetkili kurum
-taleplerinin ve hukuki yükümlülüklerin yerine getirilmesi.
+uygulamanın sunduğu kazanç ve maliyet hesaplarının yapılması; şehrine
+göre Pusula'daki tahmini yoğunluk bilgisinin telefonunda gösterilmesi;
+verilerin yedeklenmesi, geri yüklenmesi ve cihazlar arasında
+eşitlenmesi; bilgi güvenliği süreçlerinin ve destek taleplerinin
+yürütülmesi; yetkili kurum taleplerinin ve hukuki yükümlülüklerin
+yerine getirilmesi.
 
 **4. Hukuki sebepler (KVKK md. 5/2):**
 

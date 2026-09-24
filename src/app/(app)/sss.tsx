@@ -32,6 +32,10 @@ const SORULAR: { q: string; a: string }[] = [
     a: 'Vardiya sonunda kaç km yaptığını ve ortalama tüketimini soruyoruz; litre fiyatı son dolumundan biliniyor. Üçü çarpılıp o günün yakıt gideri bulunuyor. Tüketimi boş bırakırsan o vardiyada kaydettiğin dolum tutarı kullanılıyor.',
   },
   {
+    q: 'Pusula nedir, bilgiler nereden geliyor?',
+    a: 'Pusula, İstatistik sekmesinde şehrinin genel olarak ne kadar hareketli olduğunu gösteren bölüm. İstanbul, Ankara, İzmir ve Antalya için şu anki tahmini yoğunluk, günün sıcak saatleri, haftanın sıcak günleri ve yoğun bölgeleri (havalimanı, otogar, kampüs gibi) görebilirsin. Bu bilgiler senin kayıtlarından değil, şehirlerin genel çalışma, okul, gece hayatı, turizm ve ulaşım düzeni ile kamuya açık istatistiklerden derleniyor; bu yüzden hepsi "Tahmini" diye işaretli. Hava durumu, maç, konser ve tatiller gerçek yoğunluğu değiştirebilir. Profilinde seçtiğin şehir varsayılan olarak açılır, istersen diğer şehirlere de bakabilirsin.',
+  },
+  {
     q: 'Kayıtlarım nerede saklanıyor, yedekleniyor mu?',
     a: 'Kayıtların önce telefonunda tutuluyor, uygulama hiçbir zaman ağı beklemiyor. Oturum açıkken arka planda buluta da yedekleniyor; böylece telefon değiştirirsen kayıtların seninle geliyor.',
   },

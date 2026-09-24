@@ -30,3 +30,6 @@ export { Avatar, AVATAR_ICONS } from './avatar';
 export { BrandBadge } from './brand-badge';
 export { ScoreRing, useScoreColor } from './score-ring';
 export { Donut, type DonutSlice } from './donut';
+export { SegmentedControl } from './segmented-control';
+export { HeatStrip } from './heat-strip';
+export { Badge } from './badge';

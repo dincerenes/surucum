@@ -6,7 +6,7 @@ import {
   addDays, daysBetween, compareBusinessDate, businessDatesInRange,
   startOfMonth, endOfMonth, daysInMonth, startOfWeek, endOfWeek, startOfYear,
   weekdayIndex, weekdayName, formatBusinessDate, formatRelative, formatClock,
-  DEFAULT_CUTOFF_HOUR,
+  DEFAULT_CUTOFF_HOUR, WEEKDAYS_SHORT_TR, WEEKDAYS_TR,
   type BusinessDate,
 } from './business-date.ts';
 
@@ -237,5 +237,17 @@ describe('formatClock', () => {
   test('öğleden sonrayı 24 saat düzeninde yazar', () => {
     const at = new Date(2026, 7, 29, 19, 14).getTime();
     assert.equal(formatClock(at), '19:14');
+  });
+});
+
+describe('kısa gün adları', () => {
+  test('7 gün, hepsi benzersiz ve uzun adlarla aynı sırada', () => {
+    assert.equal(WEEKDAYS_SHORT_TR.length, 7);
+    assert.equal(new Set(WEEKDAYS_SHORT_TR).size, 7);
+    assert.equal(WEEKDAYS_SHORT_TR[0], 'Pzt');
+    assert.equal(WEEKDAYS_SHORT_TR[6], 'Paz');
+    WEEKDAYS_SHORT_TR.forEach((kisa, i) => {
+      assert.equal(WEEKDAYS_TR[i][0], kisa[0], `${kisa} ↔ ${WEEKDAYS_TR[i]}`);
+    });
   });
 });

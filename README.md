@@ -206,6 +206,45 @@ gelmiyor. Aynı kural yakıt tüketimi ve vardiya süresi için de geçerli.
 Eksiği söyleyen her ekran onu **düzeltme yolunu da** veriyor — düzeltilemeyen
 bir uyarı, uyarı değil suçlamadır.
 
+### Pusula
+
+**İstatistik artık iki yüzlü:** üstte "Kazancım | Pusula" anahtarı var.
+Kazancım yukarıdaki dönem özeti ve kartlar; Pusula bunlardan tamamen
+ayrı, sürücünün **kendi kayıtlarından bağımsız** bir şehir yoğunluk
+tahmini.
+
+İstanbul, Ankara, İzmir ve Antalya için dört blok: **Şu an** (Sakin /
+Hareketli / Yoğun / Çok yoğun ve bir sonraki yoğun saat), **Sıcak
+saatler** (seçilen günün 24 saatlik ısı şeridi — sürücünün günü
+06:00'da başlayıp ertesi 06:00'da bittiği için cuma gecesi 23:00–03:00
+tek blok olarak görünüyor), **Sıcak günler** (7 günlük şerit), **Sıcak
+bölgeler** (semt, havalimanı, otogar, kampüs, hastane gibi kamuya açık
+noktalar; ne zaman ve neden yoğun oldukları). Sezonu geçmiş bölge
+(kışın deniz kıyısı gibi) gizleniyor.
+
+**Her şey "Tahmini" etiketli.** Kaynak sürücü kaydı değil: şehirlerin
+genel çalışma, okul, gece hayatı, turizm ve ulaşım düzeni ile kamuya
+açık istatistikler (havalimanı yolcu sayıları, turizm rakamları, trafik
+endeksleri, belediye açık verisi). Hava durumu, maç, konser ve tatiller
+tabloyu değiştirebilir — bunu ekranda söylüyoruz, uydurmuyoruz.
+
+Veri uygulamaya gömülü (`src/lib/pusula-data.ts`), hesap
+`src/lib/pusula.ts`'te: **ağ çağrısı yok**, şema ya da bulut değişikliği
+yok, çevrimdışı çalışıyor. Sürücünün kendi kaydı hiç okunmuyor.
+
+`app_settings.city` (kurulum/Profil'de listeden seçilen şehir)
+varsayılan şehri seçiyor ve **yalnızca telefonda** kullanılıyor. Şehri
+bu dört ilin dışında olan sürücü "Şehrin için yakında" görür ve
+diğer dört şehri gezebilir; şehri boş olan sürücüye şehir seçme
+bağlantısı çıkar.
+
+**İleride (henüz kurulmadı):** sürücü sayısı yeterince artınca tahmin,
+şehir / gün / saat başına anonim ve toplulaştırılmış (yalnızca en az
+k sürücülü hücreler) sunucu tarafı ortalamayla harmanlanacak. Bölgeler
+o zaman da statik kalıyor — uygulama konum toplamıyor. Bu harmanlama
+**yayınlanmadan önce** gizlilik politikası, KVKK metni ve mağaza
+formlarının güncellenmesini gerektiriyor.
+
 ### Marka adı yasağı
 
 Uygulamanın hiçbir yerinde üçüncü taraf marka adı geçmiyor: uygulama adı, ikon,
@@ -309,6 +348,10 @@ gider dağılımı. Aritmetik `src/lib/insights.ts`, okuma
 "5 gün kaldı" gibi bekleme yazısı yok (sürücünün kararı: kullanmaya
 başlamadan neyin geleceğini görsün). Platform ve ödeme şekline göre
 dağılım yok: yolcu girilirken ikisi de sorulmuyor.
+
+İstatistik'in üstünde artık "Kazancım | Pusula" anahtarı var: yukarıdaki
+kartlar Kazancım'da; Pusula şehir bazlı tahmini yoğunluk gösteriyor
+(bkz. Mimari kararlar → Pusula).
 
 Ad, şehir ve avatar `app_settings` satırında (`display_name`, `city`,
 `avatar`; üçü de boş olabilir, senkronlanıyor). Kayıt ekranındaki
@@ -415,7 +458,9 @@ Yayın öncesi kalanlar:
   almak kararı bekliyor.
 
 Yayın sonrasına ertelenenler: sabit gider tahakkuku (bkz. "Sabit gider
-tahakkuku yok"), kimlik devri (yerelde başlayıp sonradan hesaba taşınma).
+tahakkuku yok"), kimlik devri (yerelde başlayıp sonradan hesaba taşınma),
+Pusula'nın sürücü verisiyle harmanlanması (bkz. Mimari kararlar → Pusula
+— gizlilik politikası ve KVKK metni yayından önce güncellenmeli).
 
 ## Depo kuralları
 

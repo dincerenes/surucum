@@ -43,6 +43,13 @@ const WEEKDAYS_TR = [
   'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar',
 ] as const;
 
+/**
+ * Kısa gün adları, aynı sırayla. Dar yerler için (gün seçici, hafta
+ * çubukları): üç harf, her gün BENZERSİZ — "Ç" ile "C" ayrı tutulduğu
+ * için Çarşamba ile Cuma, Cumartesi ile Cuma karışmıyor.
+ */
+export const WEEKDAYS_SHORT_TR = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'] as const;
+
 // ---------------------------------------------------------------------------
 // Oluşturma ve doğrulama
 // ---------------------------------------------------------------------------

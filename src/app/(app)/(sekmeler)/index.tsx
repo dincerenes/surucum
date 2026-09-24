@@ -242,7 +242,7 @@ function ScoreCard({ score, today }: { score: HomeScore; today: BusinessDate }) 
 
   return (
     <Pressable
-      onPress={() => router.push('/istatistik')}
+      onPress={() => router.push({ pathname: '/istatistik', params: { bolum: 'kazancim' } })}
       accessibilityRole="button"
       accessibilityLabel="Verimlilik puanı, İstatistik'i aç"
     >
@@ -373,7 +373,7 @@ function WeekCard({ bars }: { bars: DailyBar[] }) {
 
   return (
     <Pressable
-      onPress={() => router.push('/istatistik')}
+      onPress={() => router.push({ pathname: '/istatistik', params: { bolum: 'kazancim' } })}
       accessibilityRole="button"
       accessibilityLabel="Son 7 gün, İstatistik'i aç"
     >
