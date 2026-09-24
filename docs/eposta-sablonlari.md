@@ -39,7 +39,7 @@ Sürücüm şifreni sıfırla
 
 ## Confirm signup — Kayıt doğrulama
 
-Yalnızca "Confirm email" açıksa gönderilir (şu an kapalı, bkz. README).
+Yalnızca "Confirm email" açıksa gönderilir (şu an kapalı, bkz. docs/mimari.md → Durum).
 
 **Subject:**
 

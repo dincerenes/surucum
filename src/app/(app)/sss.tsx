@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PageHeader } from '@/components/ui';
 import { radius, space, type as typeScale, useTheme } from '@/theme/use-theme';
 
-// TASLAK — içerik Enes'ten gelecek; metinler README'den çıkarıldı.
+// TASLAK — içerik Enes'ten gelecek; metinler docs/mimari.md'den çıkarıldı.
 const SORULAR: { q: string; a: string }[] = [
   {
     q: 'Ciro, cebe kalan ve gerçek kâr arasındaki fark ne?',
@@ -56,7 +56,7 @@ const SORULAR: { q: string; a: string }[] = [
 /**
  * Sık sorulan sorular — akordeon liste.
  *
- * İçerik henüz taslak (bkz. dizideki yorum); metinler README'deki ürün
+ * İçerik henüz taslak (bkz. dizideki yorum); metinler docs/mimari.md'deki ürün
  * kararlarından türetildi. Tek seferde birden çok soru açık kalabiliyor,
  * kapatma zorunlu değil.
  */

@@ -4,7 +4,7 @@
  *
  * BURADAKİ HER SAYI BİR TAHMİNDİR. Hiçbiri sürücü kaydından ya da bir
  * platformun talep verisinden gelmiyor; ekran bunu "Tahmini" etiketiyle
- * açıkça söylüyor (bkz. README, "Bilinmeyen tahmin edilmez": tahmin
+ * açıkça söylüyor (bkz. docs/mimari.md, "Bilinmeyen tahmin edilmez": tahmin
  * yapıyorsak tahmin olduğunu saklamıyoruz).
  *
  * KAYNAK VE YÖNTEM (Eylül 2026): belediyelerin yayımladığı ulaşım ve

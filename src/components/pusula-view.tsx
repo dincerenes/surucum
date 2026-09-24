@@ -153,7 +153,7 @@ export function PusulaView({ resolution, city, onCityChange }: Props) {
  *
  * Şehri desteklenmiyorsa ya da hiç seçilmemişse bunu SÖYLÜYOR ve yine de
  * dört şehre bakabiliyor. Şehir seçilmemişse düzeltme yolu da burada:
- * uyarı düzeltilemiyorsa suçlamadır (README, "Bilinmeyen tahmin edilmez").
+ * uyarı düzeltilemiyorsa suçlamadır (docs/mimari.md, "Bilinmeyen tahmin edilmez").
  */
 function CityPicker({
   resolution, city, onChange,

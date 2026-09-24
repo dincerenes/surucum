@@ -5,8 +5,8 @@ kısıtlar ve mevcut belirteçler burada.
 
 > **Bu bir süreç kaydıdır.** Sonraki turlar öncekileri geçersiz kılıyor:
 > bölüm B–H birinci turun hâlini anlatıyor, aşağıdaki "Tur 2" ve "Tur 3"
-> başlıkları onları daralttı. Uygulamanın bugünkü davranışı için README'ye
-> bakılmalı; çelişki varsa kod ve README esastır.
+> başlıkları onları daralttı. Uygulamanın bugünkü davranışı için docs/mimari.md'ye
+> bakılmalı; çelişki varsa kod ve docs/mimari.md esastır.
 
 ---
 
@@ -64,7 +64,7 @@ aslında o gün zarar etmiş olabilir. Tasarım bu farkı görünür kılmalı.
 
 > **GÜNCEL (23 Eylül 2026):** Bu karar değişti. Pay artık kurulumda sorulan
 > bakım, lastik ve ikinci el değerden hesaplanıyor ve araç düzenlemede
-> değiştirilebiliyor. Bkz. README → "Yıpranma payı sürücünün cevaplarından".
+> değiştirilebiliyor. Bkz. docs/mimari.md → "Yıpranma payı sürücünün cevaplarından".
 
 Amortisman + lastik + balata + bakım. Sistem atıyor, sürücü değiştiremez.
 
@@ -108,7 +108,7 @@ durumu olacak ama sekme çubuğu sonradan yeniden dizilmesin diye şimdi tasarla
 ### B. İlk kurulum (kayıttan sonra, zorunlu, atlanamaz)
 
 > **GÜNCEL (23 Eylül 2026):** Kurulum yedi adımlı sihirbaza dönüştü. Bkz.
-> README → "Kurulum sihirbazı". Aşağıdaki liste ilk taslak.
+> docs/mimari.md → "Kurulum sihirbazı". Aşağıdaki liste ilk taslak.
 
 4. **Araç ekle** — araç adı, plaka (isteğe bağlı), **sahiplik biçimi** (4 seçenekli
    seçim: *Kendi aracım · Kiralık plaka · Kiralık araç · İşverenin aracı*),
